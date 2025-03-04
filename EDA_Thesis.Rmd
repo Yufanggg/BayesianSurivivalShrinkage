@@ -1,153 +1,20 @@
 ---
 title: "EDA_Thesis"
-author: "Yufang"
-date: "2025-02-05"
-output:
-  pdf_document: default
-  word_document: default
-  html_document:
-    df_print: paged
+author: "Yufang Wang"
+date: "2025-03-04"
+output: pdf_document
 ---
-# 1. Exploratory Data Anlysis
-
-## read in the data & clean the data with the same approach in Thei et al., 2024
-```{r, echo=FALSE, warning=FALSE, results='hide'}
+```{r, echo=TRUE}
 rm(list = ls())
 library(dplyr)
-library(survival)library(mstate)
-library(ggplot2)
-library(corrplot)
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code" )
-df <- readRDS("NOTR_DGF.rds")
-sort(colnames(df))
-```
-
-```{r, echo=FALSE}
-## INCLUSION & EXCLUSION CRITERIA
-df_using <- subset(df,Typeofdonor=='Deceased' 
-                      & Recipientage >17
-                      & Donorage >17
-                      & Number_of_transplantations==1
-                      & (Combinedtransplants=='LKi'
-                          | Combinedtransplants=='RKi') 
-                      # & PNF== 0
-                      # & is.na(Transatl) WHAT DOES THIS MEAN??
-                      # & PT_Earlydeath ==0
-                      # & !is.na(dDGF)
-                      & Year_Of_Tx > 2013
-                      & Year_Of_Tx < 2023)
-
-```
-
-# select the necessary variables
-```{r, echo=FALSE, results='hide'}
-variableName_df = read.csv(file = "../Data/codeboek2_.csv")
-variableName = variableName_df$Name_NOTR 
-variableName = if_else(variableName == "Initialweight", "Recipient_weight", variableName) # use the renamed name
-variableName = if_else(variableName == "Initialheight", "Recipient_height", variableName) # use the renamed name
-variableName = if_else(variableName == "Warmischaemicperiod1", "Warm_ischaemic_period_1", variableName) 
-variableName = if_else(variableName == "InitialColdischaemicperiod", "Cold_ischaemic_period", variableName) 
-# variableName = if_else(variableName == "Lowestcreatinine碌moll", "Lowestcreatinineµmoll", variableName) 
-
-variableName_using = variableName[nzchar(variableName)]
-variableName_using = variableName_using[!variableName_using %in% c("InitialPrimaryDisease", "InitialPrimaryDiseaserenine", "DonorHLAstring")]
-
-variableName_using = c(variableName_using, c("time", "status", "status2", "HLA_mismatch")) # including survival related variables
-df_using = df_using[variableName_using]
-
-head(df_using)
-str(df_using)
-```
-
-
-## replicate the visulized results
-```{r, echo=TRUE}
-sfall = survfit(Surv(time, status2 > 0) ~ 1, data = df_using)
-plot(sfall, lwd = 2)
-
-# cumulative incidences
-ci = Cuminc("time", "status2", data = df_using)
-head(ci)
-
-plot(ci$time, ci$CI.1, type = "s", lwd = 2, col = "blue", ylim = c(0, 0.5),
-     xlab = "Days since transplant", ylab = "Cumlative incidence")
-lines(ci$time, ci$CI.2, type = "s", lwd = 2, col = "red")
-legend("topleft", levels(df_using$status)[-1], lwd = 2, col = c("blue", "red"), bty = "n")
-```
-
-## summarize of data 1: to get the unqiue values for non-numeric & non-date variables 
-```{r, echo=TRUE}
-results <- data.frame(
-  Variable = character(),
-  LengthUniqueValues = integer(),
-  MissingObs = integer(),
-  UniqueValues = character()
-)
-
-# Loop through each column in the data frame
-for (var in colnames(df_using)) {
-  if (!is.numeric(df_using[[var]]) & !inherits(df_using[[var]], "Date")) {
-    # Convert unique values to a single string
-    unique_values_str <- paste(unique(df_using[[var]]), collapse = ", ")
-    
-    # Add the variable name, unique values, and number of unique values to the results data frame
-    results <- rbind(results, data.frame(
-      Variable = var,
-      LengthUniqueValues = length(unique(df_using[[var]])),
-      MissingObs = sum(is.na(df_using[[var]])),
-      UniqueValues = unique_values_str
-    ))
-  }
-}
-
-# Print the results data frame
-print(results)
-
-# joint non-complete cases
-sum(!complete.cases(df_using))
-sum(complete.cases(df_using))
-```
-
-## deal with missing data issues
-```{r, echo=TRUE}
-# set the missing InitialOnmachineindicator being an additional category
-df_using$InitialOnmachineindicator = if_else(is.na(df_using$InitialOnmachineindicator), "Unknown", df_using$InitialOnmachineindicator)
-
-# impute the missing Smoking data
-library(mice)
-methods = make.method(df_using)
-methods["Smoking"] = "pmm" # Predictive mean matching
-methods[setdiff(names(df_using), "Smoking")]
-# Perform the imputation with more iterations
-imputed_df_using <- mice(df_using, method = methods, m = 5, maxit = 100, seed = 500)
-
-# Check the imputed data
-summary(imputed_df_using)
-
-# Complete the dataset with the imputed values
-completed_df_ <- complete(imputed_df_using)
-
-# group the InitialPrimaryDiseaseET
-
-
-```
-
-
-### re-label/factorization variables which have 2 or three unique values
-```{r, echo=FALSE}
-df_using = df_using |>
-  mutate(Recipientsex = factor(Recipientsex, levels = c("Male","Female"), labels  = c("Male","Female")),
-         Donorsex = factor(Donorsex, levels = c("Female", "Male"), labels  = c("Female", "Male")),
-         Smoking = factor(Smoking, levels = c("Yes", "No"), labels  = c("Yes", "No")),
-         TypecadavericDBDDCD = factor(TypecadavericDBDDCD, levels = c("Donation after circulatory death", "Donation after brain death"), labels  = c("DCD", "DBD"))
-         )
+df_using <- readRDS("./preprocessed_NOTR_DGF.rds")
 ```
 
 ###  summarize of data 2: to get the variable description
 ```{r, echo=TRUE}
 # Create a correlation matrix
 cor_matrix <- cor(df_using[, sapply(df_using, is.numeric)])
-
+library(corrplot)
 # Plot the correlation matrix
 corrplot(cor_matrix, method = "color", type = "upper", 
          tl.col = "black", tl.srt = 45, 
@@ -160,7 +27,7 @@ results2 <- data.frame(
   sd_val = numeric()
 )
 
-
+library(ggplot2)
 # Function to create bar plots for factor columns
 create_barplot <- function(df, var) {
    ggplot(df, aes_string(x = var, fill = var)) +
@@ -188,14 +55,51 @@ for (var in colnames(df_using)) {
 print(results2)
 ```
 
+## check fothe missing data of numeric variables
+```{r, echo=TRUE}
+results <- data.frame(
+  Variable = character(),
+  LengthUniqueValues = integer(),
+  MissingObs = integer(),
+  UniqueValues = character()
+)
 
+# Loop through each column in the data frame
+for (var in colnames(df_using)) {
+  if (!is.numeric(df_using[[var]]) & !inherits(df_using[[var]], "Date")) {
+    # Convert unique values to a single string
+    unique_values_str <- paste(unique(df_using[[var]]), collapse = ", ")
+    
+    # Add the variable name, unique values, and number of unique values to the results data frame
+    results <- rbind(results, data.frame(
+      Variable = var,
+      LengthUniqueValues = length(unique(df_using[[var]])),
+      MissingObs = sum(is.na(df_using[[var]])),
+      UniqueValues = unique_values_str
+    ))
+  }
+  
+  else{
+     results <- rbind(results, data.frame(
+      Variable = var,
+      LengthUniqueValues = length(unique(df_using[[var]])),
+      MissingObs = sum(is.na(df_using[[var]])),
+      UniqueValues = unique_values_str
+    ))
+  }
+}
+
+# Print the results data frame
+print(results)
+```
 
 
 
 ## recensoring data because of not accounting for completing risks: only focusing on graft loss
 ```{r, echo=TRUE}
-df_using$status3 = ifelse(df_using$status == "graftloss", 1, 0)
-sf = survfit(Surv(time,status3) ~ 1, data=df_using)
+library(survival)
+df_using$status2 = ifelse(df_using$status == "graftloss", 1, 0)
+sf = survfit(Surv(time,status2) ~ 1, data=df_using)
 plot(sf$time, 1 - sf$surv, xlab = "Days in kidney transplation",
      ylab = "Cumulative distribution function", main = "The chance to experience graftloss before time t")
 ```
@@ -205,26 +109,19 @@ plot(sf$time, 1 - sf$surv, xlab = "Days in kidney transplation",
 create_EDA <- function(df, var){
   if (is.numeric(df[[var]])){
     print(var)
-    model <- coxph(Surv(time, status3) ~ pspline(df[[var]], df = 4), data = df)
+    model <- coxph(Surv(time, status2) ~ pspline(df[[var]], df = 4), data = df)
     termplot(model, term = 1, se = TRUE, transform.x = TRUE, partial.resid = TRUE,
              col.term = "blue", col.se = "red", xlabs = paste(var), 
              ylabs = paste("Parietal for Pspline (", var, ")"),
              main = paste("Effect of transformed", var, "on Hazard Function"))
   } else if (is.factor(df[[var]])){
     print(var)
-    model1 <- coxph(Surv(time, status3) ~ df[[var]], data = df)
+    model1 <- coxph(Surv(time, status2) ~ df[[var]], data = df)
     print(summary(model1))
   }
 }
 
-par(mfrow = c(3, 4))
-# Loop through each column in the data frame
-for (var in colnames(df_using)[c(-25, -26, -27, -28)]){
-  create_EDA(df_using, var)
+for (variable in colnames(df_using)){
+  create_EDA(df_using, var = variable)
 }
-```
-
-```{r, echo=TRUE}
-library(rstanarm)
-
 ```

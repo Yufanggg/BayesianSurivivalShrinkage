@@ -1,0 +1,261 @@
+---
+title: "EDA_Thesis"
+author: "Yufang"
+date: "2025-02-05"
+output:
+  pdf_document: default
+  word_document: default
+  html_document:
+    df_print: paged
+---
+# 1. Exploratory Data Anlysis
+
+## read in the data & clean the data with the same approach in Thei et al., 2024
+```{r, echo=FALSE, warning=FALSE, results='hide'}
+rm(list = ls())
+library(dplyr)
+library(survival)
+library(mstate)
+library(ggplot2)
+library(corrplot)
+setwd("G:/MasterThesis/Code" )
+df <- readRDS("./NOTR_DGF.rds")
+sort(colnames(df))
+```
+
+```{r, echo=FALSE}
+## INCLUSION & EXCLUSION CRITERIA
+df_using <- subset(df,Typeofdonor=='Deceased' 
+                      & Recipientage >17
+                      & Donorage >17
+                      & Number_of_transplantations==1
+                      & (Combinedtransplants=='LKi'
+                          | Combinedtransplants=='RKi') 
+                      # & PNF== 0
+                      # & is.na(Transatl) WHAT DOES THIS MEAN??
+                      # & PT_Earlydeath ==0
+                      # & !is.na(dDGF)
+                      & Year_Of_Tx > 2013
+                      & Year_Of_Tx < 2023)
+
+```
+
+# select the necessary variables
+```{r, echo=FALSE, results='hide'}
+variableName_df = read.csv(file = "../Data/codeboek2_.csv")
+variableName = variableName_df$Name_NOTR 
+variableName = if_else(variableName == "Initialweight", "Recipient_weight", variableName) # use the renamed name
+variableName = if_else(variableName == "Initialheight", "Recipient_height", variableName) # use the renamed name
+variableName = if_else(variableName == "Warmischaemicperiod1", "Warm_ischaemic_period_1", variableName) 
+variableName = if_else(variableName == "InitialColdischaemicperiod", "Cold_ischaemic_period", variableName) 
+variableName = if_else(variableName == "Lowestcreatinine碌moll", "", variableName)
+variableName_using = variableName[nzchar(variableName)]
+variableName_using = variableName_using[!variableName_using %in% c("InitialPrimaryDisease", 
+                                                                  "InitialPrimaryDiseaserenine",
+                                                                  "DonorHLAstring")]
+library(dplyr)
+variableName_using <- c(variableName_using, c("time", "status", "status2", "HLA_mismatch")) # including survival related variables
+df_using_ <- df_using |> select(variableName_using)
+df_using_$Lowestcreatinineµmoll <- df_using$Lowestcreatinineμmoll
+df_using <- df_using_
+head(df_using)
+str(df_using)
+
+variableName_using
+```
+
+
+## replicate the visulized results
+```{r, echo=TRUE}
+sfall = survfit(Surv(time, status2 > 0) ~ 1, data = df_using)
+plot(sfall, lwd = 2)
+
+# cumulative incidences
+ci = Cuminc("time", "status2", data = df_using)
+head(ci)
+
+plot(ci$time, ci$CI.1, type = "s", lwd = 2, col = "blue", ylim = c(0, 0.5),
+     xlab = "Days since transplant", ylab = "Cumlative incidence")
+lines(ci$time, ci$CI.2, type = "s", lwd = 2, col = "red")
+legend("topleft", levels(df_using$status)[-1], lwd = 2, col = c("blue", "red"), bty = "n")
+```
+
+## summarize of data 1: to get the unqiue values for non-numeric & non-date variables 
+```{r, echo=TRUE}
+results <- data.frame(
+  Variable = character(),
+  LengthUniqueValues = integer(),
+  MissingObs = integer(),
+  UniqueValues = character()
+)
+
+# Loop through each column in the data frame
+for (var in colnames(df_using)) {
+  if (!is.numeric(df_using[[var]]) & !inherits(df_using[[var]], "Date")) {
+    # Convert unique values to a single string
+    unique_values_str <- paste(unique(df_using[[var]]), collapse = ", ")
+    
+    # Add the variable name, unique values, and number of unique values to the results data frame
+    results <- rbind(results, data.frame(
+      Variable = var,
+      LengthUniqueValues = length(unique(df_using[[var]])),
+      MissingObs = sum(is.na(df_using[[var]])),
+      UniqueValues = unique_values_str
+    ))
+  }
+}
+
+# Print the results data frame
+print(results)
+
+# joint non-complete cases
+sum(!complete.cases(df_using))
+sum(complete.cases(df_using))
+```
+
+## deal with missing data issues
+```{r, echo=TRUE}
+# set the missing InitialOnmachineindicator being an additional category
+df_using$InitialOnmachineindicator = if_else(is.na(df_using$InitialOnmachineindicator), "Unknown", df_using$InitialOnmachineindicator)
+
+# set the datatype
+df_using[] <- lapply(df_using, function(x) if(is.character(x)) as.factor(x) else x)
+
+df_using <- df_using[, !(colnames(df_using) %in% c("Dateoftransplant", "status2"))]
+# impute the missing Smoking data
+library(mice)
+methods = make.method(df_using)
+methods["Smoking"] = "pmm" # Predictive mean matching
+methods[setdiff(names(df_using), "Smoking")] <- ""
+# Perform the imputation with more iterations in parallel
+imputed_df_using <- mice(df_using, method = methods, m = 5, maxit = 100, seed = 500)
+# imputed_df_using <- futuremice(df_using, method = methods, parallelseed = 1, m = 5, maxit = 100, seed = 500)
+
+# Complete the dataset with the imputed values
+completed_df_ <- complete(imputed_df_using)
+print(completed_df_)
+saveRDS(completed_df_, "imputed_NOTR_DGF.rds")
+```
+
+```{r, echo=TRUE}
+completed_df_ <- readRDS("./preprocessed_NOTR_DGF.rds")
+# # group the InitialPrimaryDiseaseET
+InitialPrimaryDiseaseET_group = read.csv("../Data/tx_all_primary disease.csv")
+head(InitialPrimaryDiseaseET_group)
+```
+
+```{r, echo=TRUE}
+Num_overlap <- 0
+for (InitialPrimaryDiseaseET in sort(unique(as.character(completed_df_$InitialPrimaryDiseaseET)))){
+  if (InitialPrimaryDiseaseET %in% colnames(InitialPrimaryDiseaseET_group)){
+    Num_overlap = Num_overlap + 1
+    print(InitialPrimaryDiseaseET)
+  }
+  else{
+    
+  }
+}
+Num_overlap
+library(dplyr)
+completed_df_ <- completed_df_ |> mutate(InitialPrimaryDiseaseET_regroup = case_when(
+  InitialPrimaryDiseaseET == "Amyloidosis" ~ "Other multisystem diseases",
+  InitialPrimaryDiseaseET == "Chronic renal failure - etiology uncertain"~ "Chronic renal failure; aetiology uncertain", #"Chronic.renal.failure...etiology.uncertain",
+  InitialPrimaryDiseaseET == "Congenital renal dysplasia with/without urinary tract malformation" ~ "Other congenital and hereditary kidney diseases", #"Congenital.renal.dysplasia.with.without.urinary.tract.malformation",
+  InitialPrimaryDiseaseET == "Congenital renal hypoplasia - Type unspecified" ~ "Other congenital and hereditary kidney diseases", #"Congenital.renal.hypoplasia...Type.unspecified",
+  InitialPrimaryDiseaseET == "Cortical or Tubular necrosis" ~  "Others", #"Cortical.or.Tubular.necrosis",
+  
+  
+  InitialPrimaryDiseaseET == "Cryoglobulinemic glomerulonephritis" ~ "Other multisystem diseases", #"Cryoglobulinemic.glomerulonephritis",
+  InitialPrimaryDiseaseET == "Cystic kidney disease - Other specified type" ~ "Cystic kidney diseases", #"Cystic.kidney.disease...Other.specified.type",
+  InitialPrimaryDiseaseET == "Cystic kidney disease - Type unspecified" ~ "Cystic kidney diseases", #"Cystic.kidney.disease...Type.unspecified", 
+  InitialPrimaryDiseaseET == "Cystinosis" ~ "Other congenital and hereditary kidney diseases", #"Cystinosis",
+  InitialPrimaryDiseaseET == "Diabetes Type I" ~ "Diabetes Mellitus", #"Diabetes.Type.I",
+  
+  
+  InitialPrimaryDiseaseET == "Diabetes Type II" ~ "Diabetes Mellitus", # "Diabetes.Type.II", 
+  InitialPrimaryDiseaseET == "Focal segmental glomerulosclerosis with nephrotic syndrome in adults" ~ "Glomerulonephritis", #"Focal.segmental.glomerulosclerosis.with.nephrotic.syndrome.in.adults", 
+  InitialPrimaryDiseaseET == "Focal segmental glomerulosclerosis with nephrotic syndrome in children" ~ "Glomerulonephritis", #"Focal.segmental.glomerulosclerosis.with.nephrotic.syndrome.in.children", 
+  InitialPrimaryDiseaseET == "Glomerulonephritis - histologically examined" ~ "Glomerulonephritis", 
+  #"Glomerulonephritis...histologically.examined", 
+  InitialPrimaryDiseaseET == "Glomerulonephritis - histologically not examined" ~ "Glomerulonephritis", #"Glomerulonephritis...histologically.not.examined",
+  
+  
+  InitialPrimaryDiseaseET == "Goodpasture's syndrome" ~ "Other multisystem diseases", #"Goodpasture.s.syndrome", 
+  InitialPrimaryDiseaseET == "Gout nephropathy (urate)" ~ "Others", #"Gout.nephropathy..urate.", 
+  InitialPrimaryDiseaseET == "Hemolytic Uremic Syndrome including Moschcowitz syndrome" ~ "Other multisystem diseases", #"Hemolytic.Uremic.Syndrome.including.Moschcowitz.syndrome", 
+  InitialPrimaryDiseaseET == "Henoch-Schonlein Purpura" ~ "Other multisystem diseases", #"Henoch.Schonlein.Purpura", 
+  InitialPrimaryDiseaseET == "Hereditary nephritis with nerve deafness (Alport's syndrome)" ~ "Other congenital and hereditary kidney diseases", #"Hereditary.nephritis.with.nerve.deafness..Alport.s.syndrome.", 
+  
+  
+  InitialPrimaryDiseaseET == "Hereditary Nephropathy - Other" ~ "Other congenital and hereditary kidney diseases", #"Hereditary.Nephropathy...Other", 
+  InitialPrimaryDiseaseET == "Hereditary/Familial nephropathy - Type unspecified" ~ "Other congenital and hereditary kidney diseases", #"Hereditary.Familial.nephropathy...Type.unspecified",
+  InitialPrimaryDiseaseET ==  "IgA nephropathy (proven by immunofluorescence)" ~ "Glomerulonephritis", #"IgA.nephropathy..proven.by.immunofluorescence." , 
+  InitialPrimaryDiseaseET == "Iscemic renal disease / cholesterol embolism" ~ "Renal vascular disease, excluding vasculitis", #"Iscemic.renal.disease...cholesterol.embolism", 
+  InitialPrimaryDiseaseET ==  "Kidney tumor" ~ "Others", # "Kidney.tumor", 
+  
+  
+  InitialPrimaryDiseaseET == "Lupus Erythematosus" ~ "Other multisystem diseases", #"Lupus.Erythematosus", 
+  InitialPrimaryDiseaseET == "Membrano-proliferative glomerulonephritis - Type I" ~ "Glomerulonephritis", #"Membrano.proliferative.glomerulonephritis...Type.I", 
+  InitialPrimaryDiseaseET == "Membranous nephropathy" ~ "Glomerulonephritis", #"Membranous.nephropathy", 
+  InitialPrimaryDiseaseET == "Multisystem disease - Other specified type" ~ "Other multisystem diseases", #"Multisystem.disease...Other.specified.type", 
+  InitialPrimaryDiseaseET == "Myelomatosis - Light chain deposit disease" ~ "Other multisystem diseases", #"Myelomatosis...Light.chain.deposit.disease", #"Myelomatosis...Light.chain.deposit.disease", 
+  
+  
+  InitialPrimaryDiseaseET == "Nephropathy caused by other specific drug" ~ "Interstitial nephritis, including pyelonephritis, drug induced nephropathy and urolithiasis", # "Nephropathy.caused.by.other.specific.drug",
+  InitialPrimaryDiseaseET == "Nephropathy due to Cisplatinum" ~ "Interstitial nephritis, including pyelonephritis, drug induced nephropathy and urolithiasis", #"Nephropathy.due.to.Cisplatinum", 
+  InitialPrimaryDiseaseET == "Nephropathy due to Cyclosporin A" ~ "Interstitial nephritis, including pyelonephritis, drug induced nephropathy and urolithiasis", #"Nephropathy.due.to.Cyclosporin.A", 
+  InitialPrimaryDiseaseET == "Oligomeganephronic hypoplasia" ~ "Other congenital and hereditary kidney diseases", #"Oligomeganephronic.hypoplasia", 
+  InitialPrimaryDiseaseET == "Other identified renal disorders - Specify" ~ "Others", #"Other.identified.renal.disorders...Specify", #*****
+  
+  
+  InitialPrimaryDiseaseET == "Polycystic Kidneys - Adult type (dominant)" ~ "Cystic kidney diseases", # "Polycystic.Kidneys...Adult.type..dominant.", 
+  InitialPrimaryDiseaseET == "Primary oxalosis" ~ "Other congenital and hereditary kidney diseases", # "Primary.oxalosis", 
+  InitialPrimaryDiseaseET == "Pyelonephritis/Interstitial nephritis - Acquired obstructive uropathy" ~ "Interstitial nephritis, including pyelonephritis, drug induced nephropathy and urolithiasis", #"Pyelonephritis.Interstitial.nephritis...Acquired.obstructive.uropathy", 
+  InitialPrimaryDiseaseET == "Pyelonephritis/Interstitial nephritis - Cause not specified" ~ "Interstitial nephritis, including pyelonephritis, drug induced nephropathy and urolithiasis", #"Pyelonephritis.Interstitial.nephritis...Cause.not.specified",  
+  InitialPrimaryDiseaseET == "Pyelonephritis/Interstitial nephritis - Congenital obstructive uropathy" ~ "Interstitial nephritis, including pyelonephritis, drug induced nephropathy and urolithiasis", #"Pyelonephritis.Interstitial.nephritis...Congenital.obstructive.uropathy",
+  
+  
+  InitialPrimaryDiseaseET == "Pyelonephritis/Interstitial nephritis - Neurogenic bladder" ~ "Interstitial nephritis, including pyelonephritis, drug induced nephropathy and urolithiasis", #"Pyelonephritis.Interstitial.nephritis...Neurogenic.bladder",
+  
+  
+  InitialPrimaryDiseaseET == "Pyelonephritis/Interstitial nephritis - Other cause" ~ "Interstitial nephritis, including pyelonephritis, drug induced nephropathy and urolithiasis", # "Pyelonephritis.Interstitial.nephritis...Other.cause",
+  InitialPrimaryDiseaseET == "Pyelonephritis/Interstitial nephritis - Urolithiasis" ~ "Interstitial nephritis, including pyelonephritis, drug induced nephropathy and urolithiasis", #"Pyelonephritis.Interstitial.nephritis...Urolithiasis", 
+  InitialPrimaryDiseaseET == "Pyelonephritis/Interstitial nephritis - VU reflux without obstruction" ~ "Interstitial nephritis, including pyelonephritis, drug induced nephropathy and urolithiasis", #"Pyelonephritis.Interstitial.nephritis...VU.reflux.without.obstruction", 
+  InitialPrimaryDiseaseET == "Rapidly progressive Glomerulonephritis without systemic disease" ~ "Glomerulonephritis", #"Rapidly.progressive.Glomerulonephritis.without.systemic.disease",
+  InitialPrimaryDiseaseET == "Renal vascular disease - Classified" ~ "Renal vascular disease, excluding vasculitis", # "Renal.vascular.disease...Classified", 
+  
+  
+  InitialPrimaryDiseaseET == "Renal vascular disease - Type unspecified" ~  "Renal vascular disease, excluding vasculitis",#"Renal.vascular.disease...Type.unspecified", 
+  InitialPrimaryDiseaseET == "Renal vascular disease due to hypertension" ~ "Renal vascular disease, excluding vasculitis", #"Renal.vascular.disease.due.to.hypertension", 
+  InitialPrimaryDiseaseET == "Renal vascular disease due to malignant hypertension" ~ "Renal vascular disease, excluding vasculitis", #"Renal.vascular.disease.due.to.malignant.hypertension", 
+  InitialPrimaryDiseaseET == "Renal vascular disease due to polyarteritis" ~ "Other multisystem diseases", # "Renal.vascular.disease.due.to.polyarteritis", 
+  InitialPrimaryDiseaseET == "Systemic sclerosis (scleroderma)" ~ "Other multisystem diseases", #"Systemic.sclerosis..scleroderma.", 
+  
+  
+  InitialPrimaryDiseaseET == "Traumatic or Surgical loss of kidney" ~ "Others", #"Traumatic.or.Surgical.loss.of.kidney", 
+  InitialPrimaryDiseaseET == "Tuberculosis" ~ "Others", #"Tuberculosis",
+  InitialPrimaryDiseaseET == "Tubulo-interstitial nephritis (not Pyelonephritis)" ~ "Interstitial nephritis, including pyelonephritis, drug induced nephropathy and urolithiasis", # "Tubulo.interstitial.nephritis..not.Pyelonephritis.", 
+  InitialPrimaryDiseaseET == "Wegener's granulomatosis" ~ "Other multisystem diseases",#"Wegener.s.granulomatosis",
+  InitialPrimaryDiseaseET == "Nephrocalcinosis and Hypercalcemic Nephropathy" ~ "Others"#"Nephrocalcinosis.and.Hypercalcemic.Nephropathy"
+  
+))
+
+
+df_using <- subset(completed_df_, select = -InitialPrimaryDiseaseET)
+df_using$InitialPrimaryDiseaseET_regroup = factor(df_using$InitialPrimaryDiseaseET_regroup)
+str(df_using)
+```
+
+### re-label/factorization variables which have 2 or three unique values
+```{r, echo=FALSE}
+df_using = df_using |>
+  mutate(Recipientsex = factor(Recipientsex, levels = c("Male","Female"), labels  = c("Male","Female")),
+         Donorsex = factor(Donorsex, levels = c("Female", "Male"), labels  = c("Female", "Male")),
+         Smoking = factor(Smoking, levels = c("Yes", "No"), labels  = c("Yes", "No")),
+         TypecadavericDBDDCD = factor(TypecadavericDBDDCD, levels = c("Donation after circulatory death", "Donation after brain death"), labels  = c("DCD", "DBD"))
+         )
+
+## Done with the data cleaning. on to the creatinine imputation
+saveRDS(completed_df_, "preprocessed_NOTR_DGF.rds")
+```
+
