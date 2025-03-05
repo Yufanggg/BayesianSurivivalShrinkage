@@ -171,6 +171,7 @@ print(Output2)
 
 ## STEP 4.1: estimate the baseline function
 ```{r, echo=TRUE}
+# Exponential distribution
 
 ```
 
