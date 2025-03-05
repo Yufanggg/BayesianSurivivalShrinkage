@@ -86,8 +86,8 @@ Bayesian_Survival <- function(stan_data, baseline = "PH", niter = 10000, nwarmup
   model {
     lambda ~ lognormal(0, 1); // prior
     beta ~ normal(0, 2); // prior
-    
-    target += exponential_lpdf(t | lambda * exp(x * beta));
+    t ~ exponential(lambda * exp(x * beta));
+    // target += exponential_lpdf(t | lambda * exp(x * beta));
     target += exponential_lccdf(t_cens | lambda * exp(x_cens * beta)); //log complementary cumulative distribution function (log-CCDF) for an exponential distribution
 
   }
@@ -115,8 +115,8 @@ Bayesian_Survival <- function(stan_data, baseline = "PH", niter = 10000, nwarmup
     shape ~ lognormal(0, 1); // prior
     scale ~ lognormal(0, 1); // prior
     beta ~ normal(0, 2); // prior
-    t ~ weibull(shape, scale * exp(x * beta)); 
-    target += weibull_lccdf(t_cens | shape, scale * exp(x_cens * beta)); //log complementary cumulative distribution function (log-CCDF) for an weibull distribution
+    t ~ weibull(shape, scale / exp(x * beta)); 
+    target += weibull_lccdf(t_cens | shape, scale/exp(x_cens * beta)); //log complementary cumulative distribution function (log-CCDF) for an weibull distribution
 
   }
 "
@@ -138,9 +138,54 @@ Bayesian_Survival <- function(stan_data, baseline = "PH", niter = 10000, nwarmup
   
 }
 
-Output <- Bayesian_Survival(stan_data = stan_data, baseline = "weibull")
+Output <- Bayesian_Survival(stan_data = stan_data, baseline = "PH") # The weibull and Gompertz simulation was not correctly implemented yet.
 print(Output)
 ```
 ## Conclusion for STEP 3: the betas are correctly estimated via bayesian cox regression, meaning that bayesian cox regression was correctly defined.
 
+# STEP 4: Do this on the kidney transplant real-world data
+```{r, echo=TRUE}
+df <- readRDS("./preprocessed_NOTR_DGF.rds")
+df_using <- df[, c("Recipientsex", "Donorage", "time", "status")]
+df_using$status2 <- ifelse(df_using$status == "graftloss", 1, 0)
 
+# print(sum(!complete.cases(df_using)))
+# df_using <- df_using[complete.cases(df_using),]
+Design_matrix = model.matrix(~ Recipientsex*Donorage, data = df_using)
+stan_data_kidney <- list(
+  N = sum(df_using$status2 == 1),
+  t = df_using$time[df_using$status2 == 1],
+  N_cens = sum(df_using$status2 == 0),
+  t_cens = runif(sum(df_using$status2 == 0), 3, 6),
+  K = 3,
+  x = as.matrix(Design_matrix[df_using$status2 == 1,-1]),
+  x_cens = as.matrix(Design_matrix[df_using$status2 == 0,-1]),
+  covariate = Design_matrix,
+  obstime = df_using$time,
+  status = df_using$status2
+)
+
+Output2 <- Bayesian_Survival(stan_data = stan_data_kidney, baseline = "PH") 
+print(Output2)
+```
+
+## STEP 4.1: estimate the baseline function
+```{r, echo=TRUE}
+
+```
+
+## STEP 4.2: Extract the prediction
+```{r, echo=TRUE}
+# Based on predictive power for survival models
+install.packages("Hmisc")
+library(Hmisc)
+
+# Example data
+time <- c(5, 8, 12, 15, 20)
+status <- c(1, 0, 1, 1, 0)
+predicted <- c(0.2, 0.4, 0.6, 0.8, 0.3)
+
+# Calculate Somers' D
+result <- rcorr.cens(predicted, Surv(time, status))
+print(result)
+```
