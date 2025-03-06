@@ -13,6 +13,7 @@ rm(list = ls())
 library(rstan)
 library(readr)
 library(survival)
+library(splines2)
 # Set seed for reproducibility
 set.seed(42)
 source("./SurvivalDataGenerator.R")
@@ -121,13 +122,14 @@ print(Output2)
 ## STEP 4.1: estimate the baseline function
 ```{r, echo=TRUE}
 # Exponential baseline distribution from a bayesian perspective
-Bayesian_Survival_baseline <- function(stan_data, assumption = "exponential",
+Bayesian_Survival_baseline <- function(stan_data, assumption = "exponential", school = "Bayesian", 
                               niter = 10000, 
                               nwarmup = 1000,
                               thin = 10,
                               chains = 1) {
-  if (assumption == "exponential"){
-    code_bayesian_model <- "
+  if (school == "Bayesian") {
+    if (assumption == "exponential") {
+      code_bayesian_model <- "
     data {
       int <lower=0> K; //num covariates
       int <lower=0> N; // num uncensored obs
@@ -138,129 +140,137 @@ Bayesian_Survival_baseline <- function(stan_data, assumption = "exponential",
       int N_cens; // num censored obs
       vector[N_cens] t_cens; // censoring time
       matrix[N_cens, K] x_cens; // covariates for censored obs
-      
+
       vector[K] Beta; // estimated coefficients from PH model
     }
-  
+
     parameters {
     real<lower = 0> lambda; // parameters in expoential assumption
     }
     model {
     // prior
     lambda ~ lognormal(0, 1);
-    
+
     // log-likelihood, represented by [target]
-    
+
     for (i in 1:N){
-      target += exponential_lpdf(t[i] | lambda * exp(x*Beta))
+      target += exponential_lpdf(t[i] | lambda * exp(x*Beta));
     } // uncensored data log(f(t))
-    
+
     for (i in 1:N_cens){
-       target += exponential_lccdf(t_cens[i] | lambda * exp(x*Beta))
+       target += exponential_lccdf(t_cens[i] | lambda * exp(x*Beta));
     } // right censored data log(S(t))
-    
+
     // target + = exponential_lpdf(t | lambda * exp(x * beta)) // the same with  t ~ exponential(lambda * exp(x*Beta));
     // target += exponential_lccdf(t_cens | lambda * exp(x_cens * Beta));
-    
+
     }
     "
-  }
-  
-  else if (assumption == "weibull") {
-    code_bayesian_model <- "
-    data {
-      int <lower=0> K; //num covariates
-      int <lower=0> N; // num uncensored obs
-
-      vector[N] t; // event time (non-strict decreasing)
-      matrix[N, K] x; // covariates for uncensored obs
-
-      int N_cens; // num censored obs
-      vector[N_cens] t_cens; // censoring time
-      matrix[N_cens, K] x_cens; // covariates for censored obs
-      
-      vector[K] Beta; // estimated coefficients from PH model
-  }
-  parameters {
-    real<lower = 0> shape; // parameters in weibull assumption
-    real<lower = 0> scale; // parameters in weibull assumption
-  }
-  model {
-    // Priors
-    shape ~ lognormal(0, 1); 
-    scale ~ lognorma(0, 1); 
+    }
     
-    // log-likelihood, represented by [target]
-    for (i in 1:N){
-      target += weibull_lpdf(t[i] | alpha, sigma/exp(x*Beta/alpha))
-    } // uncensored data log(f(t))
-    
-    for (i in 1:N_cens){
-       target += weibull_lccdf(t_cens[i] | alpha, sigma/exp(x*Beta/alpha))
-    } // right censored data log(S(t)) //log complementary cumulative distribution function (log-CCDF) for an weibull distribution
+    else if (assumption == "weibull") {
+      code_bayesian_model <- "
+      data {
+        int <lower=0> K; //num covariates
+        int <lower=0> N; // num uncensored obs
+
+        vector[N] t; // event time (non-strict decreasing)
+        matrix[N, K] x; // covariates for uncensored obs
+
+        int N_cens; // num censored obs
+        vector[N_cens] t_cens; // censoring time
+        matrix[N_cens, K] x_cens; // covariates for censored obs
+
+        vector[K] Beta; // estimated coefficients from PH model
+      }
+      parameters {
+        real<lower = 1e-10> alpha; // parameters in weibull assumption
+        real<lower = 0> sigma; // parameters in weibull assumption
+       }
+     model {
+       // Priors
+       alpha ~ lognormal(0, 1);
+       sigma ~ lognormal(0, 1);
+
+       // log-likelihood, represented by [target]
+       for (i in 1:N){
+         target += weibull_lpdf(t[i] | alpha, sigma/exp(x*Beta/alpha)); // weibull_lpdf() is at log scale
+        } // uncensored data log(f(t))
+
+       for (i in 1:N_cens){
+          target += weibull_lccdf(t_cens[i] | alpha, sigma/exp(x_cens*Beta/alpha)); // weibull_lccdf() is at log scale
+       } // right censored data log(S(t)) //log complementary cumulative distribution function (log-CCDF) for an weibull distribution
   }
 "
-  }
-  
-  else {
-   message("We utilized B-splines to estimate the baseline cumulative hazard function.")
-    code_bayesian_model <- "
-    function{
-    real bsplines(real input){
-       real output;
-       output = ;
-       return output;
-       }
     }
     
-    data {
-      int num_data;
-      int num_basis;
-      vector[num_data] Y;
-      vector[num_data] X;
-      matrix[num_basis, num_data] B;
-    }
-    
-    parameter {
-    row_vector[num_basis] a_raw;
-    real a0; 
-    real<lower=0> sigma;
-    real<lower=0> tau;
-    }
-    
-    model {
-    // Priors
-    
-    // likelihood
-    
-    }
-    
+    else if (assumption == "bSplines") {
+      message("We utilized B-splines to estimate the baseline cumulative hazard function.")
+      bSpline_basis <- bSpline(x, knots = knots, degree = 3, intercept = FALSE) # The B-spline basis is calculated using the method implemented in the splines2 package
+      # Compute the derivative of the B-spline basis
+      bSpline_derivative <- deriv(bs_basis)
+      
+      code_bayesian_model <- "
+      data {
+        int<lower=0> N;
+        int<lower=0> K;
+        matrix[N, K] bs_basis
+        
+        int <lower=0> K; //num covariates
+        int <lower=0> N; // num uncensored obs
+
+        vector[N] t; // event time (non-strict decreasing)
+        matrix[N, K] x; // covariates for uncensored obs
+
+        int N_cens; // num censored obs
+        vector[N_cens] t_cens; // censoring time
+        matrix[N_cens, K] x_cens; // covariates for censored obs
+
+        vector[K] Beta; // estimated coefficients from PH model
+      }
+      parameter {
+        vector[K] cofficients;
+        real<lower=0> sigma;
+      } 
+        
+      model {
+      // Priors
+      cofficients ~ normal(0, 1)
+      sigma ~ lognormal(0, 1)
+      
+      // log-likelihood, represented by [target]
+      for (i in 1:N){
+         target += bSpline_basis*cofficients * exp(x * Beta) + log(cofficients) + x*Beta + log(bSpline_derivative)
+         }; // uncensored data log(f(t))
+        
+      for (i in 1:N_cens){
+          target -= bSpline_basis* cofficients * exp(x_cens * Beta);  \\ at log scale
+      } // right censored data log(S(t)) //log complementary cumulative distribution function (log-CCDF) for an weibull distribution
+          }
     "
+    }
     
     
-  }
-  
-  
-  
-  # compile the model
-  bayesian_model <- stan_model(model_name = "bayesian_model", model_code = code_bayesian_model)
-  
-  # Model fitting and summary
-  bayesian_model_fit <- suppressWarnings(
-    sampling(
-      bayesian_model,
-      data = stan_data,
-      iter = niter,
-      warmup = nwarmup,
-      thin = 10,
-      chain = 1
+    
+    # compile the model
+    bayesian_model <- stan_model(model_name = "bayesian_model", model_code = code_bayesian_model)
+    
+    # Model fitting and summary
+    bayesian_model_fit <- suppressWarnings(
+      sampling(
+        bayesian_model,
+        data = stan_data,
+        iter = niter,
+        warmup = nwarmup,
+        thin = 10,
+        chain = 1
+      )
     )
-  )
-  
-  # Summary of the fit
-  output <- summary(bayesian_model_fit)$summary
-  return(output)
-  
+    
+    # Summary of the fit
+    output <- summary(bayesian_model_fit)$summary
+    return(output)
+  }
 }
 
 stan_data_kidney_basline <- list(
