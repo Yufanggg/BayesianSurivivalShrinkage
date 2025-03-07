@@ -93,32 +93,6 @@ print(Output)
 ```
 ## Conclusion for STEP 3: the betas are correctly estimated via bayesian cox regression, meaning that bayesian cox regression was correctly defined.
 
-# STEP 4: Do this on the kidney transplant real-world data
-```{r, echo=TRUE}
-df <- readRDS("./preprocessed_NOTR_DGF.rds")
-df_using <- df[, c("Recipientsex", "Donorage", "time", "status")]
-df_using$status2 <- ifelse(df_using$status == "graftloss", 1, 0)
-
-# print(sum(!complete.cases(df_using)))
-# df_using <- df_using[complete.cases(df_using),]
-Design_matrix = model.matrix(~ Recipientsex*Donorage, data = df_using)
-stan_data_kidney <- list(
-  N = sum(df_using$status2 == 1),
-  t = df_using$time[df_using$status2 == 1],
-  N_cens = sum(df_using$status2 == 0),
-  t_cens = runif(sum(df_using$status2 == 0), 3, 6),
-  K = 3,
-  x = as.matrix(Design_matrix[df_using$status2 == 1,-1]),
-  x_cens = as.matrix(Design_matrix[df_using$status2 == 0,-1]),
-  covariate = Design_matrix,
-  obstime = df_using$time,
-  status = df_using$status2
-)
-
-Output2 <- Bayesian_Survival_PH(stan_data = stan_data_kidney) 
-print(Output2)
-```
-
 ## STEP 4.1: estimate the baseline function
 ```{r, echo=TRUE}
 # Exponential baseline distribution from a bayesian perspective
@@ -184,7 +158,7 @@ Bayesian_Survival_baseline <- function(stan_data, assumption = "exponential", sc
         vector[K] Beta; // estimated coefficients from PH model
       }
       parameters {
-        real<lower = 1e-10> alpha; // parameters in weibull assumption
+        real<lower = 0> alpha; // parameters in weibull assumption
         real<lower = 0> sigma; // parameters in weibull assumption
        }
      model {
@@ -273,6 +247,26 @@ Bayesian_Survival_baseline <- function(stan_data, assumption = "exponential", sc
   }
 }
 
+stan_data_basline <- list(
+  N = stan_data$N,
+  t = stan_data$t,
+  N_cens = stan_data$N_cens,
+  t_cens = stan_data$t_cens,
+  K = stan_data$K,
+  x = stan_data$x,
+  x_cens = stan_data$x_cens, # # Ensure Beta is a vector of length 1
+  Beta = array(0.5, dim = c(1)),
+  covariate = stan_data$covariate,
+  obstime = stan_data$obstime,
+  status = stan_data$status
+)
+
+Output3 <- Bayesian_Survival_baseline(stan_data = stan_data_basline, assumption = "weibull") 
+print(Output3)
+
+```
+
+```{r, echo=TRUE}
 stan_data_kidney_basline <- list(
   N = sum(df_using$status2 == 1),
   t = df_using$time[df_using$status2 == 1],
@@ -289,6 +283,32 @@ stan_data_kidney_basline <- list(
 
 Output3 <- Bayesian_Survival_baseline(stan_data = stan_data_kidney_basline, assumption = "exponential") 
 print(Output3)
+```
+
+# STEP 4: Do this on the kidney transplant real-world data
+```{r, echo=TRUE}
+df <- readRDS("./preprocessed_NOTR_DGF.rds")
+df_using <- df[, c("Recipientsex", "Donorage", "time", "status")]
+df_using$status2 <- ifelse(df_using$status == "graftloss", 1, 0)
+
+# print(sum(!complete.cases(df_using)))
+# df_using <- df_using[complete.cases(df_using),]
+Design_matrix = model.matrix(~ Recipientsex*Donorage, data = df_using)
+stan_data_kidney <- list(
+  N = sum(df_using$status2 == 1),
+  t = df_using$time[df_using$status2 == 1],
+  N_cens = sum(df_using$status2 == 0),
+  t_cens = runif(sum(df_using$status2 == 0), 3, 6),
+  K = 3,
+  x = as.matrix(Design_matrix[df_using$status2 == 1,-1]),
+  x_cens = as.matrix(Design_matrix[df_using$status2 == 0,-1]),
+  covariate = Design_matrix,
+  obstime = df_using$time,
+  status = df_using$status2
+)
+
+Output2 <- Bayesian_Survival_PH(stan_data = stan_data_kidney) 
+print(Output2)
 ```
 
 ## STEP 4.2: Extract the prediction
