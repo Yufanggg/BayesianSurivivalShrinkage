@@ -31,15 +31,16 @@ SurvivalDataGenerator = function(n_samples, Betas, Design_matrix, BaselinePara, 
   
   stan_data <- list(
     N = sum(status == 1),
-    t = survival_time[status == 1],
+    t = obstime[status == 1],
     N_cens = sum(status == 0),
-    t_cens = censtime[status == 0], # Censoring time used in the simulation
+    t_cens = obstime[status == 0], # Censoring time used in the simulation
     K = dim(Design_matrix)[2], # number of covariates,
     x = as.matrix(Design_matrix[status == 1,]),
     x_cens = as.matrix(Design_matrix[status == 0,]),
     covariate = Design_matrix,
     obstime = obstime,
-    status = status
+    status = status,
+    Beta = Betas
   )
   return (stan_data)
 }

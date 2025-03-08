@@ -127,13 +127,9 @@ Bayesian_Survival_baseline <- function(stan_data, assumption = "exponential", sc
 
     // log-likelihood, represented by [target]
 
-    for (i in 1:N){
-      target += exponential_lpdf(t[i] | lambda * exp(x*Beta));
-    } // uncensored data log(f(t))
+    target += exponential_lpdf(t | lambda * exp(x*Beta)); // uncensored data log(f(t))
 
-    for (i in 1:N_cens){
-       target += exponential_lccdf(t_cens[i] | lambda * exp(x*Beta));
-    } // right censored data log(S(t))
+    target += exponential_lccdf(t_cens | lambda * exp(x*Beta)); // right censored data log(S(t))
 
     // target + = exponential_lpdf(t | lambda * exp(x * beta)) // the same with  t ~ exponential(lambda * exp(x*Beta));
     // target += exponential_lccdf(t_cens | lambda * exp(x_cens * Beta));
@@ -167,29 +163,27 @@ Bayesian_Survival_baseline <- function(stan_data, assumption = "exponential", sc
        sigma ~ lognormal(0, 1);
 
        // log-likelihood, represented by [target]
-       for (i in 1:N){
-         target += weibull_lpdf(t[i] | alpha, sigma/exp(x*Beta/alpha)); // weibull_lpdf() is at log scale
-        } // uncensored data log(f(t))
-
-       for (i in 1:N_cens){
-          target += weibull_lccdf(t_cens[i] | alpha, sigma/exp(x_cens*Beta/alpha)); // weibull_lccdf() is at log scale
-       } // right censored data log(S(t)) //log complementary cumulative distribution function (log-CCDF) for an weibull distribution
+       target += weibull_lpdf(t | alpha, sigma/exp(x*Beta/alpha)); // weibull_lpdf() is at log scale // uncensored data log(f(t))
+       target += weibull_lccdf(t_cens | alpha, sigma/exp(x_cens*Beta/alpha)); // weibull_lccdf() is at log scale  // right censored data log(S(t)) //log complementary cumulative distribution function (log-CCDF) for an weibull distribution
   }
 "
     }
     
     else if (assumption == "bSplines") {
       message("We utilized B-splines to estimate the baseline cumulative hazard function.")
-      bSpline_basis <- bSpline(x, knots = knots, degree = 3, intercept = FALSE) # The B-spline basis is calculated using the method implemented in the splines2 package
+      time_combined <- sort(unique(c(stan_data_basline$t, stan_data_basline$t_cens)))
+      notes = seq(runif(5, min(time_combined), max(time_combined)))
+      bSpline_basis <- bSpline(time_combined, knots = notes, degree = 3, intercept = FALSE) # The B-spline basis is calculated using the method implemented in the splines2 package
+
       # Compute the derivative of the B-spline basis
-      bSpline_derivative <- deriv(bs_basis)
+      bSpline_derivative <- deriv(bSpline_basis)
+      
+      # Out the corresponding information in stan data
+      stan_data_basline$bSpline_basis <- bSpline_basis
+      stan_data_basline$bSpline_derivative <- bSpline_derivative
       
       code_bayesian_model <- "
       data {
-        int<lower=0> N;
-        int<lower=0> K;
-        matrix[N, K] bs_basis
-        
         int <lower=0> K; //num covariates
         int <lower=0> N; // num uncensored obs
 
@@ -201,26 +195,26 @@ Bayesian_Survival_baseline <- function(stan_data, assumption = "exponential", sc
         matrix[N_cens, K] x_cens; // covariates for censored obs
 
         vector[K] Beta; // estimated coefficients from PH model
+        
+        matrix[N + N_cens, 8] bSpline_basis;
+        matrix[N + N_cens, 8] bSpline_derivative;
       }
-      parameter {
-        vector[K] cofficients;
-        real<lower=0> sigma;
+      
+      parameters {
+        vector[K] coefficients;
       } 
         
       model {
       // Priors
-      cofficients ~ normal(0, 1)
-      sigma ~ lognormal(0, 1)
+      for (i in 1:N){
+        coefficients[i] ~ normal(0, 1);
+      }
       
       // log-likelihood, represented by [target]
-      for (i in 1:N){
-         target += bSpline_basis*cofficients * exp(x * Beta) + log(cofficients) + x*Beta + log(bSpline_derivative)
-         }; // uncensored data log(f(t))
+      target += (-bSpline_basis*coefficients * exp(x * Beta)) + x * Beta + log(coefficients) + log(bSpline_derivative) ; // uncensored data log(f(t)), -H(t) = -bSpline_basis*cofficients * exp(x * Beta)
         
-      for (i in 1:N_cens){
-          target -= bSpline_basis* cofficients * exp(x_cens * Beta);  \\ at log scale
-      } // right censored data log(S(t)) //log complementary cumulative distribution function (log-CCDF) for an weibull distribution
-          }
+      target += -bSpline_basis* coefficients * exp(x_cens * Beta);  // at log scale,  right censored data log(S(t)),  log(S(t)) = -H(t)
+      }
     "
     }
     
@@ -261,9 +255,8 @@ stan_data_basline <- list(
   status = stan_data$status
 )
 
-Output3 <- Bayesian_Survival_baseline(stan_data = stan_data_basline, assumption = "weibull") 
+Output3 <- Bayesian_Survival_baseline(stan_data = stan_data_basline, assumption = "bSplines") #exponential, weibull,  bSplines
 print(Output3)
-
 ```
 
 ```{r, echo=TRUE}
@@ -281,7 +274,7 @@ stan_data_kidney_basline <- list(
   status = df_using$status2
 )
 
-Output3 <- Bayesian_Survival_baseline(stan_data = stan_data_kidney_basline, assumption = "exponential") 
+Output3 <- Bayesian_Survival_baseline(stan_data = stan_data_kidney_basline, assumption = "bSplines") 
 print(Output3)
 ```
 
