@@ -182,8 +182,7 @@ Bayesian_Survival_baseline <- function(stan_data_basline, assumption = "exponent
       bSpline_basis_time <- bSpline_basis[indices_time, ]
       
       # Out the corresponding information in stan data
-      stan_data_basline$bSpline_basis_t <- bSpline_basis_time
-      stan_data_basline$bSpline_basis_t_cens <- bSpline_basis_time_cens
+      stan_data_basline$bSpline_basis <- bSpline_basis
       stan_data_basline$M = length(time_combined)
       stan_data_basline$uniqueT = time_combined
       stan_data_basline$O = length(time_)
@@ -193,42 +192,53 @@ Bayesian_Survival_baseline <- function(stan_data_basline, assumption = "exponent
       
       code_bayesian_model <- "
       functions {
-        real gauss_kronrod_quad(real[] locat, real[] weights, real Ti, vector T, matrix bSpline_basis, vector coefficients, matrix x, vector beta){
+        real gauss_kronrod_quad_Hazard_basline(real[] locat, real[] weights, real Ti, vector T, matrix bSpline_basis, vector coefficients){
           real integral_ = 0;
           real integral = 0;
           real u; 
           for (q in 1:num_elements(locat)){
             u = Ti * (1 + locat[q])/2;
-            integral_ += weights[q] * h_i(u, T, bSpline_basis, coefficients, x, beta);
+            integral_ += weights[q] * exp(logh_0i(u, T, bSpline_basis, coefficients));
           }
           integral = integral_/2;
           return (integral);
         }
         
-        real h_i(real u, vector T, matrix bSpline_basis, vector coefficients, matrix x, vector beta){
-           // define the hazard function
+        real logh_0i(real u, vector T, matrix bSpline_basis, vector coefficients){
+           // define the baseline hazard function
            int index;
-           vector[num_elements(T)] h_t;
-           
-           real h_i = 0;
-           print(u);
+           vector[num_elements(T)] logh_0t;
+           real logh_0i = 0;
+           logh_0t = bSpline_basis * coefficients;
            index = find_index(u, T);
-           print(index);
-           
-           h_t = (bSpline_basis * coefficients) .* (x * beta);
-           h_i = h_t[index];
-           
-           return h_i;
-        }
-        
-      int is_in_vector(real u, vector t){
-        for (i in 1:num_elements(t)){
-          if (u == t[i]){
-            return 1; // Returen 1 if u is found in t
+           if (index != -1){
+             
+             logh_0i = logh_0t[index];
+           }
+           else { // if u not found in T, use linear interpolation
+             int lower_index = 1;
+             int upper_index = num_elements(T);
+             
+             // find the cloest indices for interpolation
+             for (i in 1:(num_elements(T)-1)){
+               if (T[i] <= u && u < T[i + 1]) {
+                    lower_index = i;
+                    upper_index = i + 1;
+                    break;
+               }
+                
+             }
+             
+             // perform linear interpolation
+             real t1 = T[lower_index];
+             real t2 = T[upper_index];
+             real h1 = logh_0t[lower_index];
+             real h2 = logh_0t[upper_index];
+             
+             logh_0i = h1 + (u-t1) * (h2-h1)/(t2-t1);
           }
+           return logh_0i;
         }
-       return 0; // Return 0 if u is not found in t
-      }
       
      int find_index(real u, vector t) {
        for (i in 1:num_elements(t)) {
@@ -238,6 +248,8 @@ Bayesian_Survival_baseline <- function(stan_data_basline, assumption = "exponent
        }
        return -1; //Return -1 if u is not found in t
      }
+     
+     
       }
       
       data {
@@ -257,8 +269,7 @@ Bayesian_Survival_baseline <- function(stan_data_basline, assumption = "exponent
 
         vector[K] Beta; // estimated coefficients from PH model
         
-        matrix[N, 8] bSpline_basis_t;
-        matrix[N_cens, 8] bSpline_basis_t_cens;
+        matrix[N + N_cens, 8] bSpline_basis;
         vector[M] uniqueT; //montously increasing unique time points
         vector[O] uniquet; //montously increasing unique time points for t
         vector[Q] uniquet_cens; //montously increasing unique time points for t_cens
@@ -277,19 +288,18 @@ Bayesian_Survival_baseline <- function(stan_data_basline, assumption = "exponent
       
       // log-likelihood, represented by [target]
       for (Ti in uniqueT){
+        real H_0i_ = gauss_kronrod_quad_Hazard_basline(locat, weights, Ti, uniqueT, bSpline_basis, coefficients);
+        real logh_0i_ = logh_0i(Ti, uniqueT, bSpline_basis, coefficients);
+        
         if (find_index(Ti, uniquet) != -1) {
-         print(999);
-         print(Ti);
-         print(find_index(Ti, uniquet));
-         print(888);
-         target += -gauss_kronrod_quad(locat, weights, Ti, uniquet, bSpline_basis_t, coefficients, x, Beta);// + h_i(Ti, uniquet, bSpline_basis_t, coefficients, x, Beta); // uncensored data log(f(t)) = -H(t) + h(t)
+         vector[N] H_i = H_0i_ .* exp(x*Beta);
+         vector[N] logh_i = logh_0i_ + x*Beta;
+         target += -H_i + logh_i; // uncensored data log(f(t)) = -H(t) + log(h(t))
         }
         
         if (find_index(Ti, uniquet_cens) != 1){
-         print(777);
-         print(Ti);
-         print(find_index(Ti, uniquet_cens));
-         target += -gauss_kronrod_quad(locat, weights, Ti, uniquet_cens, bSpline_basis_t_cens, coefficients, x_cens, Beta);  // at log scale,  right censored data log(S(t)),  log(S(t)) = -H(t)
+         vector[N_cens] H_i = H_0i_ * exp(x_cens*Beta);
+         target += -H_i;  // at log scale,  right censored data log(S(t)),  log(S(t)) = -H(t)
         }
         
       }
