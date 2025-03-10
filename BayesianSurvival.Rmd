@@ -168,13 +168,28 @@ Bayesian_Survival_baseline <- function(stan_data_basline, assumption = "exponent
     else if (assumption == "bSplines") {
       message("We utilized B-splines to estimate the baseline cumulative hazard function.")
       time_combined <- sort(unique(c(stan_data_basline$t, stan_data_basline$t_cens)))
+      time_cens <- sort(unique(stan_data_basline$t_cens))
+      time_ <- sort(unique(stan_data_basline$t))
       notes = seq(runif(5, min(time_combined), max(time_combined)))
       bSpline_basis <- bSpline(time_combined, knots = notes, degree = 3, intercept = FALSE) # The B-spline basis is calculated using the method implemented in the splines2 package
       
+      # Find indices of time_cens and time in time_combined
+      indices_time_cens <- match(time_cens, time_combined)
+      indices_time <- match(time_, time_combined)
+      
+      # Select rows from bSpline_basis corresponding to time_cens and time_
+      bSpline_basis_time_cens <- bSpline_basis[indices_time_cens, ]
+      bSpline_basis_time <- bSpline_basis[indices_time, ]
+      
       # Out the corresponding information in stan data
-      stan_data_basline$bSpline_basis <- bSpline_basis
+      stan_data_basline$bSpline_basis_t <- bSpline_basis_time
+      stan_data_basline$bSpline_basis_t_cens <- bSpline_basis_time_cens
       stan_data_basline$M = length(time_combined)
       stan_data_basline$uniqueT = time_combined
+      stan_data_basline$O = length(time_)
+      stan_data_basline$uniquet = time_
+      stan_data_basline$Q = length(time_cens)
+      stan_data_basline$uniquet_cens = time_cens
       
       code_bayesian_model <- "
       functions {
@@ -194,16 +209,11 @@ Bayesian_Survival_baseline <- function(stan_data_basline, assumption = "exponent
            // define the hazard function
            int index;
            vector[num_elements(T)] h_t;
-           real h_i = 0;
-           index = find_index(u, T);
-           // Print the size of vectors and matrices 
-           print(num_elements(T)); 
-           print(rows(bSpline_basis));
-           print(cols(bSpline_basis));
-           print(num_elements(coefficients));
-           print(num_elements(x));
            
-           print(num_elements(h_t));
+           real h_i = 0;
+           print(u);
+           index = find_index(u, T);
+           print(index);
            
            h_t = (bSpline_basis * coefficients) .* (x * beta);
            h_i = h_t[index];
@@ -213,7 +223,7 @@ Bayesian_Survival_baseline <- function(stan_data_basline, assumption = "exponent
         
       int is_in_vector(real u, vector t){
         for (i in 1:num_elements(t)){
-          if (fabs(u-t[i]) < 1e-8){
+          if (u == t[i]){
             return 1; // Returen 1 if u is found in t
           }
         }
@@ -222,7 +232,7 @@ Bayesian_Survival_baseline <- function(stan_data_basline, assumption = "exponent
       
      int find_index(real u, vector t) {
        for (i in 1:num_elements(t)) {
-          if (fabs(u -t[i]) < 1e-8) {
+          if (u == t[i]) {
             return i; // Return the index if u is found in t
           }
        }
@@ -234,8 +244,8 @@ Bayesian_Survival_baseline <- function(stan_data_basline, assumption = "exponent
         int <lower=0> K; //num covariates
         int <lower=0> N; // num uncensored obs
         int <lower=0> M; // num unique time points
-        int <lower=0> O; / num unqiue time points in t
-        int <lower=0> Q; / num unqiue time points in t_cens
+        int <lower=0> O; // num unqiue time points in t
+        int <lower=0> Q; // num unqiue time points in t_cens
         
 
         vector[N] t; // event time (non-strict decreasing)
@@ -247,7 +257,8 @@ Bayesian_Survival_baseline <- function(stan_data_basline, assumption = "exponent
 
         vector[K] Beta; // estimated coefficients from PH model
         
-        matrix[N + N_cens, 8] bSpline_basis;
+        matrix[N, 8] bSpline_basis_t;
+        matrix[N_cens, 8] bSpline_basis_t_cens;
         vector[M] uniqueT; //montously increasing unique time points
         vector[O] uniquet; //montously increasing unique time points for t
         vector[Q] uniquet_cens; //montously increasing unique time points for t_cens
@@ -266,12 +277,21 @@ Bayesian_Survival_baseline <- function(stan_data_basline, assumption = "exponent
       
       // log-likelihood, represented by [target]
       for (Ti in uniqueT){
-        if (is_in_vector(Ti, t) == 1) {
-         target += -gauss_kronrod_quad(locat, weights, Ti, uniqueT, bSpline_basis, coefficients, x, Beta);// + h_i(Ti, uniqueT, bSpline_basis, coefficients, x, Beta); // uncensored data log(f(t)) = -H(t) + h(t)
+        if (find_index(Ti, uniquet) != -1) {
+         print(999);
+         print(Ti);
+         print(find_index(Ti, uniquet));
+         print(888);
+         target += -gauss_kronrod_quad(locat, weights, Ti, uniquet, bSpline_basis_t, coefficients, x, Beta);// + h_i(Ti, uniquet, bSpline_basis_t, coefficients, x, Beta); // uncensored data log(f(t)) = -H(t) + h(t)
         }
-        else if (is_in_vector(Ti, t_cens) == 1){
-         target += -gauss_kronrod_quad(locat, weights, Ti, uniqueT, bSpline_basis, coefficients, x_cens, Beta);  // at log scale,  right censored data log(S(t)),  log(S(t)) = -H(t)
+        
+        if (find_index(Ti, uniquet_cens) != 1){
+         print(777);
+         print(Ti);
+         print(find_index(Ti, uniquet_cens));
+         target += -gauss_kronrod_quad(locat, weights, Ti, uniquet_cens, bSpline_basis_t_cens, coefficients, x_cens, Beta);  // at log scale,  right censored data log(S(t)),  log(S(t)) = -H(t)
         }
+        
       }
       }
     "
