@@ -195,54 +195,71 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
       
       code_bayesian_model <- "
       functions {
-        real gauss_kronrod_quad_Hazard_basline(real[] locat, real[] weights, real Ti, vector T, matrix bSpline_basis, vector coefficients){
-          real integral_ = 0;
-          real integral = 0;
-          real u; 
-          for (q in 1:num_elements(locat)){
-            u = Ti * (1 + locat[q])/2;
-            integral_ += weights[q] * exp(logh_0i(u, T, bSpline_basis, coefficients));
-          }
-          integral = integral_/2;
-          return (integral);
+        real gauss_kronrod_quad_Hazard_basline(real[] locat, real[] weights, real Ti, vector T, matrix bSpline_basis, vector coefficients, vector sigma){
+
+          // vectorize all computation
+          vector[num_elements(locat)] u_vec = Ti * (rep_vector(1, num_elements(locat))/2);
+          vector [num_elements(locat)] logh_0i_vec = vectorized_logh_0i(u_vec, T, bSpline_basis, coefficients, sigma);
+          real integral_ = sum(to_vector(weights) .* exp(logh_0i_vec));
+          
+          return integral_/2;
         }
         
-        real logh_0i(real u, vector T, matrix bSpline_basis, vector coefficients){
-           // define the baseline hazard function
-           int index;
-           vector[num_elements(T)] logh_0t;
-           real logh_0i = 0;
-           logh_0t = bSpline_basis * coefficients + sigma;
-           index = find_index(u, T);
-           if (index != -1){
-             
-             logh_0i = logh_0t[index];
-           }
-           else { // if u not found in T, use linear interpolation
-             int lower_index = 1;
-             int upper_index = num_elements(T);
-             
-             // find the cloest indices for interpolation
-             for (i in 1:(num_elements(T)-1)){
-               if (T[i] <= u && u < T[i + 1]) {
-                    lower_index = i;
-                    upper_index = i + 1;
-                    break;
-               }
-                
+        vector vectorized_logh_0i(vector u_vec, vector T, matrix bSpline_basis, vector coefficients, vector sigma){
+           // define the log baseline hazard function in a vectorized way
+           vector[num_elements(u_vec)] logh_0i_vec;
+           vector[num_elements(T)] logh_0t = bSpline_basis * coefficients + sigma;
+           
+           for (i in 1:num_elements(u_vec)){
+             int index = find_index(u_vec[i], T);
+             if (index != -1){
+              logh_0i_vec[i] = logh_0t[index];
              }
-             
-             // perform linear interpolation
-             real t1 = T[lower_index];
-             real t2 = T[upper_index];
-             real h1 = logh_0t[lower_index];
-             real h2 = logh_0t[upper_index];
-             
-             logh_0i = h1 + (u-t1) * (h2-h1)/(t2-t1);
-          }
+            else {
+              logh_0i_vec[i] = interpolation(u_vec[i], T, logh_0t);
+            }
+           }
+           return logh_0i_vec;
+        }
+            
+        real logh_0i(real u, vector T, matrix bSpline_basis, vector coefficients, vector sigma){
+           // define the log baseline hazard function in a vectorized way
+           vector[num_elements(T)] logh_0t = bSpline_basis * coefficients + sigma;
+           real logh_0i;
+           
+           int index = find_index(u, T);
+           if (index != -1){
+              logh_0i = logh_0t[index];
+           }
+           
+           else{
+              logh_0i = interpolation(u, T, logh_0t);
+           }
+           
            return logh_0i;
         }
-      
+        
+
+        real interpolation (real u, vector T, vector logh_0t){
+          int lower_index = 1;
+          real logh_0i_interp;
+          int upper_index = num_elements(T);
+          for (j in 1:(num_elements(T)-1)){
+            if (T[j] <= u && u < T[j + 1]) {
+                lower_index = j;
+                upper_index = j + 1;
+                break;
+              }
+          }
+          real t1 = T[lower_index];
+          real t2 = T[upper_index];
+          real h1 = logh_0t[lower_index];
+          real h2 = logh_0t[upper_index];
+          logh_0i_interp = h1 + (u - t1) * (h2 - h1) / (t2 - t1);
+          
+          return logh_0i_interp;
+        }
+
      int find_index(real u, vector t) {
        for (i in 1:num_elements(t)) {
           if (u == t[i]) {
