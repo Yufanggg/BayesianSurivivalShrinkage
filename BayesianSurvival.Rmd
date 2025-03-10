@@ -96,7 +96,7 @@ print(Output)
 ## STEP 4.1: estimate the baseline function
 ```{r, echo=TRUE}
 # Exponential baseline distribution from a bayesian perspective
-Bayesian_Survival_baseline <- function(stan_data, assumption = "exponential", school = "Bayesian", 
+Bayesian_Survival_baseline <- function(stan_data_basline, assumption = "exponential", school = "Bayesian", 
                               niter = 10000, 
                               nwarmup = 1000,
                               thin = 10,
@@ -130,10 +130,6 @@ Bayesian_Survival_baseline <- function(stan_data, assumption = "exponential", sc
     target += exponential_lpdf(t | lambda * exp(x*Beta)); // uncensored data log(f(t))
 
     target += exponential_lccdf(t_cens | lambda * exp(x*Beta)); // right censored data log(S(t))
-
-    // target + = exponential_lpdf(t | lambda * exp(x * beta)) // the same with  t ~ exponential(lambda * exp(x*Beta));
-    // target += exponential_lccdf(t_cens | lambda * exp(x_cens * Beta));
-
     }
     "
     }
@@ -174,18 +170,73 @@ Bayesian_Survival_baseline <- function(stan_data, assumption = "exponential", sc
       time_combined <- sort(unique(c(stan_data_basline$t, stan_data_basline$t_cens)))
       notes = seq(runif(5, min(time_combined), max(time_combined)))
       bSpline_basis <- bSpline(time_combined, knots = notes, degree = 3, intercept = FALSE) # The B-spline basis is calculated using the method implemented in the splines2 package
-
-      # Compute the derivative of the B-spline basis
-      bSpline_derivative <- deriv(bSpline_basis)
       
       # Out the corresponding information in stan data
       stan_data_basline$bSpline_basis <- bSpline_basis
-      stan_data_basline$bSpline_derivative <- bSpline_derivative
+      stan_data_basline$M = length(time_combined)
+      stan_data_basline$uniqueT = time_combined
       
       code_bayesian_model <- "
+      functions {
+        real gauss_kronrod_quad(real[] locat, real[] weights, real Ti, vector T, matrix bSpline_basis, vector coefficients, matrix x, vector beta){
+          real integral_ = 0;
+          real integral = 0;
+          real u; 
+          for (q in 1:num_elements(locat)){
+            u = Ti * (1 + locat[q])/2;
+            integral_ += weights[q] * h_i(u, T, bSpline_basis, coefficients, x, beta);
+          }
+          integral = integral_/2;
+          return (integral);
+        }
+        
+        real h_i(real u, vector T, matrix bSpline_basis, vector coefficients, matrix x, vector beta){
+           // define the hazard function
+           int index;
+           vector[num_elements(T)] h_t;
+           real h_i = 0;
+           index = find_index(u, T);
+           // Print the size of vectors and matrices 
+           print(num_elements(T)); 
+           print(rows(bSpline_basis));
+           print(cols(bSpline_basis));
+           print(num_elements(coefficients));
+           print(num_elements(x));
+           
+           print(num_elements(h_t));
+           
+           h_t = (bSpline_basis * coefficients) .* (x * beta);
+           h_i = h_t[index];
+           
+           return h_i;
+        }
+        
+      int is_in_vector(real u, vector t){
+        for (i in 1:num_elements(t)){
+          if (fabs(u-t[i]) < 1e-8){
+            return 1; // Returen 1 if u is found in t
+          }
+        }
+       return 0; // Return 0 if u is not found in t
+      }
+      
+     int find_index(real u, vector t) {
+       for (i in 1:num_elements(t)) {
+          if (fabs(u -t[i]) < 1e-8) {
+            return i; // Return the index if u is found in t
+          }
+       }
+       return -1; //Return -1 if u is not found in t
+     }
+      }
+      
       data {
         int <lower=0> K; //num covariates
         int <lower=0> N; // num uncensored obs
+        int <lower=0> M; // num unique time points
+        int <lower=0> O; / num unqiue time points in t
+        int <lower=0> Q; / num unqiue time points in t_cens
+        
 
         vector[N] t; // event time (non-strict decreasing)
         matrix[N, K] x; // covariates for uncensored obs
@@ -197,29 +248,34 @@ Bayesian_Survival_baseline <- function(stan_data, assumption = "exponential", sc
         vector[K] Beta; // estimated coefficients from PH model
         
         matrix[N + N_cens, 8] bSpline_basis;
-        matrix[N + N_cens, 8] bSpline_derivative;
+        vector[M] uniqueT; //montously increasing unique time points
+        vector[O] uniquet; //montously increasing unique time points for t
+        vector[Q] uniquet_cens; //montously increasing unique time points for t_cens
       }
       
       parameters {
-        vector[K] coefficients;
+        vector[8] coefficients;
       } 
         
       model {
+        real locat[15] = {-0.991455, -0.949107, -0.864865, -0.741531, -0.586087, -0.405845, -0.207785, 0.0, 0.207785, 0.405845, 0.586087, 0.741531, 0.864865, 0.949107, 0.991455};
+        real weights[15] = {0.022935, 0.063093, 0.104790, 0.140653, 0.169004, 0.190350, 0.204432, 0.209482, 0.204432, 0.190350, 0.169004, 0.140653, 0.104790, 0.063093, 0.022935};
+        
       // Priors
-      for (i in 1:N){
-        coefficients[i] ~ normal(0, 1);
-      }
+        coefficients ~ normal(0, 1);
       
       // log-likelihood, represented by [target]
-      target += (-bSpline_basis*coefficients * exp(x * Beta)) + x * Beta + log(coefficients) + log(bSpline_derivative) ; // uncensored data log(f(t)), -H(t) = -bSpline_basis*cofficients * exp(x * Beta)
-        
-      target += -bSpline_basis* coefficients * exp(x_cens * Beta);  // at log scale,  right censored data log(S(t)),  log(S(t)) = -H(t)
+      for (Ti in uniqueT){
+        if (is_in_vector(Ti, t) == 1) {
+         target += -gauss_kronrod_quad(locat, weights, Ti, uniqueT, bSpline_basis, coefficients, x, Beta);// + h_i(Ti, uniqueT, bSpline_basis, coefficients, x, Beta); // uncensored data log(f(t)) = -H(t) + h(t)
+        }
+        else if (is_in_vector(Ti, t_cens) == 1){
+         target += -gauss_kronrod_quad(locat, weights, Ti, uniqueT, bSpline_basis, coefficients, x_cens, Beta);  // at log scale,  right censored data log(S(t)),  log(S(t)) = -H(t)
+        }
+      }
       }
     "
     }
-    
-    
-    
     # compile the model
     bayesian_model <- stan_model(model_name = "bayesian_model", model_code = code_bayesian_model)
     
@@ -227,7 +283,7 @@ Bayesian_Survival_baseline <- function(stan_data, assumption = "exponential", sc
     bayesian_model_fit <- suppressWarnings(
       sampling(
         bayesian_model,
-        data = stan_data,
+        data = stan_data_basline,
         iter = niter,
         warmup = nwarmup,
         thin = 10,
