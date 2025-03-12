@@ -208,7 +208,7 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
         vector vectorized_logh_0i(vector u_vec, vector T, matrix bSpline_basis, vector coefficients, vector sigma){
            // define the log baseline hazard function in a vectorized way
            vector[num_elements(u_vec)] logh_0i_vec;
-           vector[num_elements(T)] logh_0t = bSpline_basis * coefficients + sigma;
+           vector[num_elements(T)] logh_0t = bSpline_basis * coefficients;
            
            for (i in 1:num_elements(u_vec)){
              int index = find_index(u_vec[i], T);
@@ -224,7 +224,7 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
             
         real logh_0i(real u, vector T, matrix bSpline_basis, vector coefficients, vector sigma){
            // define the log baseline hazard function in a vectorized way
-           vector[num_elements(T)] logh_0t = bSpline_basis * coefficients + sigma;
+           vector[num_elements(T)] logh_0t = bSpline_basis * coefficients;
            real logh_0i;
            
            int index = find_index(u, T);
