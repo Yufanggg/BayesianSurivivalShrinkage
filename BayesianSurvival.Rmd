@@ -96,7 +96,7 @@ print(Output)
 ## STEP 4.1: estimate the baseline function
 ```{r, echo=TRUE}
 # Exponential baseline distribution from a bayesian perspective
-Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = "exponential", school = "Bayesian", 
+Bayesian_Survival_includingbaseline <- function(stan_data_baseline, assumption = "exponential", school = "Bayesian", 
                               niter = 10000, 
                               nwarmup = 1000,
                               thin = 10,
@@ -191,9 +191,9 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
     
     else if (assumption == "bSplines") {
       message("We utilized B-splines to estimate the baseline cumulative hazard function.")
-      time_combined <- sort(unique(c(stan_data_basline$t, stan_data_basline$t_cens)))
-      time_cens <- sort(unique(stan_data_basline$t_cens))
-      time_ <- sort(unique(stan_data_basline$t))
+      time_combined <- sort(unique(c(stan_data_baseline$t, stan_data_baseline$t_cens)))
+      time_cens <- sort(unique(stan_data_baseline$t_cens))
+      time_ <- sort(unique(stan_data_baseline$t))
       notes = seq(runif(5, min(time_combined), max(time_combined)))
       bSpline_basis <- bSpline(time_combined, knots = notes, degree = 3, intercept = FALSE) # The B-spline basis is calculated using the method implemented in the splines2 package
       
@@ -206,13 +206,13 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
       bSpline_basis_time <- bSpline_basis[indices_time, ]
       
       # Out the corresponding information in stan data
-      stan_data_basline$bSpline_basis <- bSpline_basis
-      stan_data_basline$M = length(time_combined)
-      stan_data_basline$uniqueT = time_combined
-      stan_data_basline$O = length(time_)
-      stan_data_basline$uniquet = time_
-      stan_data_basline$Q = length(time_cens)
-      stan_data_basline$uniquet_cens = time_cens
+      stan_data_baseline$bSpline_basis <- bSpline_basis
+      stan_data_baseline$M = length(time_combined)
+      stan_data_baseline$uniqueT = time_combined
+      stan_data_baseline$O = length(time_)
+      stan_data_baseline$uniquet = time_
+      stan_data_baseline$Q = length(time_cens)
+      stan_data_baseline$uniquet_cens = time_cens
       
       code_bayesian_model <- "
       functions {
@@ -320,7 +320,6 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
       parameters {
         vector[8] coefficients;
         vector[K] Beta; // coefficients for design matrix;
-        vector[N+N_cens] sigma;
       } 
         
       model {
@@ -329,7 +328,6 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
         
       // Priors
         coefficients ~ normal(0, 1);
-        sigma ~ normal(0, 1);
         Beta ~ normal (0, 2);
       
       // log-likelihood, represented by [target]
@@ -355,7 +353,7 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
       matrix[M, N_new] survival_prob; // unqiue time points * rows of new data
       for (m in 1:M){
         real H_0i_ = gauss_kronrod_quad_Hazard_basline(locat, weights, m, uniqueT, bSpline_basis, coefficients);
-        survival_prob[m,] = exp(-H_0i_ + x_new*Beta) //vectorize over the x_new.
+        survival_prob[m,] = exp(-H_0i_ + x_new*Beta) //vectorize over the x_new, output is the time points * obs
       }
     }
     "
@@ -377,9 +375,10 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
     
     # Summary of the fit
     output <- summary(bayesian_model_fit)$summary
+    output$stan_data_baseline <- output$stan_data_baseline
     return(output)
   }
-}
+  }
 
 stan_data_basline <- list(
   N = stan_data$N,
@@ -395,8 +394,24 @@ stan_data_basline <- list(
   status = stan_data$status
 )
 
-Output3 <- Bayesian_Survival_includingbaseline(stan_data = stan_data_basline, assumption = "bSplines") #exponential, weibull,  bSplines
+Output3 <- Bayesian_Survival_includingbaseline(stan_data = stan_data_baseline, assumption = "bSplines") #exponential, weibull,  bSplines
 print(Output3)
+```
+# evaluate the model performance:
+```{r, echo=TRUE}
+model_performance_eval = function(test_uniqueT, test_status, pred_survival_prob, simulated_data = FASLE){
+  # pred_survival_prob: dimension is time_points*n_participants, prob in each cell
+  # test_status: dimension is time_points*n_participants, binary numbers in each cell
+  if (simulated_data == FALSE){
+    message("with a non-simulated data, we can only evaluate the prediction performance")
+    # using the Time-dependent Brier score for such prediction performance eval
+    message("Time-dependent Brier score was used for model prediction preformance eval")
+    
+    Brier_score = mean(D - pred_survival_prob)
+  }
+  
+}
+ 
 ```
 
 ```{r, echo=TRUE}
