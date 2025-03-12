@@ -107,6 +107,7 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
     data {
       int <lower=0> K; //num covariates
       int <lower=0> N; // num uncensored obs
+      int <lower=0> M; // num unique time points
 
       vector[N] t; // event time (non-strict decreasing)
       matrix[N, K] x; // covariates for uncensored obs
@@ -114,6 +115,10 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
       int N_cens; // num censored obs
       vector[N_cens] t_cens; // censoring time
       matrix[N_cens, K] x_cens; // covariates for censored obs
+      
+      vector[M] uniqueT; //montously increasing unique time points
+      int<lower=0> N_new;
+      matrix[N_new, K] x_new;
 
     }
 
@@ -132,6 +137,13 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
 
     target += exponential_lccdf(t_cens | lambda * exp(x*Beta)); // right censored data log(S(t))
     }
+    generated quantites{
+      // Predicting the survival time on the new/test dataset
+      matrix[M, N_new] survival_prob;  // Unique time points * rows of new data
+      for (m in 1:M){
+        survival_prob[m,] = exp(-lambda*uniqueT[m] + x_new*Beta) //vectorize over the x_new.
+      }
+    }
     "
     }
     
@@ -140,6 +152,7 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
       data {
         int <lower=0> K; //num covariates
         int <lower=0> N; // num uncensored obs
+        int <lower=0> M; // num unique time points
 
         vector[N] t; // event time (non-strict decreasing)
         matrix[N, K] x; // covariates for uncensored obs
@@ -147,6 +160,7 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
         int N_cens; // num censored obs
         vector[N_cens] t_cens; // censoring time
         matrix[N_cens, K] x_cens; // covariates for censored obs
+        vector[M] uniqueT; //montously increasing unique time points
 
         
       }
@@ -164,7 +178,14 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
        // log-likelihood, represented by [target]
        target += weibull_lpdf(t | alpha, sigma/exp(x*Beta/alpha)); // weibull_lpdf() is at log scale // uncensored data log(f(t))
        target += weibull_lccdf(t_cens | alpha, sigma/exp(x_cens*Beta/alpha)); // weibull_lccdf() is at log scale  // right censored data log(S(t)) //log complementary cumulative distribution function (log-CCDF) for an weibull distribution
-  }
+     }
+    generated quantites{
+      // Predicting the survival time on the new/test dataset
+      matrix[M, N_new] survival_prob;  // Unique time points * rows of new data
+      for (m in 1:M){
+        survival_prob[m,] = exp(-(uniqueT[m]/sigma)^alpha) + x_new*Beta) //vectorize over the x_new.
+      }
+    }
 "
     }
     
@@ -291,6 +312,9 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
         vector[M] uniqueT; //montously increasing unique time points
         vector[O] uniquet; //montously increasing unique time points for t
         vector[Q] uniquet_cens; //montously increasing unique time points for t_cens
+        
+        int<lower=0> N_new;
+        matrix[N_new, K] x_new;
       }
       
       parameters {
@@ -310,11 +334,11 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
       
       // log-likelihood, represented by [target]
       for (Ti in uniqueT){
-        real H_0i_ = gauss_kronrod_quad_Hazard_basline(locat, weights, Ti, uniqueT, bSpline_basis, coefficients, sigma);
-        real logh_0i_ = logh_0i(Ti, uniqueT, bSpline_basis, coefficients, sigma);
+        real H_0i_ = gauss_kronrod_quad_Hazard_basline(locat, weights, Ti, uniqueT, bSpline_basis, coefficients);
+        real logh_0i_ = logh_0i(Ti, uniqueT, bSpline_basis, coefficients);
         
         if (find_index(Ti, uniquet) != -1) {
-         vector[N] H_i = H_0i_ .* exp(x*Beta);
+         vector[N] H_i =   .* exp(x*Beta);
          vector[N] logh_i = logh_0i_ + x*Beta;
          target += -H_i + logh_i; // uncensored data log(f(t)) = -H(t) + log(h(t))
         }
@@ -326,6 +350,14 @@ Bayesian_Survival_includingbaseline <- function(stan_data_basline, assumption = 
         
       }
       }
+      
+    generated quantities{ // predicting the survival time on the new/test dataset
+      matrix[M, N_new] survival_prob; // unqiue time points * rows of new data
+      for (m in 1:M){
+        real H_0i_ = gauss_kronrod_quad_Hazard_basline(locat, weights, m, uniqueT, bSpline_basis, coefficients);
+        survival_prob[m,] = exp(-H_0i_ + x_new*Beta) //vectorize over the x_new.
+      }
+    }
     "
     }
     # compile the model
