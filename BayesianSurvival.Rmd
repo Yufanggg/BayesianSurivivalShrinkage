@@ -18,21 +18,6 @@ library(splines2)
 # set.seed(42)
 # source("./SurvivalDataGenerator.R")
 ```
-
-# STEP 2. predefine a design matrix with one column 
-```{r, echo=TRUE}
-n_samples = 1000
-Betas = 1
-Design_matrix = as.matrix(rbinom(n_samples, 1, prob = 0.5)) #rnorm(n_samples))
-BaselinePara = c(0.1, 0.2)
-
-
-stan_data = SurvivalDataGenerator(n_samples, Betas, Design_matrix, 
-                                  BaselinePara, BaselineDistr = "weibull") # exponential, weibull, and Gompertz
-
-# use the traditional coxph to verify that the data was correctly generated
-coxph(Surv(stan_data$obstime, stan_data$status) ~ stan_data$covariate)
-```
 ## Conclusion for STEP 2: the betas are correctly estimated via traditional cox regression, meaning that data was correctly generated.
 
 # STEP 3. Semiparametric & Parametric Bayesian survival model
@@ -88,8 +73,6 @@ Bayesian_Survival_PH <- function(stan_data,
   
 }
 
-Output <- Bayesian_Survival_PH(stan_data = stan_data) # The weibull and Gompertz simulation was not correctly implemented yet.
-print(Output)
 ```
 ## Conclusion for STEP 3: the betas are correctly estimated via bayesian cox regression, meaning that bayesian cox regression was correctly defined.
 
@@ -218,7 +201,7 @@ Bayesian_Survival_includingbaseline <- function(stan_data, baseline_assumption =
       functions {
         real gauss_kronrod_quad_Hazard_basline(real Ti, vector T, matrix bSpline_basis, vector coefficients){
             real locat[15] = {-0.991455, -0.949107, -0.864865, -0.741531, -0.586087, -0.405845, -0.207785, 0.0, 0.207785, 0.405845, 0.586087, 0.741531, 0.864865, 0.949107, 0.991455};
-            real  [15] = {0.022935, 0.063093, 0.104790, 0.140653, 0.169004, 0.190350, 0.204432, 0.209482, 0.204432, 0.190350, 0.169004, 0.140653, 0.104790, 0.063093, 0.022935};
+            real weights [15] = {0.022935, 0.063093, 0.104790, 0.140653, 0.169004, 0.190350, 0.204432, 0.209482, 0.204432, 0.190350, 0.169004, 0.140653, 0.104790, 0.063093, 0.022935};
 
           // vectorize all computation
           vector[num_elements(locat)] u_vec = Ti * (rep_vector(1, num_elements(locat))/2);
@@ -377,26 +360,6 @@ Bayesian_Survival_includingbaseline <- function(stan_data, baseline_assumption =
     return(output)
   }
   }
-
-stan_data_includingbaseline <- list(
-  N = stan_data$N,
-  t = stan_data$t,
-  N_cens = stan_data$N_cens,
-  t_cens = stan_data$t_cens,
-  K = stan_data$K,
-  x = stan_data$x,
-  x_cens = stan_data$x_cens, # # Ensure Beta is a vector of length 1
-
-  covariate = stan_data$covariate,
-  obstime = stan_data$obstime,
-  status = stan_data$status,
-  
-  N_new = stan_data$N,
-  x_new = stan_data$x
-)
-
-Output3 <- Bayesian_Survival_includingbaseline(stan_data = stan_data_includingbaseline, baseline_assumption = "bSplines") #exponential, weibull,  bSplines
-print(Output3)
 ```
 
 # train-test dataset splitting
@@ -432,7 +395,7 @@ print(sim_data)
 sim_data = merge(covariates, sim_data, by = "id")
 # Define the cross-validation
 CrossValidation <- function(dataset = sim_data, KFold = 5){
-  folds <- cut(seq(1:nrow(dataset)), break = KFold, labels = FALSE)
+  folds <- cut(seq(1:nrow(dataset)), breaks = KFold, labels = FALSE)
   for (i in 1:KFold){
     train_dataset = dataset[-i, ]
     test_dataset = dataset[i, ]
@@ -442,15 +405,15 @@ CrossValidation <- function(dataset = sim_data, KFold = 5){
       # Data for Bayesian model estimation
       k = ncol(train_dataset) - 2,
       # 2 represents the columns of t and status
-      N = nrow(train_dataset[status == 1,]),
+      N = nrow(train_dataset[train_dataset$status == 1,]),
       # Number of non-censored data
-      t = train_dataset[status == 1, "eventtime"],
+      t = train_dataset[train_dataset$status == 1, "eventtime"],
       x = train_dataset[train_dataset$status == 1, !(names(train_dataset) %in% c("eventtime", "status"))],
       
-      N_cens = nrow(train_dataset[status == 0,]),
+      N_cens = nrow(train_dataset[train_dataset$status == 0,]),
       # Number of censored data
-      t_cens = train_dataset[status == 0, "eventtime"],
-      x_cens = train_dataset[status == 0,!(names(train_dataset) %in% c("eventtime", "status"))],
+      t_cens = train_dataset[train_dataset$status == 0, "eventtime"],
+      x_cens = train_dataset[train_dataset$status == 0,!(names(train_dataset) %in% c("eventtime", "status"))],
       
       # Data for Bayesian model prediction, issues might pop up during brier score calculation if the status for t' (test dataset) does not exist in t (train dataset)
       
@@ -461,7 +424,8 @@ CrossValidation <- function(dataset = sim_data, KFold = 5){
     )
     Output <- Bayesian_Survival_includingbaseline(stan_data = stan_data, baseline_assumption = "bSplines") # #exponential, weibull,  bSplines
     # evaluating the model performance at the level at the level of Beta's.
-    Output3["Beta[1]", "mean"] # Extract the Betas
+    Output[grep("^Beta", rownames(Output)), "mean", drop = FALSE] ## Extract the Betas
+    
     message("In the case of real-world data, we used the Cox regression estimator as real Beta")
     cox_model = coxph(Surv(train_dataset$eventtime, train_dataset$status) ~ .)
     
