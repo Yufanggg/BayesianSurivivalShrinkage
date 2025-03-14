@@ -216,7 +216,10 @@ Bayesian_Survival_includingbaseline <- function(stan_data, baseline_assumption =
       
       code_bayesian_model <- "
       functions {
-        real gauss_kronrod_quad_Hazard_basline(real[] locat, real[] weights, real Ti, vector T, matrix bSpline_basis, vector coefficients){
+        real gauss_kronrod_quad_Hazard_basline(real Ti, vector T, matrix bSpline_basis, vector coefficients){
+        
+        real locat[15] = {-0.991455, -0.949107, -0.864865, -0.741531, -0.586087, -0.405845, -0.207785, 0.0, 0.207785, 0.405845, 0.586087, 0.741531, 0.864865, 0.949107, 0.991455};
+        real weights[15] = {0.022935, 0.063093, 0.104790, 0.140653, 0.169004, 0.190350, 0.204432, 0.209482, 0.204432, 0.190350, 0.169004, 0.140653, 0.104790, 0.063093, 0.022935};
 
           // vectorize all computation
           vector[num_elements(locat)] u_vec = Ti * (rep_vector(1, num_elements(locat))/2);
@@ -323,16 +326,13 @@ Bayesian_Survival_includingbaseline <- function(stan_data, baseline_assumption =
       } 
         
       model {
-        real locat[15] = {-0.991455, -0.949107, -0.864865, -0.741531, -0.586087, -0.405845, -0.207785, 0.0, 0.207785, 0.405845, 0.586087, 0.741531, 0.864865, 0.949107, 0.991455};
-        real weights[15] = {0.022935, 0.063093, 0.104790, 0.140653, 0.169004, 0.190350, 0.204432, 0.209482, 0.204432, 0.190350, 0.169004, 0.140653, 0.104790, 0.063093, 0.022935};
-        
       // Priors
         coefficients ~ normal(0, 1);
         Beta ~ normal (0, 2);
       
       // log-likelihood, represented by [target]
       for (Ti in uniqueT){
-        real H_0i_ = gauss_kronrod_quad_Hazard_basline(locat, weights, Ti, uniqueT, bSpline_basis, coefficients);
+        real H_0i_ = gauss_kronrod_quad_Hazard_basline(Ti, uniqueT, bSpline_basis, coefficients);
         real logh_0i_ = logh_0i(Ti, uniqueT, bSpline_basis, coefficients);
         
         if (find_index(Ti, uniquet) != -1) {
@@ -350,11 +350,9 @@ Bayesian_Survival_includingbaseline <- function(stan_data, baseline_assumption =
       }
       
     generated quantities{ // predicting the survival time on the new/test dataset
-        real locat[15] = {-0.991455, -0.949107, -0.864865, -0.741531, -0.586087, -0.405845, -0.207785, 0.0, 0.207785, 0.405845, 0.586087, 0.741531, 0.864865, 0.949107, 0.991455};
-        real weights[15] = {0.022935, 0.063093, 0.104790, 0.140653, 0.169004, 0.190350, 0.204432, 0.209482, 0.204432, 0.190350, 0.169004, 0.140653, 0.104790, 0.063093, 0.022935};
       matrix[M, N_new] survival_prob; // unqiue time points * rows of new data
       for (m in 1:M){
-        real H_0i_ = gauss_kronrod_quad_Hazard_basline(locat, weights, m, uniqueT, bSpline_basis, coefficients);
+        real H_0i_ = gauss_kronrod_quad_Hazard_basline(m, uniqueT, bSpline_basis, coefficients);
         survival_prob[m,] = to_row_vector(exp(-H_0i_ + x_new*Beta)); //vectorize over the x_new, output is the time points * obs
       }
     }
@@ -377,7 +375,6 @@ Bayesian_Survival_includingbaseline <- function(stan_data, baseline_assumption =
     
     # Summary of the fit
     output <- summary(bayesian_model_fit)$summary
-    output$stan_data <- output$stan_data
     return(output)
   }
   }
@@ -389,14 +386,10 @@ stan_data_includingbaseline <- list(
   t_cens = stan_data$t_cens,
   K = stan_data$K,
   x = stan_data$x,
-  x_cens = stan_data$x_cens, # # Ensure Beta is a vector of length 1
-
-  covariate = stan_data$covariate,
-  obstime = stan_data$obstime,
-  status = stan_data$status,
+  x_cens = stan_data$x_cens,
   
   N_new = stan_data$N,
-  x_new = stan_data$x, 
+  x_new = stan_data$x
 )
 
 Output3 <- Bayesian_Survival_includingbaseline(stan_data = stan_data_includingbaseline, baseline_assumption = "bSplines") #exponential, weibull,  bSplines
