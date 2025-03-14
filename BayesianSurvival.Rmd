@@ -15,8 +15,8 @@ library(readr)
 library(survival)
 library(splines2)
 # Set seed for reproducibility
-set.seed(42)
-source("./SurvivalDataGenerator.R")
+# set.seed(42)
+# source("./SurvivalDataGenerator.R")
 ```
 
 # STEP 2. predefine a design matrix with one column 
