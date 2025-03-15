@@ -368,10 +368,11 @@ Such splitting does not account for the case of non-overlapped time-points becau
 library(simsurv)
 library(SurvMetrics)
 set.seed(123456)
+n_samples = 1000
 covariates <- data.frame(
-  id = 1:1000,  # 100 individuals
-  cov1 = rbinom(1000, 1, 0.5),  # First covariate
-  cov2 = rnorm(1000, mean = 0, sd = 1)   # Second covariate
+  id = 1:n_samples,  # 100 individuals
+  cov1 = rbinom(n_samples, 1, 0.5),  # First covariate
+  cov2 = rnorm(n_samples, mean = 0, sd = 1)   # Second covariate
 )
 
 # Define the effects of the covariates
@@ -392,35 +393,40 @@ sim_data <- simsurv(
 # Print simulated data
 print(sim_data)
 
-sim_data = merge(covariates, sim_data, by = "id")
+censtime <- runif(n_samples, 3, 10)
+status <- as.numeric(sim_data$eventtime <= censtime) # the sum of status is the number of event
+sim_data$obstime = sim_data$eventtime * status + censtime*(1-status)
+sim_data$status1 = status
+
+sim_data = merge(covariates, sim_data, by = c("id"))
 # Define the cross-validation
 CrossValidation <- function(dataset = sim_data, KFold = 5){
   folds <- cut(seq(1:nrow(dataset)), breaks = KFold, labels = FALSE)
   for (i in 1:KFold){
-    train_dataset = dataset[-i, ]
-    test_dataset = dataset[i, ]
+    train_dataset = dataset[folds != i, ]
+    test_dataset = dataset[folds == i, ]
     
     #build up the list data to fit the bayesian stan model
     stan_data <- list(
       # Data for Bayesian model estimation
-      k = ncol(train_dataset) - 2,
+      K =  2,
       # 2 represents the columns of t and status
       N = nrow(train_dataset[train_dataset$status == 1,]),
       # Number of non-censored data
-      t = train_dataset[train_dataset$status == 1, "eventtime"],
-      x = train_dataset[train_dataset$status == 1, !(names(train_dataset) %in% c("eventtime", "status"))],
+      t = train_dataset[train_dataset$status == 1, "obstime"],
+      x = train_dataset[train_dataset$status == 1, !(names(train_dataset) %in% c("id", "eventtime", "status",  "obstime", "status1", "obstime", "status1"))],
       
       N_cens = nrow(train_dataset[train_dataset$status == 0,]),
       # Number of censored data
-      t_cens = train_dataset[train_dataset$status == 0, "eventtime"],
-      x_cens = train_dataset[train_dataset$status == 0,!(names(train_dataset) %in% c("eventtime", "status"))],
+      t_cens = train_dataset[train_dataset$status == 0, "obstime"],
+      x_cens = train_dataset[train_dataset$status == 0,!(names(train_dataset) %in% c("id", "eventtime", "status",  "obstime", "status1", "obstime", "status1"))],
       
       # Data for Bayesian model prediction, issues might pop up during brier score calculation if the status for t' (test dataset) does not exist in t (train dataset)
       
       N_new = nrow(test_dataset),
-      x_new = test_dataset[,!(names(test_dataset) %in% c("eventtime", "status"))],
-      t_new = train_dataset[, "eventtime"],
-      status_new = train_dataset[, "status"]
+      x_new = test_dataset[,!(names(test_dataset) %in% c("id", "eventtime", "status",  "obstime", "status1", "obstime", "status1"))],
+      t_new = train_dataset[, "obstime"],
+      status_new = train_dataset[, "status1"]
     )
     Output <- Bayesian_Survival_includingbaseline(stan_data = stan_data, baseline_assumption = "bSplines") # #exponential, weibull,  bSplines
     # evaluating the model performance at the level at the level of Beta's.
