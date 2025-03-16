@@ -391,14 +391,14 @@ sim_data <- simsurv(
 )
 
 # Print simulated data
-print(sim_data)
+head(sim_data)
 
 censtime <- runif(n_samples, 3, 10)
 status <- as.numeric(sim_data$eventtime <= censtime) # the sum of status is the number of event
 sim_data$obstime = sim_data$eventtime * status + censtime*(1-status)
 sim_data$status1 = status
+head(sim_data)
 
-sim_data = merge(covariates, sim_data, by = c("id"))
 # Define the cross-validation
 CrossValidation <- function(dataset = sim_data, KFold = 5){
   folds <- cut(seq(1:nrow(dataset)), breaks = KFold, labels = FALSE)
@@ -430,16 +430,26 @@ CrossValidation <- function(dataset = sim_data, KFold = 5){
     )
     Output <- Bayesian_Survival_includingbaseline(stan_data = stan_data, baseline_assumption = "bSplines") # #exponential, weibull,  bSplines
     # evaluating the model performance at the level at the level of Beta's.
-    Output[grep("^Beta", rownames(Output)), "mean", drop = FALSE] ## Extract the Betas
+    Beta_bayesian_est = Output[grep("^Beta", rownames(Output)), "mean", drop = FALSE] ## Extract the Betas
+    
     
     message("In the case of real-world data, we used the Cox regression estimator as real Beta")
-    cox_model = coxph(Surv(train_dataset$eventtime, train_dataset$status) ~ .)
+    cox_model = coxph(Surv(eventtime, status) ~ cov1 + cov2, data = train_dataset)
+    Beta_cox_est = coef(cox_model)
     
     # evaluating the model performance at the level of prediction
-    survival_prob = matrix(Output[grep("^survival_prob", rownames(Output)), "mean", drop = FALSE], nrow = nrow(test_dataset))
+    sp_matrix = matrix(Output[grep("^survival_prob", rownames(Output)), "mean", drop = FALSE], nrow = nrow(test_dataset))
+    time_combined <- sort(unique(train_dataset$obstime))
+    colnames(Beta_bayesian_est) = time_combined 
+    # use the approx() function in R to interpolate the time points only exist in the test dataset
+    
+    
     SurvObj = Surv(test_dataset$eventtime, test_dataset$status)
+    
+    # interprolation for the time points only occurs in the test dataset
     IBrier_score = IBS(SurvObj, survival_prob, test_dataset$eventtime)
     
+    #
   }
 }
 
