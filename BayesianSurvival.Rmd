@@ -5,23 +5,33 @@ date: "2025-02-19"
 output: pdf_document
 ---
 
-# STEP 1. load packages
-```{r, echo=TRUE}
+# Installing and/or Loading packages
+```{r, echo=TRUE, warning=FALSE}
 rm(list = ls())
 setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code")
-# install.packages("rstan")
-# install.packages("readr")
-library(rstan)
-library(readr)
-library(survival)
-library(splines2)
-# Set seed for reproducibility
-# set.seed(42)
+
+# Function to check and install packages
+install_and_load <- function(packages) {
+  for (pkg in packages) {
+    if (!require(pkg, character.only = TRUE)) {
+      install.packages(pkg, dependencies = TRUE)
+      library(pkg, character.only = TRUE)
+    }
+  }
+}
+
+# List of required packages
+required_packages <- c("rstan", "readr", "survival", "splines2", "dplyr", "simsurv", "SurvMetrics")
+
+# Install and/or load packages
+install_and_load(required_packages)
+
+# Set the seed for reproducable research
+set.seed(42)
 # source("./SurvivalDataGenerator.R")
 ```
-## Conclusion for STEP 2: the betas are correctly estimated via traditional cox regression, meaning that data was correctly generated.
 
-# STEP 3. Semiparametric & Parametric Bayesian survival model
+# Method 1: Semiparametric Bayesian survival model (Partical likelihood, in the case of being only interested in the p values of X)
 ```{r, echo=TRUE}
 Bayesian_Survival_PH <- function(stan_data,
                               niter = 10000,
@@ -47,13 +57,20 @@ Bayesian_Survival_PH <- function(stan_data,
   # Summary of the fit
   output <- summary(bayesian_model_fit)$summary
   return(output)
-  
 }
 
 ```
-## Conclusion for STEP 3: the betas are correctly estimated via bayesian cox regression, meaning that bayesian cox regression was correctly defined.
 
-## STEP 4.1: estimate the baseline function
+# Method 2: Paramertic (Full liklihood) Bayesian Survival Model (in the case of being interested in prediction, inference & variable selection)
+
+## Methodological techniques
+- The **Baseline hazard function** was evaluated via three following approaches: a. under the assumption of exponential distribution; b. under the assumption of weibull distribution; c. assumption-free, i.e., using the *B-splines* method to estimate the baseline function. In this case, the **Cumulative hazard function** was estimated by the gauss_kronrod quadradtic intergal. From the time points that does not exist, linear interpolation was also used. 
+
+- LogLikihood function =  sum(-H_i + logh_i) for uncensored data + sum(-H_i) for censored data.
+
+## Evaluation techniques
+- The **prediction** is estimated at the level of Intergal brier score. In the case of testing dataset and training dataset were observed at different time points, we used the linear interpolation to get the estimated survival probability at the time points that only occurs in the testing dataset.
+
 ```{r, echo=TRUE}
 # Exponential baseline distribution from a bayesian perspective
 Bayesian_Survival_includingbaseline <- function(stan_data, baseline_assumption = "exponential", school = "Bayesian", 
@@ -123,9 +140,6 @@ Bayesian_Survival_includingbaseline <- function(stan_data, baseline_assumption =
 # train-test dataset splitting
 Such splitting does not account for the case of non-overlapped time-points because of the proportional hazard assumption
 ```{r, echo=TRUE}
-library(simsurv)
-library(SurvMetrics)
-set.seed(123456)
 n_samples = 1000
 covariates <- data.frame(
   id = 1:n_samples,  # 100 individuals
@@ -162,7 +176,7 @@ head(sim_data)
 CrossValidation <- function(dataset = sim_data, KFold = 5, FDR = 0.1, Beta_real = beta, simulated = True){
   #pre-allocate the variables 
   rMSE = matrix(NA, nrow = KFold, ncol = length(!(names(dataset) %in% c("id", "eventtime", "status", "obstime", "status1"))) )
-  IBrier_scores = vector(NA, length = KFold)
+  IBrier_scores = numeric(KFold)
   
   folds <- cut(seq(1:nrow(dataset)), breaks = KFold, labels = FALSE)
   for (i in 1:KFold){
