@@ -160,6 +160,10 @@ head(sim_data)
 
 # Define the cross-validation
 CrossValidation <- function(dataset = sim_data, KFold = 5, Beta_real = beta, simulated = True){
+  #pre-allocate the variables 
+  rMSE = matrix(NA, nrow = KFold, ncol = length(!(names(dataset) %in% c("id", "eventtime", "status", "obstime", "status1"))) )
+  IBrier_scores = vector(NA, length = KFold)
+  
   folds <- cut(seq(1:nrow(dataset)), breaks = KFold, labels = FALSE)
   for (i in 1:KFold){
     train_dataset = dataset[folds != i, ]
@@ -195,6 +199,7 @@ CrossValidation <- function(dataset = sim_data, KFold = 5, Beta_real = beta, sim
       # EVAL 1: evaluating the model performance at the level at the level of Beta's.
       Beta_bayesian_est = Output[grep("^Beta", rownames(Output)), "mean", drop = FALSE] ## Extract the Betas
       MSE_est = (Beta_bayesian_est - Beta_real) ** 2 # MSE_est is a vector with the length being number of Betas
+      rMSE[i,] = MSE_est
       
       # EVAL 2: evaluating the model performance at the level of prediction
       sp = Output[grep("^survival_prob", rownames(Output)), "mean", drop = FALSE]
@@ -215,6 +220,7 @@ CrossValidation <- function(dataset = sim_data, KFold = 5, Beta_real = beta, sim
       
       # interpolation for the time points only occurs in the test dataset
       IBrier_score = IBS(SurvObj, sp_matrix_realT, test_dataset$eventtime) #IBrier-score is a scaler
+      IBrier_scores[i] = IBrier_score
       
       # EVAL 3: evaluating the model variable selection
       
@@ -229,6 +235,7 @@ CrossValidation <- function(dataset = sim_data, KFold = 5, Beta_real = beta, sim
       cox_model = coxph(Surv(eventtime, status) ~ cov1 + cov2, data = train_dataset)
       Beta_cox_est = coef(cox_model)
       MSE_est = (Beta_bayesian_est - Beta_cox_est) ** 2 # MSE_est is a vector with the length being number of Betas
+      rMSE[i,] = MSE_est
       
       # EVAL 2: evaluating the model performance at the level of prediction
       sp = Output[grep("^survival_prob", rownames(Output)), "mean", drop = FALSE]
@@ -249,6 +256,7 @@ CrossValidation <- function(dataset = sim_data, KFold = 5, Beta_real = beta, sim
       
       # interpolation for the time points only occurs in the test dataset
       IBrier_score = IBS(SurvObj, sp_matrix_realT, test_dataset$eventtime) #IBrier-score is a scaler
+      IBrier_scores[i] = IBrier_score
       
       # EVAL 3: evaluating the model variable selection
       message("we cannot evaluate the model regarding variable selection")
