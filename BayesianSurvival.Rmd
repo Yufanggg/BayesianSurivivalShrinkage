@@ -87,90 +87,13 @@ Bayesian_Survival_includingbaseline <- function(stan_data, baseline_assumption =
                               chains = 1) {
   if (school == "Bayesian") {
     if (baseline_assumption == "exponential") {
-      code_bayesian_model <- "
-    data {
-      int <lower=0> K; //num covariates
-      int <lower=0> N; // num uncensored obs
-      int <lower=0> M; // num unique time points
-
-      vector[N] t; // event time (non-strict decreasing)
-      matrix[N, K] x; // covariates for uncensored obs
-
-      int N_cens; // num censored obs
-      vector[N_cens] t_cens; // censoring time
-      matrix[N_cens, K] x_cens; // covariates for censored obs
-      
-      vector[M] uniqueT; //montously increasing unique time points
-      int<lower=0> N_new;
-      matrix[N_new, K] x_new;
-
-    }
-
-    parameters {
-      real<lower = 0> lambda; // parameters in expoential assumption
-      vector[K] Beta; // coefficients
-    }
-    model {
-    // prior
-    lambda ~ lognormal(0, 1);
-    Beta ~ normal (0, 2);
-
-    // log-likelihood, represented by [target]
-
-    target += exponential_lpdf(t | lambda * exp(x*Beta)); // uncensored data log(f(t))
-
-    target += exponential_lccdf(t_cens | lambda * exp(x*Beta)); // right censored data log(S(t))
-    }
-    generated quantites{
-      // Predicting the survival time on the new/test dataset
-      matrix[M, N_new] survival_prob;  // Unique time points * rows of new data
-      for (m in 1:M){
-        survival_prob[m,] = exp(-lambda*uniqueT[m] + x_new*Beta) //vectorize over the x_new.
-      }
-    }
-    "
+      # compile the model
+      bayesian_model <- stan_model("./exponential.stan")
     }
     
     else if (baseline_assumption == "weibull") {
-      code_bayesian_model <- "
-      data {
-        int <lower=0> K; //num covariates
-        int <lower=0> N; // num uncensored obs
-        int <lower=0> M; // num unique time points
-
-        vector[N] t; // event time (non-strict decreasing)
-        matrix[N, K] x; // covariates for uncensored obs
-
-        int N_cens; // num censored obs
-        vector[N_cens] t_cens; // censoring time
-        matrix[N_cens, K] x_cens; // covariates for censored obs
-        vector[M] uniqueT; //montously increasing unique time points
-
-        
-      }
-      parameters {
-        real<lower = 0> alpha; // parameters in weibull assumption
-        real<lower = 0> sigma; // parameters in weibull assumption
-        vector[K] Beta; // coefficients
-       }
-     model {
-       // Priors
-       alpha ~ lognormal(0, 1);
-       sigma ~ lognormal(0, 1);
-       Beta ~ normal (0, 2);
-
-       // log-likelihood, represented by [target]
-       target += weibull_lpdf(t | alpha, sigma/exp(x*Beta/alpha)); // weibull_lpdf() is at log scale // uncensored data log(f(t))
-       target += weibull_lccdf(t_cens | alpha, sigma/exp(x_cens*Beta/alpha)); // weibull_lccdf() is at log scale  // right censored data log(S(t)) //log complementary cumulative distribution function (log-CCDF) for an weibull distribution
-     }
-    generated quantites{
-      // Predicting the survival time on the new/test dataset
-      matrix[M, N_new] survival_prob;  // Unique time points * rows of new data
-      for (m in 1:M){
-        survival_prob[m,] = exp(-(uniqueT[m]/sigma)^alpha) + x_new*Beta) //vectorize over the x_new.
-      }
-    }
-"
+      # compile the model
+      bayesian_model <- stan_model("./weibull.stan")
     }
     
     else if (baseline_assumption == "bSplines") {
@@ -198,151 +121,9 @@ Bayesian_Survival_includingbaseline <- function(stan_data, baseline_assumption =
       stan_data$Q = length(time_cens)
       stan_data$uniquet_cens = time_cens
       
-      code_bayesian_model <- "
-      functions {
-        real gauss_kronrod_quad_Hazard_basline(real Ti, vector T, matrix bSpline_basis, vector coefficients){
-            real locat[15] = {-0.991455, -0.949107, -0.864865, -0.741531, -0.586087, -0.405845, -0.207785, 0.0, 0.207785, 0.405845, 0.586087, 0.741531, 0.864865, 0.949107, 0.991455};
-            real weights [15] = {0.022935, 0.063093, 0.104790, 0.140653, 0.169004, 0.190350, 0.204432, 0.209482, 0.204432, 0.190350, 0.169004, 0.140653, 0.104790, 0.063093, 0.022935};
-
-          // vectorize all computation
-          vector[num_elements(locat)] u_vec = Ti * (rep_vector(1, num_elements(locat))/2);
-          vector [num_elements(locat)] logh_0i_vec = vectorized_logh_0i(u_vec, T, bSpline_basis, coefficients);
-          real integral_ = sum(to_vector(weights) .* exp(logh_0i_vec));
-          
-          return integral_/2;
-        }
-        
-        vector vectorized_logh_0i(vector u_vec, vector T, matrix bSpline_basis, vector coefficients){
-           // define the log baseline hazard function in a vectorized way
-           vector[num_elements(u_vec)] logh_0i_vec;
-           vector[num_elements(T)] logh_0t = bSpline_basis * coefficients;
-           
-           for (i in 1:num_elements(u_vec)){
-             int index = find_index(u_vec[i], T);
-             if (index != -1){
-              logh_0i_vec[i] = logh_0t[index];
-             }
-            else {
-              logh_0i_vec[i] = interpolation(u_vec[i], T, logh_0t);
-            }
-           }
-           return logh_0i_vec;
-        }
-            
-        real logh_0i(real u, vector T, matrix bSpline_basis, vector coefficients){
-           // define the log baseline hazard function in a vectorized way
-           vector[num_elements(T)] logh_0t = bSpline_basis * coefficients;
-           real logh_0i;
-           
-           int index = find_index(u, T);
-           if (index != -1){
-              logh_0i = logh_0t[index];
-           }
-           
-           else{
-              logh_0i = interpolation(u, T, logh_0t);
-           }
-           
-           return logh_0i;
-        }
-        
-
-        real interpolation (real u, vector T, vector logh_0t){
-          int lower_index = 1;
-          real logh_0i_interp;
-          int upper_index = num_elements(T);
-          for (j in 1:(num_elements(T)-1)){
-            if (T[j] <= u && u < T[j + 1]) {
-                lower_index = j;
-                upper_index = j + 1;
-                break;
-              }
-          }
-          real t1 = T[lower_index];
-          real t2 = T[upper_index];
-          real h1 = logh_0t[lower_index];
-          real h2 = logh_0t[upper_index];
-          logh_0i_interp = h1 + (u - t1) * (h2 - h1) / (t2 - t1);
-          
-          return logh_0i_interp;
-        }
-
-     int find_index(real u, vector t) {
-       for (i in 1:num_elements(t)) {
-          if (u == t[i]) {
-            return i; // Return the index if u is found in t
-          }
-       }
-       return -1; //Return -1 if u is not found in t
-     }
-     
-     
-      }
-      
-      data {
-        int <lower=0> K; //num covariates
-        int <lower=0> N; // num uncensored obs
-        int <lower=0> M; // num unique time points
-        int <lower=0> O; // num unqiue time points in t
-        int <lower=0> Q; // num unqiue time points in t_cens
-        
-
-        vector[N] t; // event time (non-strict decreasing)
-        matrix[N, K] x; // covariates for uncensored obs
-
-        int N_cens; // num censored obs
-        vector[N_cens] t_cens; // censoring time
-        matrix[N_cens, K] x_cens; // covariates for censored obs
-        
-        matrix[N + N_cens, 6] bSpline_basis;
-        vector[M] uniqueT; //montously increasing unique time points
-        vector[O] uniquet; //montously increasing unique time points for t
-        vector[Q] uniquet_cens; //montously increasing unique time points for t_cens
-        
-        int<lower=0> N_new;
-        matrix[N_new, K] x_new;
-      }
-      
-      parameters {
-        vector[6] coefficients;
-        vector[K] Beta; // coefficients for design matrix;
-      } 
-        
-      model {
-      // Priors
-        coefficients ~ normal(0, 1);
-        Beta ~ normal (0, 2);
-      
-      // log-likelihood, represented by [target]
-      for (Ti in uniqueT){
-        real H_0i_ = gauss_kronrod_quad_Hazard_basline(Ti, uniqueT, bSpline_basis, coefficients);
-        real logh_0i_ = logh_0i(Ti, uniqueT, bSpline_basis, coefficients);
-        
-        if (find_index(Ti, uniquet) != -1) {
-         vector[N] H_i = H_0i_ * exp(x*Beta);
-         vector[N] logh_i = logh_0i_ + x*Beta;
-         target += -H_i + logh_i; // uncensored data log(f(t)) = -H(t) + log(h(t))
-        }
-        
-        if (find_index(Ti, uniquet_cens) != 1){
-         vector[N_cens] H_i = H_0i_ * exp(x_cens*Beta);
-         target += -H_i;  // at log scale,  right censored data log(S(t)),  log(S(t)) = -H(t)
-        }
-        
-      }
-      }
-      
-    generated quantities{ // predicting the survival time on the new/test dataset by Monte Carlo sampling (needs to be verfied)
-      matrix[M, N_new] survival_prob; // unqiue time points * rows of new data
-      for (m in 1:M){
-        real H_0i_ = gauss_kronrod_quad_Hazard_basline(m, uniqueT, bSpline_basis, coefficients);
-        survival_prob[m,] = to_row_vector(exp(-H_0i_ + x_new*Beta)); //vectorize over the x_new, output is the time points * obs
-      }
+      # compile the model
+      bayesian_model <- stan_model("./bSpline_model.stan")
     }
-    "
-    }
-    # compile the model
-    bayesian_model <- stan_model("./bSpline_model.stan")#model_name = "bayesian_model", model_code = code_bayesian_model)
     
     # Model fitting and summary
     bayesian_model_fit <- suppressWarnings(
@@ -393,7 +174,8 @@ sim_data <- simsurv(
 
 # Print simulated data
 head(sim_data)
-
+library(dplyr)
+sim_data <- cbind(sim_data, covariates) |> select("id", "eventtime", "status", "cov1", "cov2")
 censtime <- runif(n_samples, 3, 10)
 status <- as.numeric(sim_data$eventtime <= censtime) # the sum of status is the number of event
 sim_data$obstime = sim_data$eventtime * status + censtime*(1-status)
@@ -415,17 +197,17 @@ CrossValidation <- function(dataset = sim_data, KFold = 5){
       N = nrow(train_dataset[train_dataset$status == 1,]),
       # Number of non-censored data
       t = train_dataset[train_dataset$status == 1, "obstime"],
-      x = train_dataset[train_dataset$status == 1, !(names(train_dataset) %in% c("id", "eventtime", "status",  "obstime", "status1", "obstime", "status1"))],
+      x = train_dataset[train_dataset$status == 1, !(names(train_dataset) %in% c("id", "eventtime", "status", "obstime", "status1"))],
       
       N_cens = nrow(train_dataset[train_dataset$status == 0,]),
       # Number of censored data
       t_cens = train_dataset[train_dataset$status == 0, "obstime"],
-      x_cens = train_dataset[train_dataset$status == 0,!(names(train_dataset) %in% c("id", "eventtime", "status",  "obstime", "status1", "obstime", "status1"))],
+      x_cens = train_dataset[train_dataset$status == 0,!(names(train_dataset) %in% c("id", "eventtime", "status",  "obstime", "status1"))],
       
       # Data for Bayesian model prediction, issues might pop up during brier score calculation if the status for t' (test dataset) does not exist in t (train dataset)
       
       N_new = nrow(test_dataset),
-      x_new = test_dataset[,!(names(test_dataset) %in% c("id", "eventtime", "status",  "obstime", "status1", "obstime", "status1"))],
+      x_new = test_dataset[,!(names(test_dataset) %in% c("id", "eventtime", "status",  "obstime", "status1"))],
       t_new = train_dataset[, "obstime"],
       status_new = train_dataset[, "status1"]
     )
@@ -439,7 +221,7 @@ CrossValidation <- function(dataset = sim_data, KFold = 5){
     Beta_cox_est = coef(cox_model)
     
     # evaluating the model performance at the level of prediction
-    sp_matrix = matrix(Output[grep("^survival_prob", rownames(Output)), "mean", drop = FALSE], nrow = nrow(test_dataset))
+    #sp_matrix = matrix(Output[grep("^survival_prob", rownames(Output)), "mean", drop = FALSE], nrow = nrow(test_dataset))
     time_combined <- sort(unique(train_dataset$obstime))
     colnames(Beta_bayesian_est) = time_combined 
     # use the approx() function in R to interpolate the time points only exist in the test dataset
