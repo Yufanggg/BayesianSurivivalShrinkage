@@ -8,6 +8,7 @@ output: pdf_document
 # STEP 1. load packages
 ```{r, echo=TRUE}
 rm(list = ls())
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code")
 # install.packages("rstan")
 # install.packages("readr")
 library(rstan)
@@ -341,7 +342,7 @@ Bayesian_Survival_includingbaseline <- function(stan_data, baseline_assumption =
     "
     }
     # compile the model
-    bayesian_model <- stan_model(model_name = "bayesian_model", model_code = code_bayesian_model)
+    bayesian_model <- stan_model("./bSpline_model.stan")#model_name = "bayesian_model", model_code = code_bayesian_model)
     
     # Model fitting and summary
     bayesian_model_fit <- suppressWarnings(
