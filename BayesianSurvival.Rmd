@@ -211,28 +211,41 @@ CrossValidation <- function(dataset = sim_data, KFold = 5){
       t_new = train_dataset[, "obstime"],
       status_new = train_dataset[, "status1"]
     )
+    
+    # fit the model
     Output <- Bayesian_Survival_includingbaseline(stan_data = stan_data, baseline_assumption = "bSplines") # #exponential, weibull,  bSplines
-    # evaluating the model performance at the level at the level of Beta's.
+    
+    
+    # EVAL 1: evaluating the model performance at the level at the level of Beta's.
     Beta_bayesian_est = Output[grep("^Beta", rownames(Output)), "mean", drop = FALSE] ## Extract the Betas
     
     
     message("In the case of real-world data, we used the Cox regression estimator as real Beta")
     cox_model = coxph(Surv(eventtime, status) ~ cov1 + cov2, data = train_dataset)
     Beta_cox_est = coef(cox_model)
+    MSE_est = (Beta_bayesian_est - Beta_cox_est)**2 # MSE_est is a vector with the length being number of Betas
     
-    # evaluating the model performance at the level of prediction
-    #sp_matrix = matrix(Output[grep("^survival_prob", rownames(Output)), "mean", drop = FALSE], nrow = nrow(test_dataset))
-    time_combined <- sort(unique(train_dataset$obstime))
-    colnames(Beta_bayesian_est) = time_combined 
-    # use the approx() function in R to interpolate the time points only exist in the test dataset
+    # EVAL 2: evaluating the model performance at the level of prediction
+    sp = Output[grep("^survival_prob", rownames(Output)), "mean", drop = FALSE]
+    sp_matrix = matrix(sp, nrow = nrow(test_dataset))
+    training_tpoints <- sort(unique(train_dataset$obstime))
     
+    testing_tpoints <- sort(unique(test_dataset$obstime))
+    sp_matrix_realT = matrix(NA, nrow = nrow(test_dataset), ncol = length(testing_tpoints))
     
+    # use the approxfun() function in R to interpolate the time points that actually observed for the test dataset
+    for (obsID in 1:nrow(test_dataset)){
+      survival_fun = approxfun(training_tpoints, sp_matrix[obsID,], method = "linear")
+      sp_matrix_realT[obsID,] = survival_fun(testing_tpoints)
+    }
     SurvObj = Surv(test_dataset$eventtime, test_dataset$status)
     
-    # interprolation for the time points only occurs in the test dataset
-    IBrier_score = IBS(SurvObj, survival_prob, test_dataset$eventtime)
+    # interpolation for the time points only occurs in the test dataset
+    IBrier_score = IBS(SurvObj, sp_matrix_realT, test_dataset$eventtime) #IBrier-score is a scaler
     
-    #
+    # EVAL 3: evaluating the model variable selection
+    
+    
   }
 }
 
