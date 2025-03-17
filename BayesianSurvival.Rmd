@@ -29,32 +29,8 @@ Bayesian_Survival_PH <- function(stan_data,
                               thin = 10,
                               chains = 1) {
   # Proportional Hazard (PH) Model with covariates via partial likelihood function
-  code_bayesian_model <- "
-    data {
-      int <lower=0> K; //num covariates
-      int <lower=0> N; // num uncensored obs
-
-      matrix[N, K] x; // covariates for uncensored obs
-
-      int N_cens; // num censored obs
-      matrix[N_cens, K] x_cens; // covariates for censored obs
-  }
-  parameters {
-    vector[K] beta; // slopes without intercept
-  }
-  model {
-    beta ~ normal(0, 2); // prior
-    vector[N] log_theta = x * beta;
-    vector [N_cens] log_theta_c = x_cens * beta;
-    real log_denom = log_sum_exp(log_theta_c); //log_sum_exp is defined as the logarithm of the sum of exponentials of the input values
-    target += log_theta - log_denom;
-
-  }
-"
-  
-  
   # compile the model
-  bayesian_model <- stan_model(model_name = "bayesian_model", model_code = code_bayesian_model)
+  bayesian_model <- stan_model("PH.stan")
   
   # Model fitting and summary
   bayesian_model_fit <- suppressWarnings(
