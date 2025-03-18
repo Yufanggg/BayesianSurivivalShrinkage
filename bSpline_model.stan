@@ -140,3 +140,4 @@ generated quantities{ // predicting the survival time on the new/test dataset by
     survival_prob[m,] = to_row_vector(exp(-H_0i_ + x_new*Beta)); //vectorize over the x_new, output is the time points * obs
       }
   }
+  

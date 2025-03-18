@@ -8,7 +8,7 @@ output: pdf_document
 # Installing and/or Loading packages
 ```{r, echo=TRUE, warning=FALSE}
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code")
+#setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code")
 
 # Function to check and install packages
 install_and_load <- function(packages) {
@@ -66,10 +66,10 @@ Bayesian_Survival_PH <- function(stan_data,
 ## Methodological techniques
 - The **Baseline hazard function** was evaluated via three following approaches: a. under the assumption of exponential distribution; b. under the assumption of weibull distribution; c. assumption-free, i.e., using the *B-splines* method to estimate the baseline function. In this case, the **Cumulative hazard function** was estimated by the gauss_kronrod quadradtic intergal. From the time points that does not exist, linear interpolation was also used. 
 
-- LogLikihood function =  sum(-H_i + logh_i) for uncensored data + sum(-H_i) for censored data.
+- LogLiklihood function =  sum(-H_i + logh_i) for uncensored data + sum(-H_i) for censored data.
 
 ## Evaluation techniques
-- The **prediction** is estimated at the level of Intergal brier score. In the case of testing dataset and training dataset were observed at different time points, we used the linear interpolation to get the estimated survival probability at the time points that only occurs in the testing dataset.
+- The **prediction** is estimated at the level of Intergral brier score. In the case of testing dataset and training dataset were observed at different time points, we used the linear interpolation to get the estimated survival probability at the time points that only occurs in the testing dataset.
 
 ```{r, echo=TRUE}
 # Exponential baseline distribution from a bayesian perspective
@@ -173,9 +173,9 @@ sim_data$status1 = status
 head(sim_data)
 
 # Define the cross-validation
-CrossValidation <- function(dataset = sim_data, KFold = 5, FDR = 0.1, Beta_real = beta, simulated = True){
+CrossValidation <- function(dataset = sim_data, KFold = 5, FDR = 0.1, Beta_real = beta, simulated = TRUE){
   #pre-allocate the variables 
-  rMSE = matrix(NA, nrow = KFold, ncol = length(!(names(dataset) %in% c("id", "eventtime", "status", "obstime", "status1"))) )
+  rMSE = matrix(NA, nrow = KFold, ncol = sum(!(names(dataset) %in% c("id", "eventtime", "status", "obstime", "status1"))) )
   IBrier_scores = numeric(KFold)
   
   folds <- cut(seq(1:nrow(dataset)), breaks = KFold, labels = FALSE)
@@ -217,7 +217,8 @@ CrossValidation <- function(dataset = sim_data, KFold = 5, FDR = 0.1, Beta_real 
       
       # EVAL 2: evaluating the model performance at the level of prediction
       sp = Output[grep("^survival_prob", rownames(Output)), "mean", drop = FALSE]
-      sp_matrix = matrix(sp, nrow = nrow(test_dataset))
+      sp_matrix = matrix(sp, ncol = nrow(test_dataset)) #time points * Nobs_testing
+      sp_matrix = t(sp_matrix) # after tranpose, sp_matrix will be Nobs_testing * time points
       training_tpoints <- sort(unique(train_dataset$obstime))
       
       testing_tpoints <- sort(unique(test_dataset$obstime))
@@ -253,7 +254,8 @@ CrossValidation <- function(dataset = sim_data, KFold = 5, FDR = 0.1, Beta_real 
       
       # EVAL 2: evaluating the model performance at the level of prediction
       sp = Output[grep("^survival_prob", rownames(Output)), "mean", drop = FALSE]
-      sp_matrix = matrix(sp, nrow = nrow(test_dataset))
+      sp_matrix = matrix(sp, nrow = nrow(test_dataset))#time points * Nobs_testing
+      sp_matrix = t(sp_matrix) # after tranpose, sp_matrix will be Nobs_testing * time points
       training_tpoints <- sort(unique(train_dataset$obstime))
       
       testing_tpoints <- sort(unique(test_dataset$obstime))
