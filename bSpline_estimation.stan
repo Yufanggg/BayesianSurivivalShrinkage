@@ -11,10 +11,12 @@
 
 
 functions{
-  vector log_hi(matrix X, vector Beta, matrix  X_int, vector Beta_int, matrix bSpline_basis, vector coefficients){
-    vector[num_elements(bSpline_basis)] log_hi = bSpline_basis * coefficients + X * Beta + X_int * Beta;
+  vector log_h0(matrix bSpline_basis, vector coefficients){
+/*    print(rows(bSpline_basis));
+    print(num_elements(bSpline_basis * coefficients));*/
+    vector[rows(bSpline_basis)] log_h0 = bSpline_basis * coefficients;
     
-    return log_hi;
+    return log_h0;
   }
   
   vector approxfun(vector x, vector x_pred, vector y_pred) {
@@ -51,11 +53,11 @@ functions{
   }
 
   
-  real H_i(real Ti, vector T_known, vector locates, vector weights, matrix X, vector Beta, matrix X_int, vector Beta_int, matrix bSpline_basis, vector coefficients ){
+  real H_0(real Ti, vector T_known, vector locates, vector weights, matrix bSpline_basis, vector coefficients ){
     
-    vector[num_elements(locates)] hi_seq = exp(log_hi(X, Beta, X_int, Beta_int, bSpline_basis, coefficients));
-    vector[num_elements(locates)] hi_values = approxfun(Ti * (1+locates)/2, T_known, hi_seq);
-    real integral_ = Ti * sum(weights .* hi_values);
+    vector[rows(bSpline_basis)] h0_seq = exp(log_h0(bSpline_basis, coefficients));
+    vector[num_elements(locates)] h0_values = approxfun(Ti * (1+locates)/2, T_known, h0_seq);
+    real integral_ = Ti * sum(weights .* h0_values);
     return integral_/2;
   }
     
@@ -86,7 +88,8 @@ data {
   
   int<lower=0> N_new;
   matrix[N_new, p] x_new;
-  matrix[N_new, q] x_new_int;
+  matrix[N_new, q] x_int_new;
+  vector[N_new] t_new;
   
   vector[15] locates;
   vector[15] weights;
@@ -124,13 +127,15 @@ model {
   //log-likelihood, represented by [target]
   //log(f(t)) = -H(t) + log(h(t))for uncensored data
   for (n in 1:N){
-    target += (-H_i(t[n], uniqueT, locates, weights, x, Beta, x_int, Beta_int, bSpline_basis, coefficients) + log_hi(x, Beta, x_int, Beta_int, bSpline_basis, coefficients));
+    real H_t = H_0(t[n], uniqueT, locates, weights,bSpline_basis, coefficients) * exp(x[n] * Beta + x_int[n] * Beta_int);   
+    target += (-H_t) + (log_h0(bSpline_basis, coefficients) + x[n] * Beta + x_int[n] * Beta_int);
   }
    
   
   // log(S(t)) = - H(t)for censored data
   for (n in 1:N_cens){
-    target += (-H_i(t_cens[n], uniqueT, locates, weights, x_cens, Beta, x_int_cens, Beta_int, bSpline_basis, coefficients));
+    real H_t = H_0(t[n], uniqueT, locates, weights,bSpline_basis, coefficients) * exp(x[n] * Beta + x_int[n] * Beta_int); 
+    target += (-H_t);
   }
   
 }
@@ -138,8 +143,10 @@ model {
 generated quantities{// predicting the survival time on the new/test dataset by Monte Carlo sampling (needs to be verfied)
   matrix[N_new, M] survival_prob; // Nobs * unqiue time points 
   for (m in 1:M){
-    real Hi = H_i(uniqueT[m], uniqueT, locates, weights, x_new, Beta, x_new_int, Beta_int, bSpline_basis, coefficients);
-    survival_prob[, m] = exp(-Hi);
+    for (n in 1:N_new){
+      real H_t = H_0(t_new[n], uniqueT, locates, weights,bSpline_basis, coefficients) * exp(x_new[n] * Beta + x_int_new[n] * Beta_int);
+      survival_prob[n, m] = exp(-H_t);
+    }
   }
 }
 
