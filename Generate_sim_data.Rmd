@@ -120,7 +120,7 @@ stan_data <- list(
   g1=g1, g2=g2
   )
 
-rm(sim_data, X, X_int, X_main)
+rm(sim_data, X, X_int, X_main, p, q, g1, g2, int_names, main_names, column_names)
 
 # fit the model
 model <- Bayesian_Survival_includingbaseline(stan_data = stan_data, baseline_assumption = "bSplines") # #exponential, weibull,  bSplines
