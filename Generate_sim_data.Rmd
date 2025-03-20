@@ -1,0 +1,127 @@
+---
+title: "Generate_sim_data"
+author: "Yufang Wang"
+date: "2025-03-18"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+source("G:/MasterThesis/Code/Functions.R")
+
+install_and_load <- function(packages) {
+  for (pkg in packages) {
+    if (!require(pkg, character.only = TRUE)) {
+      install.packages(pkg, dependencies = TRUE)
+    }
+
+    library(pkg, character.only = TRUE) }
+  000000000
+  
+}
+
+# List of required packages
+required_packages <- c("rstan", "readr", "survival", "splines2", "dplyr", "simsurv", "SurvMetrics")
+# Install and/or load packages
+install_and_load(required_packages)
+```
+
+
+# Generate simulated data
+```{r, echo=TRUE}
+set.seed(123)
+n_samples <- 200
+n_features <- 10 
+
+design_matrix <- matrix(rnorm(n_samples * n_features), nrow = n_samples, ncol = n_features) 
+
+# Randomly select half of the columns and convert them to binary data
+select_columns <- sample(1:n_features, n_features/2)
+design_matrix[, select_columns] <- ifelse(design_matrix[, select_columns] > 0, 1, -1)
+
+
+# View the first few rows of the dataset
+head(design_matrix)
+     
+     
+covariates <- data.frame(design_matrix)
+colnames(covariates) <- paste0("Feature", 1:ncol(covariates))
+covariates$id <- 1:n_samples
+# Define the effects of the covariates
+beta <- rnorm(n_features)
+names(beta) <- paste0("Feature", 1:n_features)
+
+
+# Simulate the survival data
+sim_data <- simsurv(
+  dist = "weibull",
+  lambdas = 2, # scale
+  gammas = 5, # shape for weibull
+  betas = beta,
+  x = covariates,
+  mixture = FALSE,
+  maxt = 5  # Maximum follow-up time
+)
+
+
+sim_data <- sim_data |> left_join(covariates, by = "id") |> 
+  mutate(
+    censtime = runif(n_samples, 2, 5),
+    status = as.numeric(eventtime <= censtime),
+    obstime = eventtime * status + censtime * (1 - status)
+    ) |> select("obstime", "status", colnames(covariates))
+
+head(sim_data)
+
+rm(design_matrix, covariates, n_features, n_samples, required_packages, select_columns, install_and_load)
+```
+
+# Implemented it in the bayesian code
+```{r, echo=TRUE}
+X <- model.matrix(~.^2, data = sim_data[, !(names(sim_data) %in% c("id", "obstime", "status"))])
+dim(X)
+
+column_names = colnames(X)
+main_names =  column_names[!grepl(":", column_names)& column_names != "(Intercept)"]
+X_main = X[, main_names]
+
+int_names =  column_names[grepl(":", column_names)]
+X_int = X[, int_names]
+
+p <- dim(X_main)[2]
+q <- dim(X_int)[2]
+
+main_indices_for_int = find_main_effect_indices(int_names, main_names)
+g1 <- g(main_indices_for_int, 1)
+g2 <- g(main_indices_for_int, 2)
+
+
+# Prepares data and parameter input for Stan.
+stan_data <- list(
+  p = p, q= q, 
+  N = nrow(sim_data[sim_data$status == 1,]),
+  M = length(unique(sim_data$obstime)),
+  
+  t = sim_data[sim_data$status == 1, "obstime"],
+  x = X_main[sim_data$status == 1, ],
+  x_int= X_int[sim_data$status == 1, ],
+  
+  N_cens = nrow(sim_data[sim_data$status == 0,]),
+  t_cens = sim_data[sim_data$status == 0, "obstime"],
+  x_cens = X_main[sim_data$status == 0, ],
+  x_int_cens = X_int[sim_data$status == 0, ],
+  
+  N_new = nrow(sim_data),
+  x_new = X_main,
+  x_int_new = X_int,
+  t_new = sim_data$obstime,
+  
+  g1=g1, g2=g2
+  )
+
+rm(sim_data, X, X_int, X_main)
+
+# fit the model
+model <- Bayesian_Survival_includingbaseline(stan_data = stan_data, baseline_assumption = "bSplines") # #exponential, weibull,  bSplines
+```

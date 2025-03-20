@@ -40,12 +40,10 @@ Bayesian_Survival_includingbaseline <- function(stan_data, baseline_assumption =
     else if (baseline_assumption == "bSplines") {
       message("We utilized B-splines to estimate the baseline cumulative hazard function.")
       time_combined <- sort(unique(c(stan_data$t, stan_data$t_cens)))
-      notes = sort(runif(5, min(time_combined), max(time_combined)))
-      bSpline_basis <- bSpline(time_combined, knots = notes, degree = 1, intercept = FALSE) # The B-spline basis is calculated using the method implemented in the splines2 package
+      stan_data$bSpline_basis <- bSpline(time_combined, knots = sort(runif(5, min(time_combined), max(time_combined))), degree = 1, intercept = FALSE) # The B-spline basis is calculated using the method implemented in the splines2 package
       
       
       # Out the corresponding information in stan data
-      stan_data$bSpline_basis <- bSpline_basis
       stan_data$M = length(time_combined)
       stan_data$uniqueT = time_combined
       
@@ -55,10 +53,8 @@ Bayesian_Survival_includingbaseline <- function(stan_data, baseline_assumption =
       grid <- createNIGrid(dim = 1, type = "GHe", level = 15)
       
       # Get nodes and weights
-      locates <- getNodes(grid)
-      weights <- getWeights(grid)
-      stan_data$locates <- as.vector(locates)
-      stan_data$weights <- as.vector(weights)
+      stan_data$locates <- as.vector(getNodes(grid))
+      stan_data$weights <- as.vector(getWeights(grid))
       
       # compile the model
       bayesian_model <- stan_model("./bSpline_estimation.stan")
