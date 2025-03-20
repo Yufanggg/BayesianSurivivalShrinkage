@@ -134,7 +134,7 @@ model {
   
   // log(S(t)) = - H(t)for censored data
   for (n in 1:N_cens){
-    real H_t = H_0(t[n], uniqueT, locates, weights,bSpline_basis, coefficients) * exp(x[n] * Beta + x_int[n] * Beta_int); 
+    real H_t = H_0(t[n], uniqueT, locates, weights,bSpline_basis, coefficients) * exp(x_cens[n] * Beta + x_int_cens[n] * Beta_int); 
     target += (-H_t);
   }
   
