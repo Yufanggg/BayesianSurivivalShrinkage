@@ -1,42 +1,74 @@
+functions{
+   /**
+  * Log hazard for exponential distribution
+  *
+  * @param eta Vector, linear predictor
+  * @return A vector
+  */
+  vector exponential_log_haz(vector eta) {
+    return eta;
+  }
+  
+  /**
+  * Log survival and log CDF for exponential distribution
+  *
+  * @param eta Vector, linear predictor
+  * @param t Vector, event or censoring times
+  * @return A vector
+  */
+  vector exponential_log_surv(vector eta, vector t) {
+    vector[rows(eta)] res;
+    res = - t .* exp(eta);
+    return res;
+  }
+  
+  
+}
 data {
-      int<lower=0> p; // num main effect
-      int<lower=0> q; // num interaction effect
-      int <lower=0> N; // num uncensored obs
-      int <lower=0> M; // num unique time points
-      
-      int g1[q];
-      int g2[q];
-
-      vector[N] t; // event time (non-strict decreasing)
-      matrix[N, p] x; // covariates for uncensored obs
-      matrix[N, q] x_int;
-
-      int <lower=0> N_cens; // num censored obs
-      vector[N_cens] t_cens; // censoring time
-      matrix[N_cens, p] x_cens; // covariates for censored obs
-      matrix[N_cens, q] x_int_cens;
-      
-      vector[M] uniqueT; //montously increasing unique time points
-      int<lower=0> N_new;
-      matrix[N_new, p] x_new;
-      matrix[N_new, q] x_int_new;
-      vector[N_new] t_new;
-
+  // response and time variables
+  int<lower=0> nevent;
+  int<lower=0> nrcens;
+  vector[nevent] t_event;  // time of events
+  vector[nrcens] t_rcens;  // time of right censoring
+  
+  
+  // predictor matrices (time-fixed)
+  int<lower=0> p; // num main effect
+  int<lower=0> q; // num interaction effect
+  
+  matrix[nevent,p] x_event; // for rows with events
+  matrix[nevent,q] x_int_event; 
+  
+  matrix[nrcens,p] x_rcens; // for rows with right censoring
+  matrix[nrcens,q] x_int_rcens; // for rows with right censoring
+  
+  
+  // link the interaction effect with the corresponding main effects
+  int g1[q];
+  int g2[q];
+  
+  // for prediction
+  int<lower=0> nnew;
+  vector[nnew] t_new;
+  matrix[nnew,p] x_new; // for rows with events
+  matrix[nnew,q] x_int_new;
     }
 
 parameters {
-      real<lower = 0> lambda; // parameters in expoential assumption
-      vector[p] Beta; // coefficients for design matrix;
-      vector[q] Beta_int;
-      
-      real<lower=0.01, upper=1> tau2int;
-      real<lower=0>  tau2[p];
-      real<lower=0>  gam2[p];
-    }
+  vector[p] Beta; // coefficients for design matrix;
+  vector[q] Beta_int;
+  
+  real<lower=0.01, upper=1> tau2int;
+  real<lower=0>  tau2[p];
+  real<lower=0>  gam2[p];
+  }
     
 model {
+    // pre-allocated variables
+    vector[nevent] eta_event; // for events
+    vector[nrcens] eta_rcens; // for right censored
+
     // prior
-    lambda ~ lognormal(0, 1);
     tau2int ~ uniform(0.01,1);
     
     for (k in 1:p){
@@ -51,18 +83,24 @@ model {
     for (i in 1:q){
       Beta_int[i] ~ normal(0, sqrt(sqrt(tau2[g1[i]]*tau2[g2[i]])*tau2int));
       }
+      
 
     // log-likelihood, represented by [target]
-
-    target += exponential_lpdf(t | lambda * exp(x*Beta + x_int * Beta_int)); // uncensored data log(f(t))
-
-    target += exponential_lccdf(t_cens | lambda * exp(x_cens*Beta + x_int_cens * Beta_int)); // right censored data log(S(t))
+    if (nevent > 0) {
+      eta_event = x_event * Beta + x_int_event * Beta_int;
+      target +=  exponential_log_haz (eta_event);
+      target +=  exponential_log_surv(eta_event, t_event); // uncensored data log(f(t)) = log(h(t)) + log(S(t))
+      }
+      
+    if (nrcens > 0) {
+      eta_rcens = x_rcens * Beta + x_int_rcens * Beta_int;
+      target +=  exponential_log_surv(eta_rcens, t_rcens); // right censored data log(S(t))
+      }
+}
+    
+generated quantities{
+      // Predicting the survival time on the new/test dataset
+      vector[nnew] survival_prob;  // 
+      survival_prob = exp(exponential_log_surv(x_new * Beta + x_int_new * Beta_int, t_new));
     }
     
-generated quantites{
-      // Predicting the survival time on the new/test dataset
-      matrix[N_new, N_new] survival_prob;  // Unique time points * rows of new data
-      for (n in 1:N_new){
-        survival_prob[m,] = exp(-lambda*t_new[n] + x_new*Beta) //vectorize over the x_new.
-      }
-    }
