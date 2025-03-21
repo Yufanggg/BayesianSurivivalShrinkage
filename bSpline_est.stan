@@ -52,8 +52,14 @@ functions{
     return y;
   }
 
+  real log_h0_value(real Ti, vector T_known, matrix bSpline_basis, vector coefficients){
+    vector[rows(bSpline_basis)] logh0_seq = log_h0(bSpline_basis, coefficients);
+    vector[1] log_h0_value = approxfun(rep_vector(Ti, 1), T_known, logh0_seq);
+    
+    return log_h0_value[1];
+  }
   
-  real H_0(real Ti, vector T_known, vector locates, vector weights, matrix bSpline_basis, vector coefficients ){
+  real H_0(real Ti, vector T_known, vector locates, vector weights, matrix bSpline_basis, vector coefficients){
     
     vector[rows(bSpline_basis)] h0_seq = exp(log_h0(bSpline_basis, coefficients));
     vector[num_elements(locates)] h0_values = approxfun(Ti * (1+locates)/2, T_known, h0_seq);
@@ -128,13 +134,13 @@ model {
   //log(f(t)) = -H(t) + log(h(t))for uncensored data
   for (n in 1:N){
     real H_t = H_0(t[n], uniqueT, locates, weights,bSpline_basis, coefficients) * exp(x[n] * Beta + x_int[n] * Beta_int);   
-    target += (-H_t) + (log_h0(bSpline_basis, coefficients) + x[n] * Beta + x_int[n] * Beta_int);
+    target += (-H_t) + (log_h0_value(t[n], uniqueT, bSpline_basis, coefficients) + x[n] * Beta + x_int[n] * Beta_int);
   }
    
   
   // log(S(t)) = - H(t)for censored data
   for (n in 1:N_cens){
-    real H_t = H_0(t[n], uniqueT, locates, weights,bSpline_basis, coefficients) * exp(x_cens[n] * Beta + x_int_cens[n] * Beta_int); 
+    real H_t = H_0(t[n], uniqueT, locates, weights,bSpline_basis, coefficients)* exp(x_cens[n] * Beta + x_int_cens[n] * Beta_int) ; 
     target += (-H_t);
   }
   
@@ -143,7 +149,7 @@ model {
 generated quantities{// predicting the survival time on the new/test dataset by Monte Carlo sampling (needs to be verfied)
   vector[N_new] survival_prob; // Nobs * unqiue time points 
   for (n in 1:N_new){
-      real H_t = H_0(t_new[n], uniqueT, locates, weights,bSpline_basis, coefficients) * exp(x_new[n] * Beta + x_int_new[n] * Beta_int);
+      real H_t = H_0(t_new[n], uniqueT, locates, weights,bSpline_basis, coefficients)* exp(x_new[n] * Beta + x_int_new[n] * Beta_int);
       survival_prob[n] = exp(-H_t);
     }
   }

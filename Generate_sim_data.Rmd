@@ -116,6 +116,7 @@ stan_data <- list(
   x_new = X_main,
   x_int_new = X_int,
   t_new = sim_data$obstime,
+  status_new = sim_data$status,
   
   g1=g1, g2=g2
   )
