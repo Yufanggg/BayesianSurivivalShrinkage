@@ -114,21 +114,15 @@ stan_bSpline_data_Constructer(dataset, obs_window, ){
     
     # number of quadrature points
     qevent <- length(qwts_event)
-    qlcens <- length(qwts_lcens)
     qrcens <- length(qwts_rcens)
-    qicens <- length(qwts_icenl)
-    qdelay <- length(qwts_delay)
-    
+
  
   #----- basis terms for baseline hazard
   
     basis_epts_event <- make_basis(t_event,    basehaz)
     basis_qpts_event <- make_basis(qpts_event, basehaz)
-    basis_qpts_lcens <- make_basis(qpts_lcens, basehaz)
     basis_qpts_rcens <- make_basis(qpts_rcens, basehaz)
-    basis_qpts_icenl <- make_basis(qpts_icenl, basehaz)
-    basis_qpts_icenu <- make_basis(qpts_icenu, basehaz)
-    basis_qpts_delay <- make_basis(qpts_delay, basehaz)
+
     
 
   
@@ -205,6 +199,16 @@ stan_bSpline_data_Constructer(dataset, obs_window, ){
 
 
 #---------- internal
+# Select rows of a matrix
+#
+# @param x A matrix.
+# @param rows Logical or numeric vector stating which rows of 'x' to retain.
+keep_rows <- function(x, rows = 1:nrow(x)) {
+    x[rows, , drop = FALSE]
+  }  
+  
+  
+  
   
 # From a vector of length M giving the number of elements (for example number
 # of parameters or observations) for each submodel, create an indexing array 
