@@ -11,112 +11,122 @@
 
 
 functions{
-  vector log_h0(matrix bSpline_basis, vector coefficients){
-/*    print(rows(bSpline_basis));
-    print(num_elements(bSpline_basis * coefficients));*/
-    vector[rows(bSpline_basis)] log_h0 = bSpline_basis * coefficients;
-    
-    return log_h0;
+  /**
+  * Log hazard for B-spline model
+  *
+  * @param eta Vector, linear predictor
+  * @param t Vector, event or censoring times
+  * @param coefs Vector, B-spline coefficients
+  * @return A vector
+  */
+  vector bspline_log_haz(vector eta, matrix bSpline_basis, vector coefs) {
+    return bSpline_basis * coefs + eta;
   }
   
-  vector approxfun(vector x, vector x_pred, vector y_pred) {
-    // x_pred, y_pred are the known points 
-    int N = num_elements(x);
-    int K = num_elements(x_pred);
-    vector[N] y;
-    
-    for (n in 1:N) {
-      int i = 1;
-      
-      // Check if x[n] exactly matches any x_pred value
-      for (k in 1:K) {
-        if (x[n] == x_pred[k]) {
-          y[n] = y_pred[k];
-          continue;
-        }
-      }
-      
-      // Find the interval for x[n]
-      while (i < K && x_pred[i + 1] < x[n]) {
-        i += 1;
-      }
-      
-      // Linear interpolation
-      if (i < K) {
-        y[n] = y_pred[i] + (y_pred[i + 1] - y_pred[i]) * (x[n] - x_pred[i]) / (x_pred[i + 1] - x_pred[i]);
-      } else {
-        y[n] = y_pred[K]; // Extrapolate using the last interval
-      }
-    }
-    
-    return y;
+   /**
+  * Evaluate log survival or log CDF from the log hazard evaluated at
+  * quadrature points and a corresponding vector of quadrature weights
+  *
+  * @param qwts Vector, the quadrature weights
+  * @param log_hazard Vector, log hazard at the quadrature points
+  * @param qnodes Integer, the number of quadrature points for each individual
+  * @param N Integer, the number of individuals (ie. rows(log_hazard) / qnodes)
+  * @return A vector
+  */
+  real quadrature_log_surv(vector qwts, vector log_hazard) {
+    return - dot_product(qwts, exp(log_hazard)); // sum across all individuals
+  }
   }
 
-  real log_h0_value(real Ti, vector T_known, matrix bSpline_basis, vector coefficients){
-    vector[rows(bSpline_basis)] logh0_seq = log_h0(bSpline_basis, coefficients);
-    vector[1] log_h0_value = approxfun(rep_vector(Ti, 1), T_known, logh0_seq);
-    
-    return log_h0_value[1];
-  }
-  
-  real H_0(real Ti, vector T_known, vector locates, vector weights, matrix bSpline_basis, vector coefficients){
-    
-    vector[rows(bSpline_basis)] h0_seq = exp(log_h0(bSpline_basis, coefficients));
-    vector[num_elements(locates)] h0_values = approxfun(Ti * (1+locates)/2, T_known, h0_seq);
-    real integral_ = Ti * sum(weights .* h0_values);
-    return integral_/2;
-  }
-    
-  }
 
 data {
-  int<lower=0> p; // num main effect
-  int<lower=0> q; // num interaction effect
-  int <lower=0> N; // num uncensored obs
-  int <lower=0> M; // num unique time points
+  // dimensions
+  int<lower=0> p;          // num. cols in main effects (time-fixed)
+  int<lower=0> q;          // num. cols in interaction effects (time-fixed)
   
+  
+/*  int<lower=0> nevent;     // num. rows w/ an event (ie. not censored)
+  int<lower=0> nrcens;     // num. rows w/ right censoring*/
+  
+  int<lower=0> Nevent;     // num. rows w/ an event;      used only w/ quadrature
+  int<lower=0> Nrcens;     // num. rows w/ right cens;    used only w/ quadrature
 
+  int<lower=0> qnodes;     // num. nodes for GK quadrature
+  int<lower=0> qevent;     // num. quadrature points for rows w/ an event
+  int<lower=0> qrcens;     // num. quadrature points for rows w/ right censoring
+
+  int<lower=0> nvars;      // num. aux parameters for baseline hazard
+
+
+
+  // response and time variables
+/*  vector[nevent] t_event;  // time of events
+  vector[nrcens] t_rcens;  // time of right censoring*/
+
+
+  vector[Nevent] epts_event;  // time of events
+  vector[qevent] qpts_event;  // qpts for time of events
+  vector[qrcens] qpts_rcens;  // qpts for time of right censoring
+
+
+
+  // predictor matrices (time-fixed), with quadrature
+  matrix[Nevent,p] x_epts_event; // for rows with events
+  matrix[Nevent,q] x_int_epts_event; // for rows with events
   
+  matrix[qevent,p] x_qpts_event; // for rows with events
+  matrix[qevent,q] x_int_qpts_event; // for rows with events
+  
+  matrix[qrcens,p] x_qpts_rcens; // for rows with right censoring
+  matrix[qrcens,q] x_int_qpts_rcens; // for rows with right censoring
+
+
+
+  // basis matrices for B-splines, with quadrature
+  matrix[Nevent,nvars] basis_epts_event; // at event time
+  matrix[qevent,nvars] basis_qpts_event; // at qpts for event time
+  matrix[qrcens,nvars] basis_qpts_rcens; // at qpts for right censoring time
+
+
+
+  // GK quadrature weights, with (b-a)/2 scaling already incorporated
+  vector[qevent] qwts_event;
+  vector[qrcens] qwts_rcens;
+  
+  // link the interaction effect with the corresponding main effects
   int g1[q];
   int g2[q];
-  
-  vector[N] t; // event time (non-strict decreasing)
-  matrix[N, p] x; // covariates for uncensored obs
-  matrix[N, q] x_int;
-  
-  int <lower=0> N_cens; // num censored obs
-  vector[N_cens] t_cens; // censoring time
-  matrix[N_cens, p] x_cens; // covariates for censored obs
-  matrix[N_cens, q] x_int_cens;
-  
-  matrix[M, 6] bSpline_basis;
-  vector[M] uniqueT; //montously increasing unique time points
-  
-  int<lower=0> N_new;
-  matrix[N_new, p] x_new;
-  matrix[N_new, q] x_int_new;
-  vector[N_new] t_new;
-  
-  vector[15] locates;
-  vector[15] weights;
-  
+
 }
 
 // The parameters accepted by the model. Our model
 parameters {
-  vector[6] coefficients;
+  vector[nvars] coefs;
   vector[p] Beta; // coefficients for design matrix;
   vector[q] Beta_int;
   
   real<lower=0.01, upper=1> tau2int;
   real<lower=0>  tau2[p];
   real<lower=0>  gam2[p];
+  
 }
 
 
 model {
+  //pre-allocate variables
+  vector[Nevent] eta_epts_event; // for event times
+  vector[qevent] eta_qpts_event; // for qpts for event time
+  vector[qrcens] eta_qpts_rcens; // for qpts for right censoring time
+
+  
+  //log-scale hazard models
+  vector[Nevent] lhaz_epts_event;
+  vector[qevent] lhaz_qpts_event;
+  vector[qrcens] lhaz_qpts_rcens;
+  
+  
   //Prior
-  coefficients ~ normal(0, 1);
+  coefs ~ normal(0, 1);
   tau2int ~ uniform(0.01,1);
   for (k in 1:p){
     gam2[k] ~ inv_gamma(0.5, 1);
@@ -130,27 +140,34 @@ model {
     Beta_int[i] ~ normal(0, sqrt(sqrt(tau2[g1[i]]*tau2[g2[i]])*tau2int));
     }
   
+  
   //log-likelihood, represented by [target]
-  //log(f(t)) = -H(t) + log(h(t))for uncensored data
-  for (n in 1:N){
-    real H_t = H_0(t[n], uniqueT, locates, weights,bSpline_basis, coefficients) * exp(x[n] * Beta + x_int[n] * Beta_int);   
-    target += (-H_t) + (log_h0_value(t[n], uniqueT, bSpline_basis, coefficients) + x[n] * Beta + x_int[n] * Beta_int);
+  if (Nevent > 0) {
+    eta_epts_event = x_event * Beta + x_int_event * Beta_int;
+    lhaz_epts_event = bspline_log_haz(eta_epts_event, basis_epts_event, coefs);// B-splines, on log haz scale 
+    target +=  lhaz_epts_event;
+    }
+    
+  if (qevent > 0){
+    eta_qpts_event = x_qpts_event * Beta + x_qpts_int_event * Beta_int;;
+    lhaz_qpts_event = bspline_log_haz(eta_qpts_event, basis_qpts_event, coefs)
+    target +=  quadrature_log_surv(qwts_event, lhaz_qpts_event); // log(f(t)) = -H(t) + log(h(t))for uncensored data
   }
-   
   
-  // log(S(t)) = - H(t)for censored data
-  for (n in 1:N_cens){
-    real H_t = H_0(t[n], uniqueT, locates, weights,bSpline_basis, coefficients)* exp(x_cens[n] * Beta + x_int_cens[n] * Beta_int) ; 
-    target += (-H_t);
-  }
   
+  if (qrcens > 0) {
+    eta_qpts_rcens = x_qpts_rcens * Beta + x_int_qpts__rcens * Beta_int;
+    lhaz_qpts_rcens = bspline_log_haz(eta_qpts_rcens, basis_qpts_rcens, coefs);
+    target +=  quadrature_log_surv(qwts_rcens, lhaz_qpts_rcens); // log(S(t)) = - H(t)for right censored data
+    }
+
 }
 
-generated quantities{// predicting the survival time on the new/test dataset by Monte Carlo sampling (needs to be verfied)
-  vector[N_new] survival_prob; // Nobs * unqiue time points 
-  for (n in 1:N_new){
-      real H_t = H_0(t_new[n], uniqueT, locates, weights,bSpline_basis, coefficients)* exp(x_new[n] * Beta + x_int_new[n] * Beta_int);
-      survival_prob[n] = exp(-H_t);
-    }
+/*generated quantities{
+  // Predicting the survival time on the new/test dataset
+      vector[nnew] survival_prob;  // 
+      vector[nnew] eta_event_new = x_new * Beta + x_int_new * Beta_int;
+      vector[nnew] lhaz_qpts_event = bspline_log_haz(eta_qpts_event, basis_qpts_event, coefs);
+      survival_prob = exp(quadrature_log_surv(t_new, lhaz_qpts_event));
   }
-
+*/

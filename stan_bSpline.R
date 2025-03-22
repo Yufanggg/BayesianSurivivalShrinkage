@@ -35,10 +35,10 @@ stan_bSpline_data_Constructer(training_dataset, testing_dataset, obs_window, qno
 
   
   #----- baseline hazard
-  basehaz <- handle_basehaz_surv(times          = dataset$obstime, 
-                                 status         = status,
+  basehaz <- handle_basehaz_surv(times          = training_dataset$obstime, 
+                                 status         = training_dataset$status,
                                  min_t          = 0,
-                                 max_t          = max(c(dataset$obstime, obs_window), na.rm = TRUE)){
+                                 max_t          = max(c(training_dataset$obstime, obs_window), na.rm = TRUE))
   nvars <- basehaz$nvars # number of basehaz aux parameters
     
     
@@ -85,28 +85,21 @@ stan_bSpline_data_Constructer(training_dataset, testing_dataset, obs_window, qno
   df_event <- subset(training_dataset, status == 1)
   df_rcens <-  subset(training_dataset, status == 0)
     
-    
+  # combined model frame, with quadrature  
   mf_cpts <- rbind(df_event,
-                     rep_rows(df_event, times = qnodes),
-                     rep_rows(df_rcens, times = qnodes))
+                   rep_rows(df_event, times = qnodes),
+                   rep_rows(df_rcens, times = qnodes))
     
     
     
-    #----- time-fixed predictor matrices
-    ff        <- formula$fe_form
-    x         <- make_x(ff, mf     )$x
-    x_cpts    <- make_x(ff, mf_cpts)$x
-    x_centred <- sweep(x_cpts, 2, colMeans(x), FUN = "-")
-    K         <- ncol(x_cpts)
-    
-    
-    
-    # time-fixed predictor matrices, with quadrature
-    # NB skip index 6 on purpose, since time fixed predictor matrix is 
-    # identical for lower and upper limits of interval censoring time
-    x_epts_event <- x_centred[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
-    x_qpts_event <- x_centred[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
-    x_qpts_rcens <- x_centred[idx_cpts[4,1]:idx_cpts[4,2], , drop = FALSE]
+  # time-fixed predictor matrices, with quadrature
+  x_epts_event <- mf_cpts[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
+  x_qpts_event <- mf_cpts[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
+  x_qpts_rcens <- mf_cpts[idx_cpts[3,1]:idx_cpts[3,2], , drop = FALSE]
+  
+  x_int_epts_event <- mf_cpts[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
+  x_int_qpts_event <- mf_cpts[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
+  x_int_qpts_rcens <- mf_cpts[idx_cpts[3,1]:idx_cpts[3,2], , drop = FALSE]
     
 
   #----------------
@@ -126,6 +119,27 @@ stan_bSpline_data_Constructer(training_dataset, testing_dataset, obs_window, qno
     Nevent       = sum(training_dataset$status == 1),
     Nrcens       = sum(training_dataset$status == 0),
     
+    qevent       = qevent,
+    qrcens       = qrcens,
+    
+    
+    epts_event   = t_event,
+    qpts_event   = qpts_event,
+    qpts_rcens   = qpts_rcens,
+    
+    
+    qwts_event   = qwts_event,
+    qwts_rcens   =qwts_rcens,
+    
+    
+    x_epts_event = x_epts_event,
+    x_qpts_event = x_qpts_event,
+    x_qpts_rcens = x_qpts_rcens,
+    
+    
+    basis_epts_event = basis_epts_event,
+    basis_qpts_event = basis_qpts_event,
+    basis_qpts_rcens = basis_qpts_rcens,
     
     # link the interaction effect with the corresponding main effects
     g1,
@@ -137,63 +151,6 @@ stan_bSpline_data_Constructer(training_dataset, testing_dataset, obs_window, qno
   
   
 }  
-  
-  #----------------
-  # Construct data
-  #----------------
-  
-  
-  #----- dimensions and response vectors
-  
-  status = dataset$status # event indicator for each row of data
-  
-  
-  
-  # time variables for stan
-  t_event # exact event time
-  t_rcens # right censoring time
-  
-  
-  # dimensions
-  nevent <- 
-  nrcens <- 
-  
-
-  
-  #
-  
-  
-  #----- stan data
-  
-  standata <- nlist(
-    K, 
-    
-
-    
-    qevent       = qevent,
-    qrcens       = qrcens,
-
-    
-    epts_event   = t_event,
-    qpts_event   = qpts_event,
-    qpts_rcens   = qpts_rcens,
-
-    
-    qwts_event   = qwts_event,
-    qwts_rcens   =qwts_rcens,
-
-    
-    x_epts_event = x_epts_event,
-    x_qpts_event = x_qpts_event,
-    x_qpts_rcens = x_qpts_rcens,
-
-    
-    basis_epts_event = basis_epts_event,
-    basis_qpts_event = basis_qpts_event,
-    basis_qpts_rcens = basis_qpts_rcens,
-  )
-}
-
 
 
 #---------- internal
@@ -206,7 +163,20 @@ keep_rows <- function(x, rows = 1:nrow(x)) {
   }  
   
   
-  
+# Replicate rows of a matrix or data frame
+#
+# @param x A matrix or data frame.
+# @param ... Arguments passed to 'rep', namely 'each' or 'times'.
+rep_rows <- function(x, ...) {
+  if (is.null(x) || !nrow(x)) {
+    return(x)
+  } else if (is.matrix(x) || is.data.frame(x)) {
+    x <- x[rep(1:nrow(x), ...), , drop = FALSE]
+  } else {
+    stop2("'x' must be a matrix or data frame.")
+  }
+  x
+}
   
 # From a vector of length M giving the number of elements (for example number
 # of parameters or observations) for each submodel, create an indexing array 
@@ -266,7 +236,90 @@ unstandardise_qpts <- function(x, a, b, na.ok = TRUE) {
     ((b - a) / 2) * x + ((b + a) / 2)
   }
   
+
   
+# Return the cutpoints for a specified number of quantiles of 'x'
+#
+# @param x A numeric vector.
+# @param nq Integer specifying the number of quantiles.
+# @return A vector of percentiles corresponding to percentages 100*k/m for 
+#   k=1,2,...,nq-1.
+qtile <- function(x, nq = 2) {
+  if (nq > 1) {
+    probs <- seq(1, nq - 1) / nq
+    return(quantile(x, probs = probs))
+  } else if (nq == 1) {
+    return(NULL)
+  } else {
+    stop("'nq' must be >= 1.")
+  }
+}
+
+
+
+
+# Return a vector with internal knots for 'x', based on evenly spaced quantiles
+#
+# @param x A numeric vector.
+# @param df The degrees of freedom. If specified, then 'df - degree - intercept'.
+#   knots are placed at evenly spaced percentiles of 'x'. If 'iknots' is 
+#   specified then 'df' is ignored.
+# @param degree Non-negative integer. The degree for the spline basis.
+# @param iknots Optional vector of internal knots.
+# @return A numeric vector of internal knot locations, or NULL if there are
+#   no internal knots.
+get_iknots <- function(x, df = 5L, degree = 3L, iknots = NULL, intercept = FALSE) {
+  
+  # obtain number of internal knots
+  if (is.null(iknots)) {
+    nk <- df - degree - intercept
+  } else {
+    nk <- length(iknots)
+  }
+  
+  # validate number of internal knots
+  if (nk < 0) {
+    stop2("Number of internal knots cannot be negative.")
+  }
+  
+  # if no internal knots then return empty vector
+  if (nk == 0) {
+    return(numeric(0))
+  }
+  
+  # obtain default knot locations if necessary
+  if (is.null(iknots)) {
+    iknots <- qtile(x, nq = nk + 1) # evenly spaced percentiles
+  }
+  
+  # return internal knot locations, ensuring they are positive
+  validate_positive_scalar(iknots)
+  
+  return(iknots)
+}
+
+
+# Throw error if parameter isn't a positive scalar
+#
+# @param x The object to test.
+validate_positive_scalar <- function(x, not_greater_than = NULL) {
+  nm <- deparse(substitute(x))
+  if (is.null(x))
+    stop(nm, " cannot be NULL", call. = FALSE)
+  if (!is.numeric(x))
+    stop(nm, " should be numeric", call. = FALSE)
+  if (any(x <= 0)) 
+    stop(nm, " should be postive", call. = FALSE)
+  if (!is.null(not_greater_than)) {
+    if (!is.numeric(not_greater_than) || (not_greater_than <= 0))
+      stop("'not_greater_than' should be numeric and postive")
+    if (!all(x <= not_greater_than))
+      stop(nm, " should less than or equal to ", not_greater_than, call. = FALSE)
+  }
+}
+
+
+
 # Function to return standardised GK quadrature points and weights
 #
 # @param nodes The required number of quadrature nodes
@@ -357,7 +410,12 @@ get_quadpoints <- function(nodes = 15) {
     } else stop("'qnodes' must be either 7, 11 or 15.")  
   }
   
-  
+# Unlist the result from an lapply call
+#
+# @param X,FUN,... Same as lapply
+uapply <- function(X, FUN, ...) {
+  unlist(lapply(X, FUN, ...))
+}
 
 # Construct a list with information about the baseline hazard
 #
@@ -481,24 +539,6 @@ has_intercept <- function(basehaz) {
 
 
 
-# Return the desired spline basis for the given knot locations
-get_basis <- function(x,
-                      iknots,
-                      bknots = range(x),
-                      degree = 3,
-                      intercept = FALSE) {
-  out <- splines2::bSpline(
-    x,
-    knots = iknots,
-    Boundary.knots = bknots,
-    degree = degree,
-    intercept = intercept
-  )
-  out
-}
-
-
-
 # Return the spline basis for the given type of baseline hazard.
 # 
 # @param times A numeric vector of times at which to evaluate the basis.
@@ -516,6 +556,9 @@ make_basis <- function(times, basehaz, integrate = FALSE) {
   basis_matrix(times, basis = basehaz$basis)
 }
 
+
+aa <- function(x, ...) as.array  (x, ...)
+
 # Evaluate a spline basis matrix at the specified times
 #
 # @param time A numeric vector.
@@ -525,8 +568,7 @@ make_basis <- function(times, basehaz, integrate = FALSE) {
 basis_matrix <- function(times, basis, integrate = FALSE) {
   out <- predict(basis, times)
   if (integrate) {
-    stopifnot(inherits(basis, "MSpline"))
-    class(basis) <- c("ISpline", "splines2", "matrix")
+    class(basis) <- c("splines2")
     out <- predict(basis, times)
   }
   aa(out)
