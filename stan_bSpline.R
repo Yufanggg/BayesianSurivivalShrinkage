@@ -1,57 +1,141 @@
 # Part of the rstanarm package for estimating model parameters
 
-#' @param basehaz A character string indicating which baseline hazard or
-#'   baseline survival distribution to use for the event submodel. 
-#'   
-#'   The following are available under a hazard scale formulation: 
-#'   \code{"bs"}: A flexible parametric model using cubic B-splines to 
-#'     model the \emph{log} baseline hazard. The default locations for the  
-#'     internal knots, as well as the basis terms for the splines, are calculated 
-#'     with respect to time. A closed form solution for the cumulative hazard 
-#'     is \strong{not} available regardless of whether or not the model includes
-#'     time-varying effects; instead, quadrature is used to evaluate 
-#'     the cumulative hazard at each MCMC iteration. Therefore, if your model
-#'     does not include any time-varying effects, then estimation using the 
-#'   
-#' @param basehaz_ops A named list specifying options related to the baseline
-#'   hazard. Currently this can include: \cr
-#'   \itemize{
-#'     \item \code{degree}: A positive integer specifying the degree for the 
-#'     M-splines or B-splines. The default is \code{degree = 3}, which
-#'     corresponds to cubic splines. Note that specifying \code{degree = 0}
-#'     is also allowed and corresponds to piecewise constant.
-#'     \item \code{df}: A positive integer specifying the degrees of freedom 
-#'     for the M-splines or B-splines. For M-splines (i.e. when 
-#'     \code{basehaz = "ms"}), two boundary knots and \code{df - degree - 1} 
-#'     internal knots are used to generate the spline basis. For B-splines 
-#'     (i.e. when \code{basehaz = "bs"}), two boundary knots and 
-#'     \code{df - degree} internal knots are used to generate the spline 
-#'     basis. The difference is due to the fact that the M-spline basis
-#'     includes an intercept, whereas the B-spline basis does not. The 
-#'     default is \code{df = 6} for M-splines and \code{df = 5} for
-#'     B-splines (i.e. two boundary knots and two internal knots when the
-#'     default cubic splines are being used). The internal knots are placed 
-#'     at equally spaced percentiles of the distribution of uncensored event 
-#'     times.
-#'     \item \code{knots}: A numeric vector explicitly specifying internal 
-#'     knot locations for the M-splines or B-splines. Note that \code{knots} 
-#'     cannot be specified if \code{df} is specified.
-#'   }
-#'   Note that for the M-splines and B-splines -- in addition to any internal
-#'   \code{knots} -- a lower boundary knot is placed at the earliest entry time
-#'   and an upper boundary knot is placed at the latest event or censoring time.
-#'   These boundary knot locations are the default and cannot be changed by the
-#'   user.
 #'   
 #' @param qnodes The number of nodes to use for the Gauss-Kronrod quadrature
 #'   that is used to evaluate the cumulative hazard when \code{basehaz = "bs"}
 #'   Options are 15 (the default), 11 or 7.
  
 # assumptions: all data are right censored data with the observed window being [0, obs_window]
-stan_bSpline_data_Constructer(dataset, obs_window, ){
+stan_bSpline_data_Constructer(training_dataset, testing_dataset, obs_window, qnodes = 15){
   
-  basehaz = "bs"
-  qnodes = 15
+  # organize the data regarding predictor
+  
+  X <-
+    model.matrix( ~ . ^ 2, data = training_dataset[,!(names(training_dataset) %in% c("id", "obstime", "status"))])
+  dim(X)
+  
+  column_names = colnames(X)
+  main_names =  column_names[!grepl(":", column_names) &
+                               column_names != "(Intercept)"] #whether or not having intercept needs to be verified
+  X_main = X[, main_names]
+  
+  int_names =  column_names[grepl(":", column_names)]
+  X_int = X[, int_names]
+  
+  p <- dim(X_main)[2]
+  q <- dim(X_int)[2]
+  
+  main_indices_for_int = find_main_effect_indices(int_names, main_names)
+  g1 <- g(main_indices_for_int, 1)
+  g2 <- g(main_indices_for_int, 2)
+  
+  t_event = training_dataset[training_dataset$status == 1, "obstime"]
+  t_rcens = training_dataset[training_dataset$status == 0, "obstime"]
+  
+
+  
+  #----- baseline hazard
+  basehaz <- handle_basehaz_surv(times          = dataset$obstime, 
+                                 status         = status,
+                                 min_t          = 0,
+                                 max_t          = max(c(dataset$obstime, obs_window), na.rm = TRUE)){
+  nvars <- basehaz$nvars # number of basehaz aux parameters
+    
+    
+    
+  # model uses quadrature
+    
+  # standardised nodes and weights for quadrature
+  qq <- get_quadpoints(nodes = qnodes)
+  qp <- qq$points
+  qw <- qq$weights
+    
+  # quadrature points, evaluated for each row of data
+  qpts_event <- uapply(qp, unstandardise_qpts, 0, t_event)
+  qpts_rcens <- uapply(qp, unstandardise_qpts, 0, t_rcens)
+    
+    
+  # quadrature weights, evaluated for each row of data
+  qwts_event <- uapply(qw, unstandardise_qwts, 0, t_event)
+  qwts_rcens <- uapply(qw, unstandardise_qwts, 0, t_rcens)
+    
+    
+  # times at events and all quadrature points
+  cpts_list <- list(t_event,
+                      qpts_event,
+                      qpts_rcens)
+    
+  idx_cpts <- get_idx_array(sapply(cpts_list, length))
+  cpts     <- unlist(cpts_list) # as vector 
+    
+  # number of quadrature points
+  qevent <- length(qwts_event)
+  qrcens <- length(qwts_rcens)
+    
+    
+  #----- basis terms for baseline hazard
+    
+  basis_epts_event <- make_basis(t_event,    basehaz)
+  basis_qpts_event <- make_basis(qpts_event, basehaz)
+  basis_qpts_rcens <- make_basis(qpts_rcens, basehaz)
+    
+    
+  #----- model frames for generating predictor matrices
+    
+  df_event <- subset(training_dataset, status == 1)
+  df_rcens <-  subset(training_dataset, status == 0)
+    
+    
+  mf_cpts <- rbind(df_event,
+                     rep_rows(df_event, times = qnodes),
+                     rep_rows(df_rcens, times = qnodes))
+    
+    
+    
+    #----- time-fixed predictor matrices
+    ff        <- formula$fe_form
+    x         <- make_x(ff, mf     )$x
+    x_cpts    <- make_x(ff, mf_cpts)$x
+    x_centred <- sweep(x_cpts, 2, colMeans(x), FUN = "-")
+    K         <- ncol(x_cpts)
+    
+    
+    
+    # time-fixed predictor matrices, with quadrature
+    # NB skip index 6 on purpose, since time fixed predictor matrix is 
+    # identical for lower and upper limits of interval censoring time
+    x_epts_event <- x_centred[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
+    x_qpts_event <- x_centred[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
+    x_qpts_rcens <- x_centred[idx_cpts[4,1]:idx_cpts[4,2], , drop = FALSE]
+    
+
+  #----------------
+  # Construct data
+  #----------------
+  stan_data = list(
+    #----- dimensions--------
+    p,
+    q,
+    
+    nvars,
+    
+    qnodes  = 15,
+    
+    
+    
+    Nevent       = sum(training_dataset$status == 1),
+    Nrcens       = sum(training_dataset$status == 0),
+    
+    
+    # link the interaction effect with the corresponding main effects
+    g1,
+    g2,
+    
+    
+    
+  )
+  
+  
 }  
   
   #----------------
@@ -71,105 +155,19 @@ stan_bSpline_data_Constructer(dataset, obs_window, ){
   
   
   # dimensions
-  nevent <- sum(status == 1)
-  nrcens <- sum(status == 0)
+  nevent <- 
+  nrcens <- 
   
 
   
-  #----- baseline hazard
-  basehaz <- handle_basehaz_surv(basehaz        = "bs", 
-                                 ok_basehaz     = "bs",
-                                 times          = dataset$obstime, 
-                                 status         = status,
-                                 min_t          = 0,
-                                 max_t          = max(c(dataset$obstime, obs_window), na.rm = TRUE)){
-  nvars <- basehaz$nvars # number of basehaz aux parameters
-  
-
-  
- # model uses quadrature
-    
-    # standardised nodes and weights for quadrature
-    qq <- get_quadpoints(nodes = qnodes)
-    qp <- qq$points
-    qw <- qq$weights
-    
-    # quadrature points, evaluated for each row of data
-    qpts_event <- uapply(qp, unstandardise_qpts, 0, t_event)
-    qpts_rcens <- uapply(qp, unstandardise_qpts, 0, t_rcens)
-
-    
-    # quadrature weights, evaluated for each row of data
-    qwts_event <- uapply(qw, unstandardise_qwts, 0, t_event)
-    qwts_rcens <- uapply(qw, unstandardise_qwts, 0, t_rcens)
-
-    
-    # times at events and all quadrature points
-    cpts_list <- list(t_event,
-                      qpts_event,
-                      qpts_rcens)
-    
-    idx_cpts <- get_idx_array(sapply(cpts_list, length))
-    cpts     <- unlist(cpts_list) # as vector 
-    
-    # number of quadrature points
-    qevent <- length(qwts_event)
-    qrcens <- length(qwts_rcens)
-
- 
-  #----- basis terms for baseline hazard
-  
-    basis_epts_event <- make_basis(t_event,    basehaz)
-    basis_qpts_event <- make_basis(qpts_event, basehaz)
-    basis_qpts_rcens <- make_basis(qpts_rcens, basehaz)
-
-    
-
-  
-  #----- model frames for generating predictor matrices
-  
-  mf_event <- keep_rows(mf, status == 1)
-  mf_rcens <- keep_rows(mf, status == 0)
- 
-  
-
-    
-    # combined model frame, with quadrature
-    mf_cpts <- rbind(mf_event,
-                     rep_rows(mf_event, times = qnodes),
-                     rep_rows(mf_rcens, times = qnodes))
-    
-
-  
-  #----- time-fixed predictor matrices
-  ff        <- formula$fe_form
-  x         <- make_x(ff, mf     )$x
-  x_cpts    <- make_x(ff, mf_cpts)$x
-  x_centred <- sweep(x_cpts, 2, colMeans(x), FUN = "-")
-  K         <- ncol(x_cpts)
-  
- 
-    
-    # time-fixed predictor matrices, with quadrature
-    # NB skip index 6 on purpose, since time fixed predictor matrix is 
-    # identical for lower and upper limits of interval censoring time
-    x_epts_event <- x_centred[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
-    x_qpts_event <- x_centred[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
-    x_qpts_rcens <- x_centred[idx_cpts[4,1]:idx_cpts[4,2], , drop = FALSE]
-    
+  #
   
   
   #----- stan data
   
   standata <- nlist(
     K, 
-    nvars,
-
-
-    qnodes       = qnodes,
     
-    Nevent       = nevent,
-    Nrcens       = nrcens, 
 
     
     qevent       = qevent,
@@ -187,7 +185,7 @@ stan_bSpline_data_Constructer(dataset, obs_window, ){
     
     x_epts_event = x_epts_event,
     x_qpts_event = x_qpts_event,
-    x_qpts_rcens = ix_qpts_rcens,
+    x_qpts_rcens = x_qpts_rcens,
 
     
     basis_epts_event = basis_epts_event,
@@ -363,17 +361,13 @@ get_quadpoints <- function(nodes = 15) {
 
 # Construct a list with information about the baseline hazard
 #
-# @param basehaz A string specifying the type of baseline hazard
-# @param basehaz_ops A named list with elements: df, knots, degree
-# @param ok_basehaz A list of admissible baseline hazards
+
 # @param times A numeric vector with eventtimes for each individual
 # @param status A numeric vector with event indicators for each individual
 # @param min_t Scalar, the minimum entry time across all individuals
 # @param max_t Scalar, the maximum event or censoring time across all individuals
 # @return A named list with the following elements:
-#   type: integer specifying the type of baseline hazard, 1L = weibull,
-#     2L = b-splines, 3L = piecewise.
-#   type_name: character string specifying the type of baseline hazard.
+
 #   user_df: integer specifying the input to the df argument
 #   df: integer specifying the number of parameters to use for the 
 #     baseline hazard.
@@ -383,64 +377,26 @@ get_quadpoints <- function(nodes = 15) {
 #     post-estimation when evaluating the baseline hazard for posterior
 #     predictions since it contains information about the knot locations
 #     for the baseline hazard (this is implemented via splines::predict.bs). 
-handle_basehaz_surv <- function(basehaz, 
-                                basehaz_ops,
-                                ok_basehaz,
-                                times, 
+handle_basehaz_surv <- function(times, 
                                 status,
                                 min_t, max_t) {
   
-  if (!basehaz %in% ok_basehaz)
-    stop2("'basehaz' should be one of: ", comma(ok_basehaz))
+  df     <- 5
+  degree <- 3
+
+    
+  tt <- times[status == 1] # uncensored event times
+
+  bknots <- c(min_t, max_t)
+  iknots <- get_iknots(tt, df = df, degree = degree)
+  basis  <- splines2::bSpline(tt, iknots = iknots, Boundary.knots = range(tt), degree = 3, intercept = FALSE)      
   
-  ok_basehaz_ops <- get_ok_basehaz_ops(basehaz)
-  if (!all(names(basehaz_ops) %in% ok_basehaz_ops))
-    stop2("'basehaz_ops' can only include: ", comma(ok_basehaz_ops))
   
-  if (basehaz %in% c("ms", "bs", "piecewise")) {
-    
-    df     <- basehaz_ops$df
-    knots  <- basehaz_ops$knots
-    degree <- basehaz_ops$degree
-    
-    if (!is.null(df) && !is.null(knots))
-      stop2("Cannot specify both 'df' and 'knots' for the baseline hazard.")
-    
-    if (is.null(df))
-      df <- switch(basehaz,
-                   "bs"        = 5L, # assumes no intercept
-                   df) # NB this is ignored if the user specified knots
-    
-    if (is.null(degree))
-      degree <- 3L # cubic splines
-    
-    tt <- times[status == 1] # uncensored event times
-    if (is.null(knots) && !length(tt)) {
-      warning2("No observed events found in the data. Censoring times will ",
-               "be used to evaluate default knot locations for splines.")
-      tt <- times
-    }
-    
-    if (!is.null(knots)) {
-      if (any(knots < min_t))
-        stop2("'knots' cannot be placed before the earliest entry time.")
-      if (any(knots > max_t))
-        stop2("'knots' cannot be placed beyond the latest event time.")
-    }
-    
-  }
   
-  if (basehaz == "bs") {
-    
-    bknots <- c(min_t, max_t)
-    iknots <- get_iknots(tt, df = df, iknots = knots, degree = degree)
-    basis  <- get_basis(tt, iknots = iknots, bknots = bknots, degree = degree, type = "bs")      
-    nvars  <- ncol(basis)  # number of aux parameters, basis terms
-    
-  } 
+  nvars  <- ncol(basis)  # number of aux parameters, basis terms
+
   
-  nlist(type_name = basehaz, 
-        type = basehaz_for_stan(basehaz),
+  nlist(
         nvars, 
         iknots, 
         bknots,
@@ -448,7 +404,7 @@ handle_basehaz_surv <- function(basehaz,
         basis,
         df = nvars,
         user_df = nvars,
-        knots = if (basehaz == "bs") iknots else c(bknots[1], iknots, bknots[2]),
+        knots = iknots,
         bs_basis = basis)
 }
 
@@ -525,6 +481,24 @@ has_intercept <- function(basehaz) {
 
 
 
+# Return the desired spline basis for the given knot locations
+get_basis <- function(x,
+                      iknots,
+                      bknots = range(x),
+                      degree = 3,
+                      intercept = FALSE) {
+  out <- splines2::bSpline(
+    x,
+    knots = iknots,
+    Boundary.knots = bknots,
+    degree = degree,
+    intercept = intercept
+  )
+  out
+}
+
+
+
 # Return the spline basis for the given type of baseline hazard.
 # 
 # @param times A numeric vector of times at which to evaluate the basis.
@@ -539,9 +513,7 @@ make_basis <- function(times, basehaz, integrate = FALSE) {
   if (!N) { # times is NULL or empty vector
     return(matrix(0, 0, K))
   } 
-  switch(basehaz$type_name,
-         "bs"          = basis_matrix(times, basis = basehaz$basis),
-         stop2("Bug found: unknown type of baseline hazard."))
+  basis_matrix(times, basis = basehaz$basis)
 }
 
 # Evaluate a spline basis matrix at the specified times
