@@ -1,12 +1,10 @@
-# Part of the rstanarm package for estimating model parameters
 
-#'   
 #' @param qnodes The number of nodes to use for the Gauss-Kronrod quadrature
 #'   that is used to evaluate the cumulative hazard when \code{basehaz = "bs"}
 #'   Options are 15 (the default), 11 or 7.
  
 # assumptions: all data are right censored data with the observed window being [0, obs_window]
-stan_bSpline_data_Constructer(training_dataset, testing_dataset, obs_window, qnodes = 15){
+stan_bSpline_data_Constructer <- function (training_dataset, testing_dataset, obs_window, qnodes = 15){
   
   #----------------------------
   # Prepare data for model fitting
@@ -70,7 +68,7 @@ stan_bSpline_data_Constructer(training_dataset, testing_dataset, obs_window, qno
                       qpts_rcens)
     
   idx_cpts <- get_idx_array(sapply(cpts_list, length))
-  cpts     <- unlist(cpts_list) # as vector 
+  # cpts     <- unlist(cpts_list) # as vector 
     
   # number of quadrature points
   qevent <- length(qwts_event)
@@ -130,8 +128,54 @@ stan_bSpline_data_Constructer(training_dataset, testing_dataset, obs_window, qno
 
   
   
+  # for (obst in t_new){
+  #   # quadrature points, evaluated for each row of data
+  #   qpts_new_event <- uapply(qp, unstandardise_qpts, 0, obst)
+  #   
+  #   # quadrature weights, evaluated for each row of data
+  #   qwts_new_event <- uapply(qw, unstandardise_qwts, 0, obst)
+  #   
+  # }
+  # quadrature points, evaluated for each row of data
+  qpts_new_event <- uapply(qp, unstandardise_qpts, 0, t_new)
+
   
-  basis_new_qpts_event = 
+  # quadrature weights, evaluated for each row of data
+  qwts_new_event <- uapply(qw, unstandardise_qwts, 0, t_new)
+
+  
+  # # times at events and all quadrature points
+  # cpts_list_new <- list(qpts_new_event)
+  
+  # idx_cpts_new <- get_idx_array(sapply(cpts_list_new, length))
+  # cpts_new     <- unlist(cpts_list_new) # as vector 
+  
+  # number of quadrature points
+  qevent_new <- length(qwts_new_event)
+  
+  
+  #----- basis terms for baseline hazard
+  basis_new_qpts_event <- make_basis(qpts_new_event, basehaz)
+
+  
+  
+  #----- model frames for generating predictor matrices
+  
+  
+  # combined model frame, with quadrature  
+  X_main_cpts_new <- rep_rows(X_new_main, times = qnodes)
+  X_int_cpts_new <- rep_rows(X_new_int, times = qnodes)
+  
+  
+  
+  # time-fixed predictor matrices, with quadrature
+  x_new_epts_event <- X_main_cpts_new[, , drop = FALSE]
+  x_new_qpts_event <- X_main_cpts_new[, , drop = FALSE]
+  
+  
+  x_new_int_epts_event <- X_int_cpts_new[idx_cpts_new[1,1]:idx_cpts_new[1,2], , drop = FALSE]
+  x_new_int_qpts_event <- X_int_cpts_new[idx_cpts_new[2,1]:idx_cpts_new[2,2], , drop = FALSE]
+
   
 
   #----------------
@@ -182,16 +226,20 @@ stan_bSpline_data_Constructer(training_dataset, testing_dataset, obs_window, qno
     g2 = g2,
     
     #--- for prediction ----
-    nnew = nrow(dataset),
-    t_new = dataset$obstime,
+    nnew = nrow(testing_dataset),
+    qevent_new = qevent_new,
+    t_new = testing_dataset$obstime,
     x_new = X_new_main,
     x_int_new = X_new_int,
-    basis_new_qpts_event = ,
-    qwt_new = 
+    basis_new_qpts_event = basis_new_qpts_event,
+    qwts_new_event = qwts_new_event
   )
   
+  return(stan_data)
   
 }  
+
+
 
 
 #---------- internal

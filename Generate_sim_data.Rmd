@@ -8,6 +8,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
+setwd("G:/MasterThesis/Code/")
 source("G:/MasterThesis/Code/Functions.R")
 
 install_and_load <- function(packages) {
@@ -31,7 +32,7 @@ install_and_load(required_packages)
 # Generate simulated data
 ```{r, echo=TRUE}
 set.seed(123)
-n_samples <- 200
+n_samples <- 500
 n_features <- 10 
 
 design_matrix <- matrix(rnorm(n_samples * n_features), nrow = n_samples, ncol = n_features) 
@@ -75,54 +76,85 @@ sim_data <- sim_data |> left_join(covariates, by = "id") |>
 head(sim_data)
 
 rm(design_matrix, covariates, n_features, n_samples, required_packages, select_columns, install_and_load)
+print(beta)
+```
+
+#Implemented the code in a Cross-validation way
+```{r, echo=TRUE}
+source("G:/MasterThesis/Code/stan_bSpline.R")
+stan_data <- stan_bSpline_data_Constructer(training_dataset = sim_data, testing_dataset = sim_data, obs_window = 5)
+model <- Bayesian_Survival_includingbaseline(stan_data = stan_data, baseline_assumption = "bSplines") # #exponential, weibull,  bSplines
+summary(model)$summary
 ```
 
 # Implemented it in the bayesian code
 ```{r, echo=TRUE}
-X <- model.matrix(~.^2, data = sim_data[, !(names(sim_data) %in% c("id", "obstime", "status"))])
-dim(X)
-
-column_names = colnames(X)
-main_names =  column_names[!grepl(":", column_names)& column_names != "(Intercept)"]
-X_main = X[, main_names]
-
-int_names =  column_names[grepl(":", column_names)]
-X_int = X[, int_names]
-
-p <- dim(X_main)[2]
-q <- dim(X_int)[2]
-
-main_indices_for_int = find_main_effect_indices(int_names, main_names)
-g1 <- g(main_indices_for_int, 1)
-g2 <- g(main_indices_for_int, 2)
-
-
-# Prepares data and parameter input for Stan.
-stan_data <- list(
-  p = p, q= q, 
-  N = nrow(sim_data[sim_data$status == 1,]),
-  M = length(unique(sim_data$obstime)),
+cross_validation(dataset = sim_data,
+                 method = "exponential",
+                 spilit = FALSE) {
+  X <-
+    model.matrix( ~ . ^ 2, data = dataset[,!(names(dataset) %in% c("id", "obstime", "status"))])
+  dim(X)
   
-  t = sim_data[sim_data$status == 1, "obstime"],
-  x = X_main[sim_data$status == 1, ],
-  x_int= X_int[sim_data$status == 1, ],
+  column_names = colnames(X)
+  main_names =  column_names[!grepl(":", column_names) &
+                               column_names != "(Intercept)"]
+  X_main = X[, main_names]
   
-  N_cens = nrow(sim_data[sim_data$status == 0,]),
-  t_cens = sim_data[sim_data$status == 0, "obstime"],
-  x_cens = X_main[sim_data$status == 0, ],
-  x_int_cens = X_int[sim_data$status == 0, ],
+  int_names =  column_names[grepl(":", column_names)]
+  X_int = X[, int_names]
   
-  N_new = nrow(sim_data),
-  x_new = X_main,
-  x_int_new = X_int,
-  t_new = sim_data$obstime,
-  status_new = sim_data$status,
+  p <- dim(X_main)[2]
+  q <- dim(X_int)[2]
   
-  g1=g1, g2=g2
+  main_indices_for_int = find_main_effect_indices(int_names, main_names)
+  g1 <- g(main_indices_for_int, 1)
+  g2 <- g(main_indices_for_int, 2)
+  
+  
+  # Prepares data and parameter input for Stan.
+  stan_data <- list(
+    # response and time variable
+    nevent = nrow(dataset[dataset$status == 1, ]),
+    nrcens = nrow(dataset[dataset$status == 0, ]),
+    t_event = dataset[dataset$status == 1, "obstime"],
+    t_rcens = dataset[dataset$status == 0, "obstime"],
+    
+    # predictor matrices (time-fixed)
+    p = p,
+    q = q,
+    x_event = X_main[dataset$status == 1,],
+    x_int_event =  X_int[dataset$status == 1,],
+    
+    x_rcens = X_main[dataset$status == 0,],
+    x_int_rcens = X_int[dataset$status == 0,],
+    
+    # link the interaction effect with the corresponding main effects
+    g1 = g1,
+    g2 = g2,
+    
+    # for prediction
+    nnew = nrow(dataset),
+    x_new = X_main,
+    x_int_new = X_int,
+    t_new = dataset[, "obstime"]
   )
-
-rm(sim_data, X, X_int, X_main, p, q, g1, g2, int_names, main_names, column_names)
-
-# fit the model
-model <- Bayesian_Survival_includingbaseline(stan_data = stan_data, baseline_assumption = "bSplines") # #exponential, weibull,  bSplines
+  
+  rm(dataset,
+     X,
+     X_int,
+     X_main,
+     p,
+     q,
+     g1,
+     g2,
+     int_names,
+     main_names,
+     column_names)
+  
+  # fit the model
+  model <-
+    Bayesian_Survival_includingbaseline(stan_data = stan_data, baseline_assumption = "bSplines") # #exponential, weibull,  bSplines
+  return (model)
+}
 ```
