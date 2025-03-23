@@ -40,6 +40,8 @@ functions{
 
 
 data {
+  
+  //-----for model fitting-----/
   // dimensions
   int<lower=0> p;          // num. cols in main effects (time-fixed)
   int<lower=0> q;          // num. cols in interaction effects (time-fixed)
@@ -96,6 +98,14 @@ data {
   // link the interaction effect with the corresponding main effects
   int g1[q];
   int g2[q];
+  
+  //-----for model prediction-----/
+  int<lower=0> nnew;
+  vector[nnew] t_new;
+  matrix[nnew, p] x_new;
+  matrix[nnew, q] x_int_new;
+  matrix[nnew,nvars] basis_new_qpts_event;
+  vector[nnew] qwt_new;
 
 }
 
@@ -143,31 +153,31 @@ model {
   
   //log-likelihood, represented by [target]
   if (Nevent > 0) {
-    eta_epts_event = x_event * Beta + x_int_event * Beta_int;
+    eta_epts_event = x_epts_event * Beta + x_int_epts_event * Beta_int;
     lhaz_epts_event = bspline_log_haz(eta_epts_event, basis_epts_event, coefs);// B-splines, on log haz scale 
     target +=  lhaz_epts_event;
     }
     
   if (qevent > 0){
-    eta_qpts_event = x_qpts_event * Beta + x_qpts_int_event * Beta_int;;
-    lhaz_qpts_event = bspline_log_haz(eta_qpts_event, basis_qpts_event, coefs)
+    eta_qpts_event = x_qpts_event * Beta + x_int_qpts_event * Beta_int;;
+    lhaz_qpts_event = bspline_log_haz(eta_qpts_event, basis_qpts_event, coefs);
     target +=  quadrature_log_surv(qwts_event, lhaz_qpts_event); // log(f(t)) = -H(t) + log(h(t))for uncensored data
   }
   
   
   if (qrcens > 0) {
-    eta_qpts_rcens = x_qpts_rcens * Beta + x_int_qpts__rcens * Beta_int;
+    eta_qpts_rcens = x_qpts_rcens * Beta + x_int_qpts_rcens * Beta_int;
     lhaz_qpts_rcens = bspline_log_haz(eta_qpts_rcens, basis_qpts_rcens, coefs);
     target +=  quadrature_log_surv(qwts_rcens, lhaz_qpts_rcens); // log(S(t)) = - H(t)for right censored data
     }
 
 }
 
-/*generated quantities{
+generated quantities{
   // Predicting the survival time on the new/test dataset
       vector[nnew] survival_prob;  // 
       vector[nnew] eta_event_new = x_new * Beta + x_int_new * Beta_int;
-      vector[nnew] lhaz_qpts_event = bspline_log_haz(eta_qpts_event, basis_qpts_event, coefs);
-      survival_prob = exp(quadrature_log_surv(t_new, lhaz_qpts_event));
+      vector[nnew] lhaz_qpts_event = bspline_log_haz(eta_event_new, basis_new_qpts_event, coefs);
+      survival_prob = exp(quadrature_log_surv(qwt_new, lhaz_qpts_event));
   }
-*/
+

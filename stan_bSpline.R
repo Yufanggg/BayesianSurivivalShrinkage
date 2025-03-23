@@ -8,7 +8,11 @@
 # assumptions: all data are right censored data with the observed window being [0, obs_window]
 stan_bSpline_data_Constructer(training_dataset, testing_dataset, obs_window, qnodes = 15){
   
-  # organize the data regarding predictor
+  #----------------------------
+  # Prepare data for model fitting
+  #-----------------------------
+  
+  #----- organize the data regarding predictor
   
   X <-
     model.matrix( ~ . ^ 2, data = training_dataset[,!(names(training_dataset) %in% c("id", "obstime", "status"))])
@@ -82,35 +86,63 @@ stan_bSpline_data_Constructer(training_dataset, testing_dataset, obs_window, qno
     
   #----- model frames for generating predictor matrices
     
-  df_event <- subset(training_dataset, status == 1)
-  df_rcens <-  subset(training_dataset, status == 0)
+  id_event <- which(training_dataset$status == 1)
+  id_rcens <-  which(training_dataset$status == 0)
     
   # combined model frame, with quadrature  
-  mf_cpts <- rbind(df_event,
-                   rep_rows(df_event, times = qnodes),
-                   rep_rows(df_rcens, times = qnodes))
+  X_main_cpts <- rbind(X_main[id_event,],
+                   rep_rows(X_main[id_event,], times = qnodes),
+                   rep_rows(X_main[id_rcens,], times = qnodes))
+  X_int_cpts <- rbind(X_int[id_event,],
+                      rep_rows(X_int[id_event,], times = qnodes),
+                      rep_rows(X_int[id_rcens,], times = qnodes))
     
     
     
   # time-fixed predictor matrices, with quadrature
-  x_epts_event <- mf_cpts[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
-  x_qpts_event <- mf_cpts[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
-  x_qpts_rcens <- mf_cpts[idx_cpts[3,1]:idx_cpts[3,2], , drop = FALSE]
+  x_epts_event <- X_main_cpts[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
+  x_qpts_event <- X_main_cpts[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
+  x_qpts_rcens <- X_main_cpts[idx_cpts[3,1]:idx_cpts[3,2], , drop = FALSE]
   
-  x_int_epts_event <- mf_cpts[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
-  x_int_qpts_event <- mf_cpts[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
-  x_int_qpts_rcens <- mf_cpts[idx_cpts[3,1]:idx_cpts[3,2], , drop = FALSE]
+  x_int_epts_event <- X_int_cpts[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
+  x_int_qpts_event <- X_int_cpts[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
+  x_int_qpts_rcens <- X_int_cpts[idx_cpts[3,1]:idx_cpts[3,2], , drop = FALSE]
+  
+  
+  
+  #----------------------------
+  # Prepare data for prediction
+  #-----------------------------
     
+  nnew <- nrow(testing_dataset)
+  t_new <- testing_dataset$obstime
+  X_2 <-
+    model.matrix( ~ . ^ 2, data = testing_dataset[,!(names(testing_dataset) %in% c("id", "obstime", "status"))])
+  dim(X_2)
+  
+  column_names = colnames(X_2)
+  main_names =  column_names[!grepl(":", column_names) &
+                               column_names != "(Intercept)"] #whether or not having intercept needs to be verified
+  X_new_main = X_2[, main_names]
+  
+  int_names =  column_names[grepl(":", column_names)]
+  X_new_int = X_2[, int_names]
+
+  
+  
+  
+  basis_new_qpts_event = 
+  
 
   #----------------
   # Construct data
   #----------------
   stan_data = list(
-    #----- dimensions--------
-    p,
-    q,
+    #----- for model fitting --------
+    p = p,
+    q = q,
     
-    nvars,
+    nvars = nvars,
     
     qnodes  = 15,
     
@@ -119,22 +151,26 @@ stan_bSpline_data_Constructer(training_dataset, testing_dataset, obs_window, qno
     Nevent       = sum(training_dataset$status == 1),
     Nrcens       = sum(training_dataset$status == 0),
     
-    qevent       = qevent,
-    qrcens       = qrcens,
+    qevent = qevent,
+    qrcens = qrcens,
     
     
     epts_event   = t_event,
-    qpts_event   = qpts_event,
-    qpts_rcens   = qpts_rcens,
+    qpts_event = qpts_event,
+    qpts_rcens = qpts_rcens,
     
     
-    qwts_event   = qwts_event,
-    qwts_rcens   =qwts_rcens,
+    qwts_event = qwts_event,
+    qwts_rcens = qwts_rcens,
     
     
     x_epts_event = x_epts_event,
     x_qpts_event = x_qpts_event,
     x_qpts_rcens = x_qpts_rcens,
+    
+    x_int_epts_event = x_int_epts_event,
+    x_int_qpts_event = x_int_qpts_event,
+    x_int_qpts_rcens = x_int_qpts_rcens,
     
     
     basis_epts_event = basis_epts_event,
@@ -142,11 +178,16 @@ stan_bSpline_data_Constructer(training_dataset, testing_dataset, obs_window, qno
     basis_qpts_rcens = basis_qpts_rcens,
     
     # link the interaction effect with the corresponding main effects
-    g1,
-    g2,
+    g1 = g1,
+    g2 = g2,
     
-    
-    
+    #--- for prediction ----
+    nnew = nrow(dataset),
+    t_new = dataset$obstime,
+    x_new = X_new_main,
+    x_int_new = X_new_int,
+    basis_new_qpts_event = ,
+    qwt_new = 
   )
   
   
@@ -573,3 +614,4 @@ basis_matrix <- function(times, basis, integrate = FALSE) {
   }
   aa(out)
 }
+
