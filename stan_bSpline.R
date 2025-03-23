@@ -128,34 +128,21 @@ stan_bSpline_data_Constructer <- function (training_dataset, testing_dataset, ob
 
   
   
-  # for (obst in t_new){
-  #   # quadrature points, evaluated for each row of data
-  #   qpts_new_event <- uapply(qp, unstandardise_qpts, 0, obst)
-  #   
-  #   # quadrature weights, evaluated for each row of data
-  #   qwts_new_event <- uapply(qw, unstandardise_qwts, 0, obst)
-  #   
-  # }
   # quadrature points, evaluated for each row of data
-  qpts_new_event <- uapply(qp, unstandardise_qpts, 0, t_new)
+  qpts_new_event <- uapply(qp, unstandardise_qpts, 0, t_new) #500 first node for all t_new, 500 second node for all t_new
 
   
   # quadrature weights, evaluated for each row of data
   qwts_new_event <- uapply(qw, unstandardise_qwts, 0, t_new)
 
-  
-  # # times at events and all quadrature points
-  # cpts_list_new <- list(qpts_new_event)
-  
-  # idx_cpts_new <- get_idx_array(sapply(cpts_list_new, length))
-  # cpts_new     <- unlist(cpts_list_new) # as vector 
+
   
   # number of quadrature points
   qevent_new <- length(qwts_new_event)
   
   
   #----- basis terms for baseline hazard
-  basis_new_qpts_event <- make_basis(qpts_new_event, basehaz)
+  basis_new_qpts_event <- make_basis(qpts_new_event, basehaz) #500 first node for all t_new, 500 second node for all t_new
 
   
   
@@ -163,18 +150,15 @@ stan_bSpline_data_Constructer <- function (training_dataset, testing_dataset, ob
   
   
   # combined model frame, with quadrature  
-  X_main_cpts_new <- rep_rows(X_new_main, times = qnodes)
+  X_main_cpts_new <- rep_rows(X_new_main, times = qnodes) #X_main first for all t_new; X_main second for all t_new
   X_int_cpts_new <- rep_rows(X_new_int, times = qnodes)
   
   
   
   # time-fixed predictor matrices, with quadrature
-  x_new_epts_event <- X_main_cpts_new[, , drop = FALSE]
-  x_new_qpts_event <- X_main_cpts_new[, , drop = FALSE]
+  x_new_qpts_event <- X_main_cpts_new[, , drop = FALSE] #X_main first for all t_new; X_main second for all t_new
   
-  
-  x_new_int_epts_event <- X_int_cpts_new[idx_cpts_new[1,1]:idx_cpts_new[1,2], , drop = FALSE]
-  x_new_int_qpts_event <- X_int_cpts_new[idx_cpts_new[2,1]:idx_cpts_new[2,2], , drop = FALSE]
+  x_new_int_qpts_event <- X_int_cpts_new[, , drop = FALSE]
 
   
 
