@@ -11,13 +11,25 @@
 
 functions {
   real gauss_kronrod_quad_Hazard_basline(real Ti, vector T, matrix bSpline_basis, vector coefficients){
-    real locat[15] = {-0.991455, -0.949107, -0.864865, -0.741531, -0.586087, -0.405845, -0.207785, 0.0, 0.207785, 0.405845, 0.586087, 0.741531, 0.864865, 0.949107, 0.991455};
-    real weights [15] = {0.022935, 0.063093, 0.104790, 0.140653, 0.169004, 0.190350, 0.204432, 0.209482, 0.204432, 0.190350, 0.169004, 0.140653, 0.104790, 0.063093, 0.022935};
+    # Original nodes and weights for Gauss-Kronrod quadrature on [-1, 1]
+    real gauss_nodes[7] = c(-0.949107912342759, -0.741531185599394, -0.405845151377397, 0.000000000000000, 0.405845151377397, 0.741531185599394, 0.949107912342759);
+    real gauss_weights[7] = c(0.129484966168870, 0.279705391489277, 0.381830050505119, 0.417959183673469, 0.381830050505119, 0.279705391489277, 0.129484966168870);
+    
+    #Scaling nodes and weights to the interval [0, 10]
+    real locat <- (gauss_nodes + 1) / 2 * 1.3859386 + 0.1299756
+    real weights <-gauss_weights * 0.6929693
     
     // vectorize all computation
     vector[num_elements(locat)] u_vec = Ti * (rep_vector(1, num_elements(locat))/2);
     vector [num_elements(locat)] logh_0i_vec = vectorized_logh_0i(u_vec, T, bSpline_basis, coefficients);
     real integral_ = sum(to_vector(weights) .* exp(logh_0i_vec));
+/*    print("Ti:", Ti);
+    // // Print intermediate values for debugging
+    // print("u_vec: ", u_vec);
+    // print("logh_0i_vec: ", logh_0i_vec);
+    // // Print the integral value
+    print("integral_: ", integral_);*/
+    
     
     return integral_/2;
     }
@@ -115,7 +127,7 @@ model {
   // Priors
   coefficients ~ normal(0, 1);
   Beta ~ normal (0, 2);
-  
+  // print("uniqueT:", uniqueT);
   // log-likelihood, represented by [target]
   for (Ti in uniqueT){
     real H_0i_ = gauss_kronrod_quad_Hazard_basline(Ti, uniqueT, bSpline_basis, coefficients);
@@ -137,6 +149,8 @@ generated quantities{ // predicting the survival time on the new/test dataset by
   matrix[M, N_new] survival_prob; // unqiue time points * rows of new data
   for (m in 1:M){
     real H_0i_ = gauss_kronrod_quad_Hazard_basline(m, uniqueT, bSpline_basis, coefficients);
+    print("The time points: ", M);
+    print("The value of H_0i_ is: ", H_0i_);
     survival_prob[m,] = to_row_vector(exp(-H_0i_ + x_new*Beta)); //vectorize over the x_new, output is the time points * obs
       }
   }

@@ -8,16 +8,18 @@ output: pdf_document
 # Installing and/or Loading packages
 ```{r, echo=TRUE, warning=FALSE}
 rm(list = ls())
-#setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code")
+setwd("G/MasterThesis/Code")#G:\MasterThesis\Code
 
 # Function to check and install packages
 install_and_load <- function(packages) {
   for (pkg in packages) {
     if (!require(pkg, character.only = TRUE)) {
       install.packages(pkg, dependencies = TRUE)
-      library(pkg, character.only = TRUE)
     }
-  }
+
+    library(pkg, character.only = TRUE) }
+  
+  
 }
 
 # List of required packages
@@ -130,9 +132,7 @@ Bayesian_Survival_includingbaseline <- function(stan_data, baseline_assumption =
       )
     )
     
-    # Summary of the fit
-    output <- summary(bayesian_model_fit)$summary
-    return(output)
+    return(bayesian_model_fit)
   }
   }
 ```
@@ -178,10 +178,14 @@ CrossValidation <- function(dataset = sim_data, KFold = 5, FDR = 0.1, Beta_real 
   rMSE = matrix(NA, nrow = KFold, ncol = sum(!(names(dataset) %in% c("id", "eventtime", "status", "obstime", "status1"))) )
   IBrier_scores = numeric(KFold)
   
-  folds <- cut(seq(1:nrow(dataset)), breaks = KFold, labels = FALSE)
+  # shuffled_indices <- sample(seq_len(nrow(dataset)))
+  # folds <- cut(seq_along(shuffled_indices), breaks = KFold, labels = FALSE)
+  # folds <- cut(seq(1:nrow(dataset)), breaks = KFold, labels = FALSE)
+  
   for (i in 1:KFold){
-    train_dataset = dataset[folds != i, ]
-    test_dataset = dataset[folds == i, ]
+    train_id = sample(1:nrow(dataset), size = 0.8*nrow(dataset))
+    train_dataset = dataset[train_id,]
+    test_dataset = dataset[-train_id,]
     
     #build up the list data to fit the bayesian stan model
     stan_data <- list(
@@ -207,7 +211,7 @@ CrossValidation <- function(dataset = sim_data, KFold = 5, FDR = 0.1, Beta_real 
     )
     
     # fit the model
-    Output <- Bayesian_Survival_includingbaseline(stan_data = stan_data, baseline_assumption = "bSplines") # #exponential, weibull,  bSplines
+    model <- Bayesian_Survival_includingbaseline(stan_data = stan_data, baseline_assumption = "bSplines") # #exponential, weibull,  bSplines
     
     if (simulated == TRUE){
       # EVAL 1: evaluating the model performance at the level at the level of Beta's.
