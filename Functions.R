@@ -70,6 +70,30 @@ Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponentia
   }
 }
 
+
+
+
+# Function to construct stan_data for model fitting
+stan_data_Constructer <- function(training_dataset, testing_dataset, baseline_modelling = "bSplines", obs_window = 5){
+  
+  if (baseline_modelling == "exponential"){
+    source("./exponential_stan_constructor.R")
+    stan_data = stan_exponential_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset)
+  }
+  
+  if (baseline_modelling == "weibull"){
+    source("./weibull_stan_constructor.R")
+    stan_data = stan_weibull_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset)
+  }
+  
+  if (baseline_modelling == "bSplines"){
+    source("./bSpline_stan_constructor.R")
+    stan_data = stan_bSpline_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset, obs_window = 5)
+  }
+  
+  return(stan_data)
+}
+
 # Function to check the Bayesian survival model using various criteria
 # @param: model, a model fitting by the bayesian method.
 # @param: the metric for model fitting criteria
@@ -152,7 +176,7 @@ Model_performance_eval <- function(model_result, ComparsionValues, Criteria = c(
   if ("C_index" %in% Criteria) {
     # EVAL 2: Evaluating the model performance at the level of prediction
     sp <- model_result$sp
-    C_index <- rcorr.cens(Surv(test_t, test_status), sp) # rcorr.cens
+    C_index <- rcorr.cens(sp, Surv(test_t, test_status))[["C Index"]] # rcorr.cens
     model_metric$C_index <- C_index
   }
   
@@ -169,4 +193,49 @@ Model_performance_eval <- function(model_result, ComparsionValues, Criteria = c(
   }
   
   return(model_metric)
+}
+
+
+# Function for model evaluation visualization
+# @model_metric: a list, including rMSE_s, Brier_scores, C_indices, C_indices
+#   rMSE_s is a matrix with [nFold, nParams], Brier_scores, C_indices, and FDR_vals
+#   are vectors with the length of nFold.
+metric_visualization <- function(cross_val_metric){
+  rMSE_s <- cross_val_metric$rMSE_s
+  Brier_scores <- cross_val_metric$Brier_scores
+  C_indices <- cross_val_metric$C_indices
+  FDR_vals <- cross_val_metric$FDR_vals
+
+  # Adjust the margins
+  par(mfrow = c(2, 2))
+  #-----------------------------
+  # visual the result of rMSE_s
+  #-----------------------------
+  mean_values <- colMeans(rMSE_s)
+  sd_values <- apply(rMSE_s, 2, sd)
+  # Plot the mean values
+  plot(mean_values, type = "o", col = "blue", xlab = "estimated Betas", ylab = "estimated Value of Betas", ylim = c(0, 2), main = "Mean Values with Error Bars", pch = 16)
+  # Add error bars
+  arrows(1:55, mean_values - sd_values, 1:55, mean_values + sd_values, angle = 90, code = 3, length = 0.05, col = "red")
+
+  # Add a legend
+  legend("topright", legend = c("Mean Values", "Error Bars"), col = c("blue", "red"), pch = 16, lty = 1)
+
+  #-----------------------------
+  # visual the result of Brier_scores
+  #-----------------------------
+  boxplot(Brier_scores, main = "Brier_scores for the model prediction", ylab = "Brier_scores", col = "blue")
+
+
+  #-----------------------------
+  # visual the result of C_indices
+  #-----------------------------
+  boxplot(C_indices, main = "C_indices for the model prediction", ylab = "C_indices", col = "green")
+
+  #-----------------------------
+  # visual the result of FDR_vals
+  #-----------------------------
+  boxplot(FDR_vals, main = "FDR for the model prediction", ylab = "FDR", col = "orange")
+
+
 }

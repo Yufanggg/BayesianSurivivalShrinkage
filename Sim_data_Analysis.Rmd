@@ -5,10 +5,11 @@ date: "2025-03-18"
 output: pdf_document
 ---
 
+# Step 1: Set up the environment
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")   # G:/MasterThesis/Code/
+setwd("G:/MasterThesis/Code/")   # "C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")
 source("./Functions.R")
 
 install_and_load <- function(packages) {
@@ -21,13 +22,13 @@ install_and_load <- function(packages) {
 }
 
 # List of required packages
-required_packages <- c("rstan", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "SurvMetrics")
+required_packages <- c("rstan", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret")
 # Install and/or load packages
 install_and_load(required_packages)
 ```
 
 
-# Generate simulated data
+# Step 2: Generate simulated data
 ```{r, echo=TRUE}
 set.seed(123)
 n_samples <- 500
@@ -75,11 +76,133 @@ head(sim_data)
 
 rm(design_matrix, covariates, n_features, n_samples, required_packages, select_columns, install_and_load)
 print(beta)
+
+
+# Get a list of all objects in the environment
+all_objects <- mget(ls())
+
+# Save all objects to an .Rds file
+saveRDS(all_objects, file = "Simulated_Data.Rds")
 ```
 
-#Implemented the code in a Cross-validation way
+# Step 3: Model performance metric
 ```{r, echo=TRUE}
-source("./stan_bSpline.R")
+cross_validation <- function(whole_dataset, baseline_modelling = "bSplines", num_folds = 5){
+  # create the cross-validation folds
+  folds <- createFolds(whole_dataset$status, k = num_folds, list = TRUE, returnTrain = FALSE)
+  cross_val_metric <- list()
+  rMSE_s = matrix(nrow = 5, ncol = 55); Brier_scores =  rep(NA, 5); C_indices =  rep(NA, 5); FDR_vals =  rep(NA, 5)
+  for (i in 1:num_folds){
+    fold_indices <- folds[[i]]
+    training_data = whole_dataset[-fold_indices, ]
+    testing_data = whole_dataset[fold_indices, ]
+    stan_data <- stan_data_Constructer(training_dataset = training_data, testing_dataset = testing_data, obs_window = 5)
+    model_fit <- Bayesian_Survival_model(stan_data = stan_data, baseline_assumption = baseline_modelling)
+    
+    #extract the info from the bayesian model fit
+    model_result <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit)
+    
+    ComparsionValues <- list(
+      Beta_reference = c(beta, rep(0, 45)),
+      test_t = testing_data$obstime,
+      test_status = testing_data$status,
+      Selection_reference = c(rep(TRUE, 10), rep(FALSE, 45))
+      )
+    model_metric <- Model_performance_eval(model_result = model_result, ComparsionValues)
+    rMSE_s[i, ] <- model_metric$rMSE
+    Brier_scores[i] <- model_metric$Brier_score
+    C_indices[i] <- model_metric$C_index
+    FDR_vals[i] <- model_metric$FDR
+  }
+  cross_val_metric$rMSE_s <- rMSE_s
+  cross_val_metric$Brier_scores <- Brier_scores
+  cross_val_metric$C_indices <- C_indices
+  cross_val_metric$C_indices <- FDR_vals
+  
+  return(cross_val_metric)
+}
+
+cross_val_metric <- cross_validation(whole_dataset = sim_data)
+
+metric_visualization(cross_val_metric)
+```
+
+# Step 3: visualize the model metric results
+
+```{r, echo=TRUE}
+rMSE_s <- cross_val_metric$rMSE_s
+Brier_scores <- cross_val_metric$Brier_scores
+C_indices <- cross_val_metric$C_indices
+FDR_vals <- cross_val_metric$FDR_vals
+
+# Adjust the margins
+par(mfrow = c(2, 2))
+#-----------------------------
+# visual the result of rMSE_s
+#-----------------------------
+mean_values <- colMeans(rMSE_s)
+sd_values <- apply(rMSE_s, 2, sd)
+# Plot the mean values
+plot(
+  mean_values,
+  type = "o",
+  col = "blue",
+  xlab = "estimated Betas",
+  ylab = "estimated Value of Betas",
+  ylim = c(0, 2),
+  main = "Mean Values with Error Bars",
+  pch = 16
+)
+# Add error bars
+arrows(
+  1:55,
+  mean_values - sd_values,
+  1:55,
+  mean_values + sd_values,
+  angle = 90,
+  code = 3,
+  length = 0.05,
+  col = "red"
+)
+
+# Add a legend
+legend(
+  "topright",
+  legend = c("Mean Values", "Error Bars"),
+  col = c("blue", "red"),
+  pch = 16,
+  lty = 1
+)
+
+#-----------------------------
+# visual the result of Brier_scores
+#-----------------------------
+boxplot(Brier_scores,
+        main = "Brier_scores for the model prediction",
+        ylab = "Brier_scores",
+        col = "blue")
+
+
+#-----------------------------
+# visual the result of C_indices
+#-----------------------------
+boxplot(C_indices,
+        main = "C_indices for the model prediction",
+        ylab = "C_indices",
+        col = "green")
+
+#-----------------------------
+# visual the result of FDR_vals
+#-----------------------------
+boxplot(FDR_vals,
+        main = "FDR for the model prediction",
+        ylab = "FDR",
+        col = "orange")
+```
+
+
+```{r, echo=TRUE}
+source("./bSpline_stan_constructor.R")
 stan_data <- stan_bSpline_data_Constructer(training_dataset = sim_data, testing_dataset = sim_data, obs_window = 5)
 model_fit <- Bayesian_Survival_model(stan_data = stan_data, baseline_assumption = "bSplines") # #exponential, weibull,  bSplines
 #Bayesian_Survival_model_check(model_fit) # model diagnostic
