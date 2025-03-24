@@ -53,7 +53,7 @@ The method was validated from two following perspectivess.
 # Deom on the simulated data:
 With the listed code, [a simulated bayesian survival analysis](./Sim_data_Analysis.Rmd) (i.e., a bayesian survival model for time-to -event data under high-dimensional setting was conducted on a simulated dataset) was conducted to validate the research setting. See the model evaluation result on this simulated dataset as following: 
 
-![alt text](./Images/PowerCurve.jpg)
+![alt text](./Image/model_performancec_simulated_Data.png)
 
 # Results on the real-world data:
 The propsed method was also [validated on real-world data](./Real_data_Analysis.Rmd). See the model evaluation results as following:
