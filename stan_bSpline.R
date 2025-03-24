@@ -127,6 +127,11 @@ stan_bSpline_data_Constructer <- function (training_dataset, testing_dataset, ob
   X_new_int = X_2[, int_names]
 
   
+  #----------------------------
+  # prediction the survival probability 
+  # for each participant at a specific 
+  # time point
+  #-----------------------------
   
   # quadrature points, evaluated for each row of data
   qpts_new_event <- uapply(qp, unstandardise_qpts, 0, t_new) #500 first node for all t_new, 500 second node for all t_new
@@ -520,7 +525,7 @@ handle_basehaz_surv <- function(times,
 
   bknots <- c(min_t, max_t)
   iknots <- get_iknots(tt, df = df, degree = degree)
-  basis  <- splines2::bSpline(tt, iknots = iknots, Boundary.knots = bknotss, degree = 3, intercept = FALSE)      
+  basis  <- splines2::bSpline(tt, iknots = iknots, Boundary.knots = bknots, degree = 3, intercept = FALSE)      
   
   
   
