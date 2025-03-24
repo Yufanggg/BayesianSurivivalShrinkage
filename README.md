@@ -35,9 +35,9 @@ To run this Project, you will need the following:
 - `bSpline_est.stan`:
 
 #### Stan data constructor
-- `stan_exponential.R`: setting up the stan_data structure for `exponential_est.stan`;
-- `stan_weibull.R`: setting up the stan_data structure for `weibull_est.stan`;
-- `stan_bSpline.R`: setting up the stan_data structure for `bSpline_est.stan`.
+- `exponential_stan_constructor.R`: setting up the stan_data structure for `exponential_est.stan`;
+- `weibull_stan_constructor.R`: setting up the stan_data structure for `weibull_est.stan`;
+- `bSpline_stan_constructor.R`: setting up the stan_data structure for `bSpline_est.stan`.
 
 #### Other supporting functions
 - `Functions.R`: Functions being used when constructing the stan_data, model diagnosis and model performance evaluation.
@@ -46,16 +46,15 @@ To run this Project, you will need the following:
 
 # Validating the method:
 The method was validated from two following perspectivess. 
-- `Model diagnosis`: The model diagnosis focused on two levels: (1) MCMC convergence; and (2) model assumption check;
+1. `Model diagnosis`: The model diagnosis focused on two levels: (1) MCMC convergence; and (2) model assumption check;
 
-- `Model performance`: The model performance focused on three levels: (1) parameter estimation estimation; (2) survival probability prediction; and (3) variable selection.
+2. `Model performance`: The model performance focused on three levels: (1) parameter estimation estimation; (2) survival probability prediction; and (3) variable selection.
 
 # Deom on the simulated data:
-- `Sim_data_Analysis.Rmd`:
-
 With the listed code, [a simulated bayesian survival analysis](./Sim_data_Analysis.Rmd) (i.e., a bayesian survival model for time-to -event data under high-dimensional setting was conducted on a simulated dataset) was conducted to validate the research setting. See the model evaluation result on this simulated dataset as following: 
 
 ![alt text](./Images/PowerCurve.jpg)
 
-
+# Results on the real-world data:
+The propsed method was also [validated on real-world data](./Real_data_Analysis.Rmd). See the model evaluation results as following:
 

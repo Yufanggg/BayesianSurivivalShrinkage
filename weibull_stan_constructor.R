@@ -1,0 +1,92 @@
+
+ 
+# assumptions: all data are right censored data with the observed window being [0, obs_window]
+stan_weibull_data_Constructer <- function (training_dataset, testing_dataset){
+  
+  #----------------------------
+  # Prepare data for model fitting
+  #-----------------------------
+  
+  #----- organize the data regarding predictor
+  
+  X <-
+    model.matrix( ~ . ^ 2, data = training_dataset[,!(names(training_dataset) %in% c("id", "obstime", "status"))])
+  dim(X)
+  
+  column_names = colnames(X)
+  main_names =  column_names[!grepl(":", column_names) &
+                               column_names != "(Intercept)"] #whether or not having intercept needs to be verified
+  X_main = X[, main_names]
+  
+  int_names =  column_names[grepl(":", column_names)]
+  X_int = X[, int_names]
+  
+  p <- dim(X_main)[2]
+  q <- dim(X_int)[2]
+  
+  main_indices_for_int = find_main_effect_indices(int_names, main_names)
+  g1 <- g(main_indices_for_int, 1)
+  g2 <- g(main_indices_for_int, 2)
+  
+ 
+  
+
+  
+  
+  
+  #----------------------------
+  # Prepare data for prediction
+  #-----------------------------
+    
+  nnew <- nrow(testing_dataset)
+  t_new <- testing_dataset$obstime
+  X_2 <-
+    model.matrix( ~ . ^ 2, data = testing_dataset[,!(names(testing_dataset) %in% c("id", "obstime", "status"))])
+  dim(X_2)
+  
+  column_names = colnames(X_2)
+  main_names =  column_names[!grepl(":", column_names) &
+                               column_names != "(Intercept)"] #whether or not having intercept needs to be verified
+  X_new_main = X_2[, main_names]
+  
+  int_names =  column_names[grepl(":", column_names)]
+  X_new_int = X_2[, int_names]
+
+  
+  
+
+  #----------------
+  # Construct data
+  #----------------
+  stan_data = list(
+    #----- for model fitting --------
+    nevent = nrow(training_dataset[training_dataset$status == 1, ]),
+    nrcens = nrow(training_dataset[training_dataset$status == 0, ]),
+    t_event = dataset[training_dataset$status == 1, "obstime"],
+    t_rcens = dataset[training_dataset$status == 0, "obstime"],
+    
+    # predictor matrices (time-fixed)
+    p = p,
+    q = q,
+    
+    x_event = X_main[training_dataset$status == 1,],
+    x_int_event =  X_int[training_dataset$status == 1,],
+    
+    x_rcens = X_main[training_dataset$status == 0,],
+    x_int_rcens = X_int[training_dataset$status == 0,],
+    
+    # link the interaction effect with the corresponding main effects
+    g1 = g1,
+    g2 = g2,
+    
+    # for prediction
+    nnew = nrow(testing_dataset),
+    x_new = X_new_main,
+    x_int_new = X_new_int,
+    t_new = testing_dataset[, "obstime"]
+  )
+  
+  return(stan_data)
+  
+}  
+
