@@ -33,7 +33,7 @@ model {
     target += exponential_lccdf(t_cens | lambda * exp(x*Beta)); // right censored data log(S(t))
     }
     
-generated quantites{
+generated quantities{
       // Predicting the survival time on the new/test dataset
       matrix[M, N_new] survival_prob;  // Unique time points * rows of new data
       for (m in 1:M){
