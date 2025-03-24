@@ -27,7 +27,7 @@ To run this Project, you will need the following:
 
 ## Installation
 
-## Project structure
+## Project structure 
 ### Code
 #### Stan model:
 - `exponential_est.stan`: setting up bayesian survival model with the assumption of exponential baseline hazard function;
@@ -41,6 +41,8 @@ To run this Project, you will need the following:
 
 #### Other supporting functions
 - `Functions.R`: Functions being used when constructing the stan_data, model diagnosis and model performance evaluation.
+
+### Report
 
 # Validating the method:
 The method was validated from two following perspectivess. 
