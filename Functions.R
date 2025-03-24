@@ -74,20 +74,25 @@ Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponentia
 # @param: model, a model fitting by the bayesian method.
 # @param: the metric for model fitting criteria
 # @return: not return any things but give a few plots
-Bayesian_Survival_model_check <- function(model, criteria = c("Bayesian R-square", "MCMC chain", "MCMC autocorrelations")) {
-  library(bayesplot)
+Bayesian_Survival_model_check <- function(bayesian_model_fit, criteria = c("Bayesian R-square", "MCMC chain", "MCMC autocorrelations")) {
+  # Extract posterior samples
+  posterior_samples <- extract(bayesian_model_fit)
+  # Convert posterior samples to mcmc object
+  mcmc_samples <- mcmc(as.matrix(posterior_samples))
   
-  if ("Bayesian R-square" %in% criteria) {
-    Bayes_r2 <- bayes_R2(model)  # Calculate Bayesian R-square
-    mcmc_hist(Bayes_r2)  # Plot Bayesian R-square
-  }
-  
+  # if ("Bayesian R-square" %in% criteria) { # might not be a useful metric for time-to-event data
+  #   Bayes_r2 <- bayes_R2(model)  # Calculate Bayesian R-square
+  #   mcmc_hist(Bayes_r2)  # Plot Bayesian R-square
+  # }
+
   if ("MCMC chain" %in% criteria) {
-    mcmc_trace(as.array(model))  # Plot MCMC chains
+    # Plot MCMC chains
+    plot(mcmc_samples)
   }
   
   if ("MCMC autocorrelations" %in% criteria) {
-    mcmc_acf(as.array(model))  # Plot MCMC autocorrelations
+    # Plot MCMC autocorrelations
+    autocorr.plot(mcmc_samples)
   }
 }
 
