@@ -13,11 +13,11 @@ This project is updated from codes used in my Master work and aims to address th
 
 ## Table of Contents
 
-- [stan model](#stan-model)
-- [stan data constructor](#stan-data-constructor)
-- [model evaluation](#data-analysis)
-- [Project Structure](#project-structure)
-- [Results](#Results)
+- [Requirments](#Requirments)
+- [Installation](#Installation)
+- [Project structure](#Project-structure)
+- [Deom on the simulated data](#Deom-on-the-simulated-data)
+- [Results on the real-world data](#Results-on-the-real-world-data)
 
 ## Requirments
 To run this Project, you will need the following:
@@ -30,17 +30,23 @@ To run this Project, you will need the following:
 ## Project structure
 ### Code
 #### Stan model:
-- `exponential_est.stan`:
-- `weibull_est.stan`:
+- `exponential_est.stan`: setting up bayesian survival model with the assumption of exponential baseline hazard function;
+- `weibull_est.stan`: setting up bayesian survival model with the assumption of weibull baseline hazard function;
 - `bSpline_est.stan`:
 
 #### Stan data constructor
-- `stan_exponential.R`:
-- `stan_weibull.R`:
-- `stan_bSpline.R`:
+- `stan_exponential.R`: setting up the stan_data structure for `exponential_est.stan`;
+- `stan_weibull.R`: setting up the stan_data structure for `weibull_est.stan`;
+- `stan_bSpline.R`: setting up the stan_data structure for `bSpline_est.stan`.
 
 #### Other supporting functions
-- `Functions.R`:
+- `Functions.R`: Functions being used when constructing the stan_data, model diagnosis and model performance evaluation.
+
+# Validating the method:
+The method was validated from two following perspectivess. 
+- `Model diagnosis`: The model diagnosis focused on two levels: (1) MCMC convergence; and (2) model assumption check;
+
+- `Model performance`: The model performance focused on three levels: (1) parameter estimation estimation; (2) survival probability prediction; and (3) variable selection.
 
 # Deom on the simulated data:
 - `Sim_data_Analysis.Rmd`:
