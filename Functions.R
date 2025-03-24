@@ -152,7 +152,7 @@ Model_performance_eval <- function(model_result, ComparsionValues, Criteria = c(
   if ("C_index" %in% Criteria) {
     # EVAL 2: Evaluating the model performance at the level of prediction
     sp <- model_result$sp
-    C_index <- Cindex(Surv(test_t, test_status), sp, test_t)
+    C_index <- rcorr.cens(Surv(test_t, test_status), sp) # rcorr.cens
     model_metric$C_index <- C_index
   }
   

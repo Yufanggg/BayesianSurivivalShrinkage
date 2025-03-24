@@ -14,7 +14,7 @@ This project is updated from codes used in my Master work and aims to address th
 ## Table of Contents
 
 - [stan model](#stan-model)
-- [stan data constructor](#eeg-data-analysis)
+- [stan data constructor](#stan-data-constructor)
 - [model evaluation](#data-analysis)
 - [Project Structure](#project-structure)
 - [Results](#Results)
@@ -27,26 +27,27 @@ To run this Project, you will need the following:
 
 ## Installation
 
-## Experimental Design
+## Project structure
+### Code
+#### Stan model:
+- `exponential_est.stan`:
+- `weibull_est.stan`:
+- `bSpline_est.stan`:
 
-### Power Analysis
-With a given experimental materials, a [Power Analysis](./DOE.Rmd) was conducted to validate the number of participants. See the an example result for 2-by-2 experimental design within subject and target word (which are fully crossed) as following: 
+#### Stan data constructor
+- `stan_exponential.R`:
+- `stan_weibull.R`:
+- `stan_bSpline.R`:
+
+#### Other supporting functions
+- `Functions.R`:
+
+# Deom on the simulated data:
+- `Sim_data_Analysis.Rmd`:
+
+With the listed code, [a simulated bayesian survival analysis](./Sim_data_Analysis.Rmd) (i.e., a bayesian survival model for time-to -event data under high-dimensional setting was conducted on a simulated dataset) was conducted to validate the research setting. See the model evaluation result on this simulated dataset as following: 
+
 ![alt text](./Images/PowerCurve.jpg)
 
-## Data Analysis
-### Behavioral Data Analysis
-The behavioral data analysis can be conducted:
-- `Exp02_BehaviouralAnalysis.Rmd`:
 
-### EEG Data Analysis
-EEG data analysis includes: data preprocessing, feature extraction and statistcial modelling.
 
-##### EEG Data Preprocessing \& Feature Extraction can be conducted with the code in the given steps: 
-- `EEG_Step01_PreproEEG_Batch.m`:
-- `EEG_Step02_PreproEEG.m`:
-- `EEG_Step03_PreproRemovthreshold.m`:
-- `EEG_Step_04_ExploratoryERPPermutation.m`:
-
-##### EEG statistcial modelling can be conducted with the code in the given steps: 
-- `Exp02_ExploratoryERP.Rmd`:
-- `Exp02_ERPPlannedAnalysis.Rmd`:
