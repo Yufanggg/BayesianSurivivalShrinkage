@@ -180,7 +180,7 @@ generated quantities{
       
       vector[qevent_new] eta_epts_event_new = x_new_qpts_event * Beta + x_new_int_qpts_event * Beta_int;
       vector[qevent_new] lhaz_epts_event_new = bspline_log_haz(eta_qpts_event_new, basis_new_qpts_event, coefs);
-      vector[qevent_new] quadrature_log_surv_qwtsindiv = - eta_qpts_event_new .* lhaz_epts_event_new;
+      vector[qevent_new] quadrature_log_surv_qwtsindiv = - eta_qpts_event_new .* exp(lhaz_epts_event_new);
       matrix[nnew, qnodes] quadrature_log_surv_indiv = to_matrix(quadrature_log_surv_qwtsindiv, nnew, qnodes);
       
       for (n in 1:nnew){
