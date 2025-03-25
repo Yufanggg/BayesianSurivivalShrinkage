@@ -44,17 +44,17 @@ To run this Project, you will need the following:
 
 ### Report
 
-# Validating the method:
+## Validating the method:
 The method was validated from two following perspectivess. 
 1. `Model diagnosis`: The model diagnosis focused on two levels: (1) MCMC convergence; and (2) model assumption check;
 
 2. `Model performance`: The model performance focused on three levels: (1) parameter estimation estimation; (2) survival probability prediction; and (3) variable selection.
 
-# Deom on the simulated data:
+## Deom on the simulated data:
 With the listed code, [a simulated bayesian survival analysis](./Sim_data_Analysis.Rmd) (i.e., a bayesian survival model for time-to -event data under high-dimensional setting was conducted on a simulated dataset) was conducted to validate the research setting. The simulated data can be obtained from the file of [Simulated_Data](./Data/imputed_NOTR_DGF.rds). See the bSpline model evaluation result on this simulated dataset as following: 
 
 ![alt text](./Image/bSpline_performance%20_simulated.png)
 
-# Results on the real-world data:
+## Results on the real-world data:
 The propsed method was also [validated on real-world data](./Real_data_Analysis.Rmd). See the model evaluation results as following:
 
