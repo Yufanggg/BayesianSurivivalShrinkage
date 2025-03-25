@@ -30,14 +30,14 @@ To run this Project, you will need the following:
 ## Project structure 
 ### Code
 #### Stan model:
-- `exponential_est.stan`: setting up bayesian survival model with the assumption of exponential baseline hazard function;
-- `weibull_est.stan`: setting up bayesian survival model with the assumption of weibull baseline hazard function;
-- `bSpline_est.stan`:
+- `.\stan_files\exponential_est.stan`: setting up bayesian survival model with the assumption of exponential baseline hazard function;
+- `.\stan_files\weibull_est.stan`: setting up bayesian survival model with the assumption of weibull baseline hazard function;
+- `.\stan_files\bSpline_est.stan`:
 
 #### Stan data constructor
-- `exponential_stan_constructor.R`: setting up the stan_data structure for `exponential_est.stan`;
-- `weibull_stan_constructor.R`: setting up the stan_data structure for `weibull_est.stan`;
-- `bSpline_stan_constructor.R`: setting up the stan_data structure for `bSpline_est.stan`.
+- `.\function_file\exponential_stan_constructor.R`: setting up the stan_data structure for `exponential_est.stan`;
+- `.\function_file\weibull_stan_constructor.R`: setting up the stan_data structure for `weibull_est.stan`;
+- `.\function_file\bSpline_stan_constructor.R`: setting up the stan_data structure for `bSpline_est.stan`.
 
 #### Other supporting functions
 - `Functions.R`: Functions being used when constructing the stan_data, model diagnosis and model performance evaluation.
@@ -51,7 +51,7 @@ The method was validated from two following perspectivess.
 2. `Model performance`: The model performance focused on three levels: (1) parameter estimation estimation; (2) survival probability prediction; and (3) variable selection.
 
 # Deom on the simulated data:
-With the listed code, [a simulated bayesian survival analysis](./Sim_data_Analysis.Rmd) (i.e., a bayesian survival model for time-to -event data under high-dimensional setting was conducted on a simulated dataset) was conducted to validate the research setting. See the model evaluation result on this simulated dataset as following: 
+With the listed code, [a simulated bayesian survival analysis](./Sim_data_Analysis.Rmd) (i.e., a bayesian survival model for time-to -event data under high-dimensional setting was conducted on a simulated dataset) was conducted to validate the research setting. The simulated data can be obtained from the file of [Simulated_Data](./Data/imputed_NOTR_DGF.rds) See the model evaluation result on this simulated dataset as following: 
 
 ![alt text](./Image/model_performancec_simulated_Data.png)
 
