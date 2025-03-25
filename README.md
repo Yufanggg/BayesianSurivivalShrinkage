@@ -51,7 +51,7 @@ The method was validated from two following perspectivess.
 2. `Model performance`: The model performance focused on three levels: (1) parameter estimation estimation; (2) survival probability prediction; and (3) variable selection.
 
 # Deom on the simulated data:
-With the listed code, [a simulated bayesian survival analysis](./Sim_data_Analysis.Rmd) (i.e., a bayesian survival model for time-to -event data under high-dimensional setting was conducted on a simulated dataset) was conducted to validate the research setting. The simulated data can be obtained from the file of [Simulated_Data](./Data/imputed_NOTR_DGF.rds) See the bSpline model evaluation result on this simulated dataset as following: 
+With the listed code, [a simulated bayesian survival analysis](./Sim_data_Analysis.Rmd) (i.e., a bayesian survival model for time-to -event data under high-dimensional setting was conducted on a simulated dataset) was conducted to validate the research setting. The simulated data can be obtained from the file of [Simulated_Data](./Data/imputed_NOTR_DGF.rds). See the bSpline model evaluation result on this simulated dataset as following: 
 
 ![alt text](./Image/bSpline_performance%20_simulated.png)
 
