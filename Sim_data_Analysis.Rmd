@@ -10,7 +10,7 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
 setwd("G:/MasterThesis/Code/")   # "C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")
-source("./Functions.R")
+source("./function_file/Functions.R")
 
 install_and_load <- function(packages) {
   for (pkg in packages) {
@@ -82,7 +82,7 @@ print(beta)
 all_objects <- mget(ls())
 
 # Save all objects to an .Rds file
-saveRDS(all_objects, file = "Simulated_Data.Rds")
+saveRDS(all_objects, file = "./Data/Simulated_Data.Rds")
 ```
 
 # Step 3: Model performance metric

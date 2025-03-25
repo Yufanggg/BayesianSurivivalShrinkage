@@ -8,8 +8,9 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")   # G:/MasterThesis/Code/
-source("./Functions.R")
+setwd("G:/MasterThesis/Code/")   # C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/
+source("./function_file//Functions.R") #function for data analysis
+source("./function_file/DataPreprocessing.R")
 
 install_and_load <- function(packages) {
   for (pkg in packages) {
@@ -21,60 +22,140 @@ install_and_load <- function(packages) {
 }
 
 # List of required packages
-required_packages <- c("rstan", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "SurvMetrics")
+required_packages <- c("rstan", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", # packages for the original data analysis
+                       
+                       # packages for the real-world data preprocesssing
+                       "readxl", "tidyverse", "survminer",  "lubridate", "modeest", "reshape2", "tableone", "tidytidbits",
+                       "survivalAnalysis", "naniar", "transplantr", "ggeffects", "splitstackshape", "data.table", "lessR",
+                       "tibble", "janitor", "mice", "ggthemes", "forestplot", "ggtext", "splines")
 # Install and/or load packages
 install_and_load(required_packages)
 ```
 
 
-# Generate simulated data
+# reorganize the dataset 
 ```{r, echo=TRUE}
-set.seed(123)
-n_samples <- 500
-n_features <- 10 
+df_thei <- readRDS("./Data/NOTR_DGF.rds")#Data_proprocessing1()
+df_reorganize <- Real_world_data_reorganization(df_thei)
+head(df_reorganize)
+```
 
-design_matrix <- matrix(rnorm(n_samples * n_features), nrow = n_samples, ncol = n_features) 
+# EDA
+```{r, echo=TRUE}
+# summarize of data to get the variable description
+# Create a correlation matrix
+cor_matrix <- cor(df_reorganize[, sapply(df_reorganize, is.numeric)])
+library(corrplot)
+# Plot the correlation matrix
+corrplot(cor_matrix, method = "color", type = "upper", 
+         tl.col = "black", tl.srt = 45, 
+         addCoef.col = "black", number.cex = 0.7)
 
-# Randomly select half of the columns and convert them to binary data
-select_columns <- sample(1:n_features, n_features/2)
-design_matrix[, select_columns] <- ifelse(design_matrix[, select_columns] > 0, 1, -1)
-
-
-# View the first few rows of the dataset
-head(design_matrix)
-     
-     
-covariates <- data.frame(design_matrix)
-colnames(covariates) <- paste0("Feature", 1:ncol(covariates))
-covariates$id <- 1:n_samples
-# Define the effects of the covariates
-beta <- rnorm(n_features)
-names(beta) <- paste0("Feature", 1:n_features)
-
-
-# Simulate the survival data
-sim_data <- simsurv(
-  dist = "weibull",
-  lambdas = 2, # scale
-  gammas = 5, # shape for weibull
-  betas = beta,
-  x = covariates,
-  mixture = FALSE,
-  maxt = 5  # Maximum follow-up time
+results2 <- data.frame(
+  Variable = character(),
+  mean_val = numeric(),
+  medium_val = numeric(),
+  sd_val = numeric()
 )
 
+library(ggplot2)
+# Function to create bar plots for factor columns
+create_barplot <- function(df, var) {
+   ggplot(df, aes_string(x = var, fill = var)) +
+    geom_bar() +
+    labs(title = paste("Bar Plot of", var), x = var, y = "Proportion") +
+    theme_minimal() +
+    theme(legend.position = "bottom")
+}
 
-sim_data <- sim_data |> left_join(covariates, by = "id") |> 
-  mutate(
-    censtime = runif(n_samples, 0.5, 2),
-    status = as.numeric(eventtime <= censtime),
-    obstime = pmin(eventtime, censtime)
-    ) |> select("obstime", "status", colnames(covariates))
+# Loop through each column in the data frame
+for (var in colnames(df_reorganize)) {
+  if (is.numeric(df_reorganize[[var]])){
+    results2 <- rbind(results2, data.frame(
+      Variable = var,
+      mean_val = mean(df_reorganize[[var]]),
+      median_val = median(df_reorganize[[var]]),
+      sd_val =  sd(df_reorganize[[var]])
+    ))
+  } else if (!is.numeric(df_reorganize[[var]]) & !inherits(df_reorganize[[var]], "Date")) {
+    print(create_barplot(df_reorganize, var))
+  }
+}
 
-head(sim_data)
+# Print the results data frame
+print(results2)
+```
 
-rm(design_matrix, covariates, n_features, n_samples, required_packages, select_columns, install_and_load)
-print(beta)
+## check fothe missing data of numeric variables
+```{r, echo=TRUE}
+results <- data.frame(
+  Variable = character(),
+  LengthUniqueValues = integer(),
+  MissingObs = integer(),
+  UniqueValues = character()
+)
+
+# Loop through each column in the data frame
+for (var in colnames(df_reorganize)) {
+  if (!is.numeric(df_reorganize[[var]]) & !inherits(df_reorganize[[var]], "Date")) {
+    # Convert unique values to a single string
+    unique_values_str <- paste(unique(df_reorganize[[var]]), collapse = ", ")
+    
+    # Add the variable name, unique values, and number of unique values to the results data frame
+    results <- rbind(results, data.frame(
+      Variable = var,
+      LengthUniqueValues = length(unique(df_reorganize[[var]])),
+      MissingObs = sum(is.na(df_reorganize[[var]])),
+      UniqueValues = unique_values_str
+    ))
+  }
+  
+  else{
+     results <- rbind(results, data.frame(
+      Variable = var,
+      LengthUniqueValues = length(unique(df_reorganize[[var]])),
+      MissingObs = sum(is.na(df_reorganize[[var]])),
+      UniqueValues = unique_values_str
+    ))
+  }
+}
+
+# Print the results data frame
+print(results)
+
+# joint non-complete cases
+sum(!complete.cases(df_reorganize))
+sum(complete.cases(df_reorganize))
+```
+
+```{r, echo=TRUE}
+
+# recensoring data because of not accounting for completing risks: only focusing on graft loss
+df_reorganize$status2 = ifelse(df_reorganize$status == "graftloss", 1, 0)
+
+
+## deal with missing data issues
+# set the missing InitialOnmachineindicator being an additional category
+df_reorganize$InitialOnmachineindicator = if_else(is.na(df_reorganize$InitialOnmachineindicator), "Unknown", df_reorganize$InitialOnmachineindicator)
+
+# set the datatype
+df_reorganize[] <- lapply(df_reorganize, function(x) if(is.character(x)) as.factor(x) else x)
+
+df_reorganize <- df_reorganize[, !(colnames(df_reorganize) %in% c("Dateoftransplant", "status2"))]
+# impute the missing Smoking data
+library(mice)
+methods = make.method(df_reorganize)
+methods["Smoking"] = "pmm" # Predictive mean matching
+methods[setdiff(names(df_reorganize), "Smoking")] <- ""
+# Perform the imputation with more iterations in parallel
+imputed_df_using <- mice(df_reorganize, method = methods, m = 5, maxit = 100, seed = 500)
+# imputed_df_using <- futuremice(df_using, method = methods, parallelseed = 1, m = 5, maxit = 100, seed = 500)
+
+# Complete the dataset with the imputed values
+completed_df_ <- complete(imputed_df_using)
+print(completed_df_)
+saveRDS(completed_df_, "imputed_NOTR_DGF.rds")
+```
 ```
 
 #Implemented the code in a Cross-validation way

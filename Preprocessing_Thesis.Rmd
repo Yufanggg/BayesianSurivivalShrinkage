@@ -19,7 +19,7 @@ library(mstate)
 library(ggplot2)
 library(corrplot)
 setwd("G:/MasterThesis/Code" )
-df <- readRDS("./NOTR_DGF.rds")
+df <- readRDS("./Data/NOTR_DGF.rds")
 sort(colnames(df))
 ```
 
@@ -39,6 +39,7 @@ df_using <- subset(df,Typeofdonor=='Deceased'
                       & Year_Of_Tx < 2023)
 
 ```
+.
 
 # select the necessary variables
 ```{r, echo=FALSE, results='hide'}
@@ -125,16 +126,16 @@ df_using <- df_using[, !(colnames(df_using) %in% c("Dateoftransplant", "status2"
 # impute the missing Smoking data
 library(mice)
 methods = make.method(df_using)
-methods["Smoking"] = "pmm" # Predictive mean matching
-methods[setdiff(names(df_using), "Smoking")] <- ""
+methods["Smoking"] = "pmm" #Predictive mean matching
+
 # Perform the imputation with more iterations in parallel
-imputed_df_using <- mice(df_using, method = methods, m = 5, maxit = 100, seed = 500)
-# imputed_df_using <- futuremice(df_using, method = methods, parallelseed = 1, m = 5, maxit = 100, seed = 500)
+imputed_df_using <- mice(df_using, method = methods, m = 5, maxit = 5, seed = 500)
+
 
 # Complete the dataset with the imputed values
 completed_df_ <- complete(imputed_df_using)
 print(completed_df_)
-saveRDS(completed_df_, "imputed_NOTR_DGF.rds")
+saveRDS(completed_df_, "./Data/imputed_NOTR_DGF.rds")
 ```
 
 ```{r, echo=TRUE}
@@ -256,6 +257,6 @@ df_using = df_using |>
          )
 
 ## Done with the data cleaning. on to the creatinine imputation
-saveRDS(completed_df_, "preprocessed_NOTR_DGF.rds")
+saveRDS(completed_df_, "./Data/preprocessed_NOTR_DGF.rds")
 ```
 

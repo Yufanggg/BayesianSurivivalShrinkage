@@ -1,4 +1,8 @@
-Data_cleaning <- function(){
+# Function for the kidney data preprocessing with the same approach 
+# of Thei et al., 2024
+
+# @return the cleaned dataset, also save the corresponding file in the fold of .\Data
+Data_proprocessing1 <- function(){
 
   
   ## locate the file on your computer
@@ -45,8 +49,8 @@ Data_cleaning <- function(){
       Recipient_Cardiac_event = na_if(Recipient_Cardiac_event, "Unknown"),
       Warm_ischaemic_period_1 = na_if(Warm_ischaemic_period_1, 0),
       Warm_ischaemic_period_2 = na_if(Warm_ischaemic_period_2, 0), 
-      Lowestcreatinine??moll = case_when(Lowestcreatinine??moll <1001 ~ Lowestcreatinine??moll,
-                                         Lowestcreatinine??moll >1000 ~NA),
+      Lowestcreatininemumoll = case_when(Lowestcreatinine¦Ìmoll <1001 ~ Lowestcreatinine¦Ìmoll,
+                                         Lowestcreatinine¦Ìmoll >1000 ~NA),
       Cold_ischaemic_period = ifelse(Cold_ischaemic_period <0, 0,Cold_ischaemic_period )
     )%>%
     mutate(across(where(is.numeric), ~ifelse(. == -1, NA, .)))
@@ -404,10 +408,10 @@ Data_cleaning <- function(){
   
   
   ## Done with the data cleaning. on to the creatinine imputation
-  saveRDS(NOTR_DGF.df, "NOTR_DGF.rds")
+  saveRDS(NOTR_DGF.df, "./Data/NOTR_DGF.Rds")
+  
+  return (NOTR_DGF.df)
 }
-
-
 
 
 # Function for the kidney data preprocessing
@@ -428,12 +432,13 @@ Real_world_data_reorganization <- function(dataset){
   
   # select the necessary variables
   variableName_df = read.csv(file = "../Data/codeboek2_.csv")
+  
   variableName = variableName_df$Name_NOTR 
   variableName = if_else(variableName == "Initialweight", "Recipient_weight", variableName) # use the renamed name
   variableName = if_else(variableName == "Initialheight", "Recipient_height", variableName) # use the renamed name
   variableName = if_else(variableName == "Warmischaemicperiod1", "Warm_ischaemic_period_1", variableName) 
   variableName = if_else(variableName == "InitialColdischaemicperiod", "Cold_ischaemic_period", variableName) 
-  variableName = if_else(variableName == "Lowestcreatinineç¢Œmoll", "", variableName)
+  variableName = if_else(variableName == "LowestcreatinineÂµmoll", "Lowestcreatininemumoll", variableName)
   variableName_using = variableName[nzchar(variableName)]
   variableName_using = variableName_using[!variableName_using %in% c("InitialPrimaryDisease", 
                                                                      "InitialPrimaryDiseaserenine",
@@ -441,7 +446,7 @@ Real_world_data_reorganization <- function(dataset){
   
   variableName_using <- c(variableName_using, c("time", "status", "status2", "HLA_mismatch")) # including survival related variables
   df_using_ <- df_using |> select(variableName_using)
-  df_using_$LowestcreatinineÂµmoll <- df_using$LowestcreatinineÎ¼moll
+  df_using_$Lowestcreatininemumoll <- df_using$Lowestcreatininemumoll
   df_using <- df_using_
   head(df_using)
   str(df_using)
@@ -464,6 +469,9 @@ Real_world_data_reorganization <- function(dataset){
   # # group the InitialPrimaryDiseaseET
   InitialPrimaryDiseaseET_group = read.csv("../Data/tx_all_primary disease.csv")
   print(head(InitialPrimaryDiseaseET_group))
+  
+  completed_df_ <- dataset
+
 
   Num_overlap <- 0
   for (InitialPrimaryDiseaseET in sort(unique(as.character(completed_df_$InitialPrimaryDiseaseET)))){

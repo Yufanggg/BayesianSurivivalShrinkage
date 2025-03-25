@@ -38,12 +38,12 @@ Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponentia
   if (school == "Bayesian") {
     if (baseline_assumption == "exponential") {
       # compile the model
-      bayesian_model <- stan_model("./exponential_est.stan")
+      bayesian_model <- stan_model("./stan_file/exponential_est.stan")
     }
     
     else if (baseline_assumption == "weibull") {
       # compile the model
-      bayesian_model <- stan_model("./weibull_est.stan")
+      bayesian_model <- stan_model("./stan_file/weibull_est.stan")
     }
     
     else if (baseline_assumption == "bSplines") {
@@ -51,7 +51,7 @@ Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponentia
       
       
       # compile the model
-      bayesian_model <- stan_model("./bSpline_est.stan")
+      bayesian_model <- stan_model("./stan_file/bSpline_est.stan")
     }
     
     # Model fitting
@@ -77,17 +77,17 @@ Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponentia
 stan_data_Constructer <- function(training_dataset, testing_dataset, baseline_modelling = "bSplines", obs_window = 5){
   
   if (baseline_modelling == "exponential"){
-    source("./exponential_stan_constructor.R")
+    source("./function_file/exponential_stan_constructor.R")
     stan_data = stan_exponential_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset)
   }
   
   if (baseline_modelling == "weibull"){
-    source("./weibull_stan_constructor.R")
+    source("./function_file/weibull_stan_constructor.R")
     stan_data = stan_weibull_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset)
   }
   
   if (baseline_modelling == "bSplines"){
-    source("./bSpline_stan_constructor.R")
+    source("./function_file/bSpline_stan_constructor.R")
     stan_data = stan_bSpline_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset, obs_window = 5)
   }
   
@@ -235,7 +235,7 @@ metric_visualization <- function(cross_val_metric){
   #-----------------------------
   # visual the result of FDR_vals
   #-----------------------------
-  boxplot(FDR_vals, main = "FDR for the model prediction", ylab = "FDR", col = "orange")
+  boxplot(FDR_vals, main = "FDR for the variable selection", ylab = "FDR", col = "orange")
 
 
 }
