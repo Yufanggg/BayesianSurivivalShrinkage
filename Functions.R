@@ -214,7 +214,7 @@ metric_visualization <- function(cross_val_metric){
   mean_values <- colMeans(rMSE_s)
   sd_values <- apply(rMSE_s, 2, sd)
   # Plot the mean values
-  plot(mean_values, type = "o", col = "blue", xlab = "estimated Betas", ylab = "estimated Value of Betas", ylim = c(0, 2), main = "Mean Values with Error Bars", pch = 16)
+  plot(mean_values, type = "o", col = "blue", xlab = "estimated Betas", ylab = "estimated Value of Betas", ylim = c(0, 2), main = "MSE for Beta estimation", pch = 16)
   # Add error bars
   arrows(1:55, mean_values - sd_values, 1:55, mean_values + sd_values, angle = 90, code = 3, length = 0.05, col = "red")
 
