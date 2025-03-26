@@ -78,8 +78,8 @@ rm(design_matrix, covariates, n_features, n_samples, required_packages, select_c
 print(beta)
 
 
-# Get a list of all objects in the environment
-all_objects <- mget(ls())
+# # Get a list of all objects in the environment
+# all_objects <- mget(ls())
 
 # Save all objects to an .Rds file
 # saveRDS(all_objects, file = "./Data/Simulated_Data.Rds")

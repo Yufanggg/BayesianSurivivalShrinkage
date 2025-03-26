@@ -49,7 +49,6 @@ Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponentia
     else if (baseline_assumption == "bSplines") {
       message("We utilized B-splines to estimate the baseline cumulative hazard function.")
       
-      
       # compile the model
       bayesian_model <- stan_model("./stan_file/bSpline_est.stan")
     }
