@@ -1,7 +1,7 @@
 //
 // This Stan program defines a survival model of cox regression.
 // The baseline hazard in this stan program is approximated by bSplines.
-// The integral for the bSpline baseline hazard is obatined by the Gauss¨CKronrod quadrature.
+// The integral for the bSpline baseline hazard is obatined by the Gauss-Kronrod quadrature.
 // Learn more about model development with Stan at:
 //
 //    http://mc-stan.org/users/interfaces/rstan.html
