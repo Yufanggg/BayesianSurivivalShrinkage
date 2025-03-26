@@ -1,12 +1,13 @@
 
-# Cognitive2Computation
+# Bayesian survival analysis under high-dimensional setting
+
 [![LinkedIn](https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555)](https://www.linkedin.com/in/yufang-w-1295881b5/) [![GitHub](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white&colorB=555)](https://github.com/Yufanggg) <img alt="GitHub" src="https://img.shields.io/github/license/bopith/UnicornCompanies?style=for-the-badge"> 
 
 ## Overview
-This repository contains the bayesian survival model for high-dimensional data. 
+This repository aims to detect the interaction effects for time-to-event data under high-dimensional setting. 
 
-This project is updated from codes used in my Master work and aims to address the following research related questions:
-1. The reformulated \textit{Bayint} model for time-to-event data;
+This project is updated from codes used in my Master work in Statistics & Data Science and aims to address the following research related questions:
+1. The reformulated *Bayint* model for time-to-event data;
 2. Its potential pros and cons compared to tree-based machine learning methods;
 3. An effective approach to estimate interaction effects for time-to-event data with a moderate n to p ratio.
 
