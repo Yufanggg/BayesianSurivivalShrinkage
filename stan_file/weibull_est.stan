@@ -1,3 +1,12 @@
+//
+// This Stan program defines a survival model of cox regression.
+// The baseline hazard in this stan program is assumed to be weibull distributed.
+// Learn more about model development with Stan at:
+//
+//    http://mc-stan.org/users/interfaces/rstan.html
+//    https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started
+//
+
 functions{
   /**
   * Log hazard for Weibull distribution
@@ -120,7 +129,7 @@ generated quantities{
       vector[nnew] survival_prob;  // 
       vector[nnew] est_new = x_new * Beta + x_int_new * Beta_int;
       survival_prob = exp(weibull_log_surv(est_new, t_new, shape));
-      }
+}
       
       
       

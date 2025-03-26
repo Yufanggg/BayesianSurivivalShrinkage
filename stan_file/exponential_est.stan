@@ -1,3 +1,15 @@
+//
+// This Stan program defines a survival model of cox regression.
+// The baseline hazard in this stan program is assumed to be exponential distributed.
+//
+
+// Learn more about model development with Stan at:
+//
+//    http://mc-stan.org/users/interfaces/rstan.html
+//    https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started
+//
+
+
 functions{
    /**
   * Log hazard for exponential distribution
@@ -102,5 +114,5 @@ generated quantities{
       // Predicting the survival time on the new/test dataset
       vector[nnew] survival_prob;  // 
       survival_prob = exp(exponential_log_surv(x_new * Beta + x_int_new * Beta_int, t_new));
-    }
+}
     

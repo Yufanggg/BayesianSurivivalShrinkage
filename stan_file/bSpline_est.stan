@@ -1,8 +1,7 @@
 //
-// This Stan program defines a simple model, with a
-// vector of values 'y' modeled as normally distributed
-// with mean 'mu' and standard deviation 'sigma'.
-//
+// This Stan program defines a survival model of cox regression.
+// The baseline hazard in this stan program is approximated by bSplines.
+// The integral for the bSpline baseline hazard is obatined by the Gauss¨CKronrod quadrature.
 // Learn more about model development with Stan at:
 //
 //    http://mc-stan.org/users/interfaces/rstan.html
