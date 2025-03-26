@@ -16,7 +16,7 @@ This project is updated from codes used in my Master work and aims to address th
 - [Requirments](#Requirments)
 - [Installation](#Installation)
 - [Project structure](#Project-structure)
-- [Deom on the simulated data](#Deom-on-the-simulated-data)
+- [Resuls on the simulated data](#Results-on-the-simulated-data)
 - [Results on the real-world data](#Results-on-the-real-world-data)
 
 ## Requirments
@@ -40,9 +40,10 @@ To run this Project, you will need the following:
 - `.\function_file\bSpline_stan_constructor.R`: setting up the stan_data structure for `bSpline_est.stan`.
 
 #### Other supporting functions
-- `Functions.R`: Functions being used when constructing the stan_data, model diagnosis and model performance evaluation.
+- `.\function_file\Functions.R`: Functions being used when constructing the stan_data, model diagnosis and model performance evaluation.
 
 ### Report
+The report of this project is now underdrafting.
 
 ## Validating the method:
 The method was validated from two following perspectivess. 
@@ -50,10 +51,13 @@ The method was validated from two following perspectivess.
 
 2. `Model performance`: The model performance focused on three levels: (1) parameter estimation estimation; (2) survival probability prediction; and (3) variable selection.
 
-## Deom on the simulated data:
-With the listed code, [a simulated bayesian survival analysis](./Sim_data_Analysis.Rmd) (i.e., a bayesian survival model for time-to -event data under high-dimensional setting was conducted on a simulated dataset) was conducted to validate the research setting. The simulated data can be obtained from the file of [Simulated_Data](./Data/imputed_NOTR_DGF.rds). See the bSpline model evaluation result on this simulated dataset as following: 
+## Results on the simulated data:
+With the listed code, [a simulated bayesian survival analysis](./Sim_data_Analysis.Rmd) (i.e., a bayesian survival model for time-to -event data under high-dimensional setting was conducted on a simulated dataset) was conducted to validate the research setting. The simulated data can be obtained from the file of [Simulated_Data](./Data/imputed_NOTR_DGF.rds), in which a weibull baseline hazard function were assumed. With this simulated data, the following three models have been built: 
+1. **the exponential model**: ![alt text](./Image/exponential_performance%20_simulated.png)
+2. **the weibull model**:  ![alt text](./Image/weibull_performance%20_simulated.png)
+3. **the bSpline models**: ![alt text](./Image/bSpline_performance%20_simulated.png)
 
-![alt text](./Image/bSpline_performance%20_simulated.png)
+
 
 ## Results on the real-world data:
 The propsed method was also [validated on real-world data](./Real_data_Analysis.Rmd). See the model evaluation results as following:
