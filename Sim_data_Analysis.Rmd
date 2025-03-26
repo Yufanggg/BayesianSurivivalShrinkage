@@ -30,52 +30,32 @@ install_and_load(required_packages)
 
 # Step 2: Generate simulated data
 ```{r, echo=TRUE}
-set.seed(123)
 n_samples <- 500
 n_features <- 10 
 
-design_matrix <- matrix(rnorm(n_samples * n_features), nrow = n_samples, ncol = n_features) 
-
-# Randomly select half of the columns and convert them to binary data
-select_columns <- sample(1:n_features, n_features/2)
-design_matrix[, select_columns] <- ifelse(design_matrix[, select_columns] > 0, 1, -1)
-
-
-# View the first few rows of the dataset
-head(design_matrix)
-     
-     
-covariates <- data.frame(design_matrix)
-colnames(covariates) <- paste0("Feature", 1:ncol(covariates))
-covariates$id <- 1:n_samples
-# Define the effects of the covariates
-beta <- rnorm(n_features)
-names(beta) <- paste0("Feature", 1:n_features)
-
-
-# Simulate the survival data
-sim_data <- simsurv(
-  dist = "weibull",
-  lambdas = 2, # scale
-  gammas = 5, # shape for weibull
-  betas = beta,
-  x = covariates,
-  mixture = FALSE,
-  maxt = 5  # Maximum follow-up time
-)
+# function for one simulation
+simulation_bayint_survival <- function(){
+  simulated_data <- DataGenerator(n_samples = 500, n_features = 10)
+  dataset <- simulated_data$dataset
+  Beta <- simulated_data$Beta
+  
+  stan_data <- stan_data_Constructer(training_dataset = dataset, testing_dataset = head(dataset, 10), baseline_modelling = "exponential", obs_window = 5)
+  model_fit <- Bayesian_Survival_model(stan_data = stan_data, baseline_assumption = "exponential")
+    
+  #extract the info from the bayesian model fit
+  model_result <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit, criteria = "DesignCoefficients")
+  
+  output = list(
+    Beta_true = Beta,
+    Beta_est = model_result$Beta_bayesian_est
+  )
+  
+}
 
 
-sim_data <- sim_data |> left_join(covariates, by = "id") |> 
-  mutate(
-    censtime = runif(n_samples, 0.5, 2),
-    status = as.numeric(eventtime <= censtime),
-    obstime = pmin(eventtime, censtime)
-    ) |> select("obstime", "status", colnames(covariates))
 
-head(sim_data)
+set.seed(123)
 
-rm(design_matrix, covariates, n_features, n_samples, required_packages, select_columns, install_and_load)
-print(beta)
 
 
 # # Get a list of all objects in the environment
@@ -85,7 +65,14 @@ print(beta)
 # saveRDS(all_objects, file = "./Data/Simulated_Data.Rds")
 ```
 
-# Step 3: Model performance metric
+# Step 3: Model performance metric for the cofficients of design matrix
+```{r, echo=TRUE}
+simulation_for_coefficients <- function(simulation_times){
+  
+}
+```
+
+
 ```{r, echo=TRUE}
 cross_validation <- function(whole_dataset, baseline_modelling = "weibull", num_folds = 5){
   # create the cross-validation folds

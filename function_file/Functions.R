@@ -69,6 +69,116 @@ Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponentia
   }
 }
 
+# Generate simulated design matrices that including both main and interaction effects
+# @param: num_factors: the total number of main effects
+# @param: factor_indices: indices of factor variables
+# @param: num_rows: desired length of the design matrix
+# @return: a design matrix with `num_factors` main variables, `factor _indices` are variables, 
+#          num_rows; and the corresponding interaction variables
+generate_design_matrix <- function(num_factors, factor_indices, num_rows) {
+  # Generate all combinations of factor levels (-1 and 1) for factors
+  factor_levels <- expand.grid(rep(list(c(-1, 1)), length(factor_indices)))
+  
+  # Generate random numeric values for numeric factors
+  numeric_levels <- expand.grid(rep(list(runif(2, -1, 1)), num_factors - length(factor_indices)))
+  
+  # Combine factor and numeric levels
+  levels <- cbind(factor_levels, numeric_levels)
+  
+  # Repeat the levels to match the desired number of rows
+  levels <- levels[rep(seq_len(nrow(levels)), length.out = num_rows), ]
+  
+  # Initialize the design matrix with main effects
+  design_matrix <- as.data.frame(levels)
+  
+  # Generate interaction effects
+  for (i in 1:(num_factors - 1)) {
+    for (j in (i + 1):num_factors) {
+      interaction_term <- design_matrix[, i] * design_matrix[, j]
+      colname <- paste0("Var", i, ":Var", j)
+      design_matrix[[colname]] <- interaction_term
+    }
+  }
+  
+  return(design_matrix)
+}
+
+
+# Generate a simulate dateset
+DataGenerator <- function(n_samples = 500, n_features = 10) {
+  sim_data <- list()
+  
+  # generate design matrix
+  factor_indices <- sample(1:n_features, 3, replace = FALSE)  # Indices of factor variables
+  design_matrix <- generate_design_matrix(num_factors = n_features, factor_indices = factor_indices, num_rows = n_samples)
+  
+  # generate the cofficents of design matrix
+  Beta = rnorm(ncol(design_matrix))
+  names(Beta) = colnames(design_matrix)
+  sim_data$Beta <- Beta
+  
+  # Generate simulated survival data
+  survival_data <- simsurv(
+    dist = "weibull",
+    lambdas = 2,
+    # scale
+    gammas = 5,
+    # shape for weibull
+    betas = Beta,
+    x = design_matrix,
+    mixture = FALSE,
+    maxt = 5  # Maximum follow-up time
+  )
+  
+  survival_data <- survival_data |>
+    mutate(
+      censtime = runif(n_samples, 0.5, 2),
+      status = as.numeric(eventtime <= censtime),
+      obstime = pmin(eventtime, censtime)
+    ) |> select("obstime", "status")
+  
+  dataset <- cbind(survival_data, design_matrix)
+  sim_data$dataset <- dataset
+  
+  return(sim_data)
+}
+
+
+cross_simulation <- function(whole_dataset, baseline_modelling = "weibull", num_folds = 5){
+  # create the cross-validation folds
+  folds <- createFolds(whole_dataset$status, k = num_folds, list = TRUE, returnTrain = FALSE)
+  cross_val_metric <- list()
+  rMSE_s = matrix(nrow = 5, ncol = 55); Brier_scores =  rep(NA, 5); C_indices =  rep(NA, 5); FDR_vals =  rep(NA, 5)
+  for (i in 1:num_folds){
+    fold_indices <- folds[[i]]
+    training_data = whole_dataset[-fold_indices, ]
+    testing_data = whole_dataset[fold_indices, ]
+    stan_data <- stan_data_Constructer(training_dataset = training_data, testing_dataset = testing_data, baseline_modelling = baseline_modelling, obs_window = 5)
+    model_fit <- Bayesian_Survival_model(stan_data = stan_data, baseline_assumption = baseline_modelling)
+    
+    #extract the info from the bayesian model fit
+    model_result <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit)
+    
+    ComparsionValues <- list(
+      Beta_reference = c(beta, rep(0, 45)),
+      test_t = testing_data$obstime,
+      test_status = testing_data$status,
+      Selection_reference = c(rep(TRUE, 10), rep(FALSE, 45))
+    )
+    model_metric <- Model_performance_eval(model_result = model_result, ComparsionValues)
+    rMSE_s[i, ] <- model_metric$rMSE
+    Brier_scores[i] <- model_metric$Brier_score
+    C_indices[i] <- model_metric$C_index
+    FDR_vals[i] <- model_metric$FDR
+  }
+  cross_val_metric$rMSE_s <- rMSE_s
+  cross_val_metric$Brier_scores <- Brier_scores
+  cross_val_metric$C_indices <- C_indices
+  cross_val_metric$FDR_vals <- FDR_vals
+  
+  return(cross_val_metric)
+}
+
 
 
 # Function to construct stan_data for model fitting
