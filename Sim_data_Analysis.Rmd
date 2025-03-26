@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")   # "C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 
 install_and_load <- function(packages) {
@@ -82,12 +82,12 @@ print(beta)
 all_objects <- mget(ls())
 
 # Save all objects to an .Rds file
-saveRDS(all_objects, file = "./Data/Simulated_Data.Rds")
+# saveRDS(all_objects, file = "./Data/Simulated_Data.Rds")
 ```
 
 # Step 3: Model performance metric
 ```{r, echo=TRUE}
-cross_validation <- function(whole_dataset, baseline_modelling = "bSplines", num_folds = 5){
+cross_validation <- function(whole_dataset, baseline_modelling = "weibull", num_folds = 5){
   # create the cross-validation folds
   folds <- createFolds(whole_dataset$status, k = num_folds, list = TRUE, returnTrain = FALSE)
   cross_val_metric <- list()
@@ -96,7 +96,7 @@ cross_validation <- function(whole_dataset, baseline_modelling = "bSplines", num
     fold_indices <- folds[[i]]
     training_data = whole_dataset[-fold_indices, ]
     testing_data = whole_dataset[fold_indices, ]
-    stan_data <- stan_data_Constructer(training_dataset = training_data, testing_dataset = testing_data, obs_window = 5)
+    stan_data <- stan_data_Constructer(training_dataset = training_data, testing_dataset = testing_data, baseline_modelling = baseline_modelling, obs_window = 5)
     model_fit <- Bayesian_Survival_model(stan_data = stan_data, baseline_assumption = baseline_modelling)
     
     #extract the info from the bayesian model fit
@@ -122,7 +122,7 @@ cross_validation <- function(whole_dataset, baseline_modelling = "bSplines", num
   return(cross_val_metric)
 }
 
-cross_val_metric <- cross_validation(whole_dataset = sim_data)
+cross_val_metric <- cross_validation(whole_dataset = sim_data, baseline_modelling = "bSplines") # exponential, weibull, bSplines
 
 # Step 3: visualize the model metric results
 metric_visualization(cross_val_metric)
