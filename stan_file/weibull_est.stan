@@ -16,8 +16,8 @@ functions{
   * @param shape Real, Weibull shape
   * @return A vector
   */
-  vector weibull_log_haz(vector eta, vector t, real shape) {
-    return log(shape) + (shape - 1) * log(t) + eta;
+  vector weibull_log_haz(vector eta, vector t, real shape, real lambda) {
+    return log(shape) + (shape - 1) * log(t) + eta + log(lambda);
   }
 
   
@@ -44,9 +44,9 @@ functions{
   * @param shape Real, Weibull shape
   * @return A vector
   */
-  vector weibull_log_surv(vector eta, vector t, real shape) {
+  vector weibull_log_surv(vector eta, vector t, real shape, real lambda) {
     vector[rows(eta)] res;
-    res = - pow_vec(t, shape) .* exp(eta);
+    res = - pow_vec(t, shape) .* exp(eta) * lambda;
     return res;
   }
 }
@@ -87,6 +87,7 @@ parameters {
   real<lower=0>  tau2[p];
   real<lower=0>  gam2[p];
   real<lower=0>  shape;
+  real<lower=0>  lambda;
        }
 model {
        // pre-allocated variables
@@ -110,25 +111,26 @@ model {
       }
       
     shape ~ lognormal(0, 1);
+    lambda ~ lognormal(0, 1);
       
 
     // log-likelihood, represented by [target]
     if (nevent > 0) {
       eta_event = x_event * Beta + x_int_event * Beta_int;
-      target +=  weibull_log_haz(eta_event, t_event, shape);
-      target +=  weibull_log_surv(eta_event, t_event, shape); // uncensored data log(f(t)) = log(h(t)) + log(S(t))
+      target +=  weibull_log_haz(eta_event, t_event, shape, lambda);
+      target +=  weibull_log_surv(eta_event, t_event, shape, lambda); // uncensored data log(f(t)) = log(h(t)) + log(S(t))
       }
       
     if (nrcens > 0) {
       eta_rcens = x_rcens * Beta + x_int_rcens * Beta_int;
-      target +=  weibull_log_surv(eta_rcens, t_rcens, shape); // right censored data log(S(t))
+      target +=  weibull_log_surv(eta_rcens, t_rcens, shape, lambda); // right censored data log(S(t))
       }
      }
 generated quantities{
       // Predicting the survival time on the new/test dataset
       vector[nnew] survival_prob;  // 
       vector[nnew] est_new = x_new * Beta + x_int_new * Beta_int;
-      survival_prob = exp(weibull_log_surv(est_new, t_new, shape));
+      survival_prob = exp(weibull_log_surv(est_new, t_new, shape, lambda));
 }
       
       

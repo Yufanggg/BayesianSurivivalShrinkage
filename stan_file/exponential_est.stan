@@ -17,8 +17,8 @@ functions{
   * @param eta Vector, linear predictor
   * @return A vector
   */
-  vector exponential_log_haz(vector eta) {
-    return eta;
+  vector exponential_log_haz(real lambda, vector eta) {
+    return eta + log(lambda);
   }
   
   /**
@@ -28,9 +28,9 @@ functions{
   * @param t Vector, event or censoring times
   * @return A vector
   */
-  vector exponential_log_surv(vector eta, vector t) {
+  vector exponential_log_surv(real lambda, vector eta, vector t) {
     vector[rows(eta)] res;
-    res = - t .* exp(eta);
+    res = (- t .* exp(eta)) * lambda;
     return res;
   }
   
