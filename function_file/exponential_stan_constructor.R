@@ -63,8 +63,8 @@ stan_exponential_data_Constructer <- function (training_dataset, testing_dataset
     #----- for model fitting --------
     nevent = nrow(training_dataset[training_dataset$status == 1, ]),
     nrcens = nrow(training_dataset[training_dataset$status == 0, ]),
-    t_event = dataset[training_dataset$status == 1, "obstime"],
-    t_rcens = dataset[training_dataset$status == 0, "obstime"],
+    t_event = training_dataset[training_dataset$status == 1, "obstime"],
+    t_rcens = training_dataset[training_dataset$status == 0, "obstime"],
     
     # predictor matrices (time-fixed)
     p = p,
