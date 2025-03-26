@@ -24,7 +24,7 @@ functions{
   }
   
    /**
-  * Evaluate log survival or log CDF from the log hazard evaluated at
+  * Evaluate log survival from the log hazard evaluated at
   * quadrature points and a corresponding vector of quadrature weights
   *
   * @param qwts Vector, the quadrature weights

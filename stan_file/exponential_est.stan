@@ -10,7 +10,7 @@ functions{
   }
   
   /**
-  * Log survival and log CDF for exponential distribution
+  * Log survival for exponential distribution
   *
   * @param eta Vector, linear predictor
   * @param t Vector, event or censoring times

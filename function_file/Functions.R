@@ -72,8 +72,8 @@ Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponentia
 
 
 
-
 # Function to construct stan_data for model fitting
+# @para: training_dataset: 
 stan_data_Constructer <- function(training_dataset, testing_dataset, baseline_modelling = "bSplines", obs_window = 5){
   
   if (baseline_modelling == "exponential"){

@@ -12,9 +12,23 @@ functions{
   }
 
   
+    /**
+  * Raise each element of x to the power of y
+  *
+  * @param x Vector
+  * @param y Real, the power to raise to
+  * @return vector
+  */
+  vector pow_vec(vector x, real y) {
+    int N = rows(x);
+    vector[N] res;
+    for (n in 1:N)
+      res[n] = pow(x[n], y);
+    return res;
+  }
   
   /**
-  * Log survival and log CDF for Weibull distribution
+  * Log survival for Weibull distribution
   *
   * @param eta Vector, linear predictor
   * @param t Vector, event or censoring times
@@ -86,13 +100,13 @@ model {
       Beta_int[i] ~ normal(0, sqrt(sqrt(tau2[g1[i]]*tau2[g2[i]])*tau2int));
       }
       
-    shape ~ lognormal(0, 1)
+    shape ~ lognormal(0, 1);
       
 
     // log-likelihood, represented by [target]
     if (nevent > 0) {
       eta_event = x_event * Beta + x_int_event * Beta_int;
-      target +=  weibull_log_haz (eta_event);
+      target +=  weibull_log_haz(eta_event, t_event, shape);
       target +=  weibull_log_surv(eta_event, t_event, shape); // uncensored data log(f(t)) = log(h(t)) + log(S(t))
       }
       
@@ -104,6 +118,10 @@ model {
 generated quantities{
       // Predicting the survival time on the new/test dataset
       vector[nnew] survival_prob;  // 
-      survival_prob = exp(weibull_log_surv(x_new * Beta + x_int_new * Beta_int, t_new));
+      vector[nnew] est_new = x_new * Beta + x_int_new * Beta_int;
+      survival_prob = exp(weibull_log_surv(est_new, t_new, shape));
       }
-    }
+      
+      
+      
+      
