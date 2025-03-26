@@ -8,29 +8,24 @@ stan_exponential_data_Constructer <- function (training_dataset, testing_dataset
   
   #----- organize the data regarding predictor
   
-  X <-
-    model.matrix( ~ . ^ 2, data = training_dataset[,!(names(training_dataset) %in% c("id", "obstime", "status"))])
-  dim(X)
+  design__matrix = training_dataset[,!(names(training_dataset) %in% c("id", "obstime", "status"))]
   
-  column_names = colnames(X)
+  column_names = colnames(design__matrix)
   main_names =  column_names[!grepl(":", column_names) &
                                column_names != "(Intercept)"]
-  X_main = X[, main_names]
+  X_main = design__matrix[, main_names]
   
   int_names =  column_names[grepl(":", column_names)]
-  X_int = X[, int_names]
+  X_int = design__matrix[, int_names]
   
   p <- dim(X_main)[2]
   q <- dim(X_int)[2]
   
   main_indices_for_int = find_main_effect_indices(int_names, main_names)
+
   g1 <- g(main_indices_for_int, 1)
   g2 <- g(main_indices_for_int, 2)
-  
-  
 
-  
-  
   
   
   #----------------------------
@@ -39,17 +34,14 @@ stan_exponential_data_Constructer <- function (training_dataset, testing_dataset
   
     
   nnew <- nrow(testing_dataset)
-  X_2 <-
-    model.matrix( ~ . ^ 2, data = testing_dataset[,!(names(testing_dataset) %in% c("id", "obstime", "status"))])
-  dim(X_2)
+  design__matrix_2 = testing_dataset[,!(names(testing_dataset) %in% c("id", "obstime", "status"))]
   
-  column_names = colnames(X_2)
-  main_names =  column_names[!grepl(":", column_names) &
-                               column_names != "(Intercept)"] #whether or not having intercept needs to be verified
-  X_new_main = X_2[, main_names]
+  column_names = colnames(design__matrix_2)
+  main_names =  column_names[!grepl(":", column_names)] #whether or not having intercept needs to be verified
+  X_new_main = design__matrix_2[, main_names]
   
   int_names =  column_names[grepl(":", column_names)]
-  X_new_int = X_2[, int_names]
+  X_new_int = design__matrix_2[, int_names]
 
   
  

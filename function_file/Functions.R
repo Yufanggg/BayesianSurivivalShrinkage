@@ -90,6 +90,7 @@ generate_design_matrix <- function(num_factors, factor_indices, num_rows) {
   
   # Initialize the design matrix with main effects
   design_matrix <- as.data.frame(levels)
+  names(design_matrix) <- paste0("Var", 1:num_factors)
   
   # Generate interaction effects
   for (i in 1:(num_factors - 1)) {

@@ -34,16 +34,16 @@ n_samples <- 500
 n_features <- 10 
 
 # function for one simulation
-simulation_bayint_survival <- function(){
+simulation_bayint_survival <- function(baseline_modelling = "exponential", criteria = "DesignCoefficients"){
   simulated_data <- DataGenerator(n_samples = 500, n_features = 10)
   dataset <- simulated_data$dataset
   Beta <- simulated_data$Beta
   
-  stan_data <- stan_data_Constructer(training_dataset = dataset, testing_dataset = head(dataset, 10), baseline_modelling = "exponential", obs_window = 5)
-  model_fit <- Bayesian_Survival_model(stan_data = stan_data, baseline_assumption = "exponential")
+  stan_data <- stan_data_Constructer(training_dataset = dataset, testing_dataset = head(dataset, 10), baseline_modelling = baseline_modelling, obs_window = 5)
+  model_fit <- Bayesian_Survival_model(stan_data = stan_data, baseline_assumption = baseline_modelling)
     
   #extract the info from the bayesian model fit
-  model_result <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit, criteria = "DesignCoefficients")
+  model_result <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit, criteria = criteria)
   
   output = list(
     Beta_true = Beta,
@@ -52,9 +52,6 @@ simulation_bayint_survival <- function(){
   
 }
 
-
-
-set.seed(123)
 
 
 
