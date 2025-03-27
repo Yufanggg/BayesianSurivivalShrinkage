@@ -51,6 +51,7 @@ functions{
   }
 }
 
+
 data {
   // response and time variables
   int<lower=0> nevent;
@@ -136,7 +137,4 @@ generated quantities{
       vector[nnew] est_new = x_new * Beta + x_int_new * Beta_int;
       survival_prob = exp(weibull_log_surv(est_new, t_new, shape, lambda));
 }
-      
-      
-      
-      
+

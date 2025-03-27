@@ -37,6 +37,7 @@ functions{
   
 }
 
+
 data {
   // response and time variables
   int<lower=0> nevent;
@@ -118,4 +119,4 @@ generated quantities{
       vector[nnew] survival_prob;  // 
       survival_prob = exp(exponential_log_surv(x_new * Beta + x_int_new * Beta_int, t_new, lambda));
 }
-    
+
