@@ -50,6 +50,7 @@ functions{
     return res;
   }
 }
+
 data {
   // response and time variables
   int<lower=0> nevent;
@@ -79,6 +80,7 @@ data {
   matrix[nnew,p] x_new; // for rows with events
   matrix[nnew,q] x_int_new;
 }
+
 parameters {
   vector[p] Beta; // coefficients for design matrix;
   vector[q] Beta_int;
@@ -89,6 +91,7 @@ parameters {
   real<lower=0>  shape;
   real<lower=0>  lambda;
        }
+       
 model {
        // pre-allocated variables
     vector[nevent] eta_event; // for events
@@ -126,6 +129,7 @@ model {
       target +=  weibull_log_surv(eta_rcens, t_rcens, shape, lambda); // right censored data log(S(t))
       }
      }
+     
 generated quantities{
       // Predicting the survival time on the new/test dataset
       vector[nnew] survival_prob;  // 

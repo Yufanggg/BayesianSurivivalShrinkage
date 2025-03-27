@@ -17,7 +17,7 @@ functions{
   * @param eta Vector, linear predictor
   * @return A vector
   */
-  vector exponential_log_haz(real lambda, vector eta) {
+  vector exponential_log_haz(vector eta, real lambda) {
     return eta + log(lambda);
   }
   
@@ -28,7 +28,7 @@ functions{
   * @param t Vector, event or censoring times
   * @return A vector
   */
-  vector exponential_log_surv(real lambda, vector eta, vector t) {
+  vector exponential_log_surv(vector eta, vector t, real lambda) {
     vector[rows(eta)] res;
     res = (- t .* exp(eta)) * lambda;
     return res;
@@ -36,6 +36,7 @@ functions{
   
   
 }
+
 data {
   // response and time variables
   int<lower=0> nevent;
@@ -73,6 +74,7 @@ parameters {
   real<lower=0.01, upper=1> tau2int;
   real<lower=0>  tau2[p];
   real<lower=0>  gam2[p];
+  real<lower=0>  lambda;
   }
     
 model {
@@ -95,24 +97,25 @@ model {
     for (i in 1:q){
       Beta_int[i] ~ normal(0, sqrt(sqrt(tau2[g1[i]]*tau2[g2[i]])*tau2int));
       }
-      
+    
+    lambda ~ lognormal(0, 1);
 
     // log-likelihood, represented by [target]
     if (nevent > 0) {
       eta_event = x_event * Beta + x_int_event * Beta_int;
-      target +=  exponential_log_haz (eta_event);
-      target +=  exponential_log_surv(eta_event, t_event); // uncensored data log(f(t)) = log(h(t)) + log(S(t))
+      target +=  exponential_log_haz (eta_event, lambda);
+      target +=  exponential_log_surv(eta_event, t_event, lambda); // uncensored data log(f(t)) = log(h(t)) + log(S(t))
       }
       
     if (nrcens > 0) {
       eta_rcens = x_rcens * Beta + x_int_rcens * Beta_int;
-      target +=  exponential_log_surv(eta_rcens, t_rcens); // right censored data log(S(t))
+      target +=  exponential_log_surv(eta_rcens, t_rcens, lambda); // right censored data log(S(t))
       }
 }
     
 generated quantities{
       // Predicting the survival time on the new/test dataset
       vector[nnew] survival_prob;  // 
-      survival_prob = exp(exponential_log_surv(x_new * Beta + x_int_new * Beta_int, t_new));
+      survival_prob = exp(exponential_log_surv(x_new * Beta + x_int_new * Beta_int, t_new, lambda));
 }
     
