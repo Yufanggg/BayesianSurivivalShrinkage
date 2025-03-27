@@ -11,8 +11,7 @@ stan_exponential_data_Constructer <- function (training_dataset, testing_dataset
   design__matrix = training_dataset[,!(names(training_dataset) %in% c("id", "obstime", "status"))]
   
   column_names = colnames(design__matrix)
-  main_names =  column_names[!grepl(":", column_names) &
-                               column_names != "(Intercept)"]
+  main_names =  column_names[!grepl(":", column_names)]
   X_main = design__matrix[, main_names]
   
   int_names =  column_names[grepl(":", column_names)]
