@@ -92,7 +92,7 @@ parameters {
   real<lower=0>  shape;
   real<lower=0>  lambda;
        }
-       
+
 model {
        // pre-allocated variables
     vector[nevent] eta_event; // for events
@@ -129,8 +129,8 @@ model {
       eta_rcens = x_rcens * Beta + x_int_rcens * Beta_int;
       target +=  weibull_log_surv(eta_rcens, t_rcens, shape, lambda); // right censored data log(S(t))
       }
-     }
      
+
 generated quantities{
       // Predicting the survival time on the new/test dataset
       vector[nnew] survival_prob;  // 

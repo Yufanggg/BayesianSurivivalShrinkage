@@ -77,7 +77,7 @@ parameters {
   real<lower=0>  gam2[p];
   real<lower=0>  lambda;
   }
-    
+
 model {
     // pre-allocated variables
     vector[nevent] eta_event; // for events
@@ -113,7 +113,7 @@ model {
       target +=  exponential_log_surv(eta_rcens, t_rcens, lambda); // right censored data log(S(t))
       }
 }
-    
+
 generated quantities{
       // Predicting the survival time on the new/test dataset
       vector[nnew] survival_prob;  // 
