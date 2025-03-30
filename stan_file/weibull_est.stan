@@ -129,7 +129,7 @@ model {
       eta_rcens = x_rcens * Beta + x_int_rcens * Beta_int;
       target +=  weibull_log_surv(eta_rcens, t_rcens, shape, lambda); // right censored data log(S(t))
       }
-     
+}
 
 generated quantities{
       // Predicting the survival time on the new/test dataset

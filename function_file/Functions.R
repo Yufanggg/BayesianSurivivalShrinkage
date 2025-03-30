@@ -38,16 +38,18 @@ Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponentia
   if (school == "Bayesian") {
     if (baseline_assumption == "exponential") {
       # compile the model
+      message("We assume that the baseline hazard function is exponentially distributed.")
       bayesian_model <- stan_model("./stan_file/exponential_est.stan")
     }
     
     else if (baseline_assumption == "weibull") {
       # compile the model
+      message("We assume that the baseline hazard function is weibully distributed.")
       bayesian_model <- stan_model("./stan_file/weibull_est.stan")
     }
     
     else if (baseline_assumption == "bSplines") {
-      message("We utilized B-splines to estimate the baseline cumulative hazard function.")
+      message("We utilized B-splines to estimate the log baseline hazard function.")
       
       # compile the model
       bayesian_model <- stan_model("./stan_file/bSpline_est.stan")
@@ -69,54 +71,56 @@ Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponentia
   }
 }
 
-# Generate simulated design matrices that including both main and interaction effects
-# @param: num_factors: the total number of main effects
-# @param: factor_indices: indices of factor variables
-# @param: num_rows: desired length of the design matrix
-# @return: a design matrix with `num_factors` main variables, `factor _indices` are variables, 
-#          num_rows; and the corresponding interaction variables
-generate_design_matrix <- function(num_factors, factor_indices, num_rows) {
-  # Generate all combinations of factor levels (-1 and 1) for factors
-  factor_levels <- expand.grid(rep(list(c(-1, 1)), length(factor_indices)))
+
+# Generate a simulate dateset
+DataGenerator <- function(n_samples = 210, n_features = 10) {
+  sim_data <- list()
   
-  # Generate random numeric values for numeric factors
-  numeric_levels <- expand.grid(rep(list(runif(2, -1, 1)), num_factors - length(factor_indices)))
+  # generate design matrix in the formate of dataframe
+  # Generate covariance matrix
+  Sigma <- matrix(0.3, nrow = n_features, ncol = n_features)
+  diag(Sigma) <- 1
   
-  # Combine factor and numeric levels
-  levels <- cbind(factor_levels, numeric_levels)
-  
-  # Repeat the levels to match the desired number of rows
-  levels <- levels[rep(seq_len(nrow(levels)), length.out = num_rows), ]
-  
-  # Initialize the design matrix with main effects
-  design_matrix <- as.data.frame(levels)
-  names(design_matrix) <- paste0("Var", 1:num_factors)
+  design_matrix <- mvrnorm(n_samples, mu = rep(0, n_features), Sigma = Sigma)
+  design_matrix <- as.data.frame(design_matrix)
+  names(design_matrix) <- paste0("Var", 1:n_features)
   
   # Generate interaction effects
-  for (i in 1:(num_factors - 1)) {
-    for (j in (i + 1):num_factors) {
+  for (i in 1:(n_features - 1)) {
+    for (j in (i + 1):n_features) {
       interaction_term <- design_matrix[, i] * design_matrix[, j]
       colname <- paste0("Var", i, ":Var", j)
       design_matrix[[colname]] <- interaction_term
     }
   }
-  
-  return(design_matrix)
-}
 
-
-# Generate a simulate dateset
-DataGenerator <- function(n_samples = 500, n_features = 10) {
-  sim_data <- list()
-  
-  # generate design matrix
-  factor_indices <- sample(1:n_features, 3, replace = FALSE)  # Indices of factor variables
-  design_matrix <- generate_design_matrix(num_factors = n_features, factor_indices = factor_indices, num_rows = n_samples)
+  print(names(design_matrix))
   
   # generate the cofficents of design matrix
-  Beta = rnorm(ncol(design_matrix))
-  names(Beta) = colnames(design_matrix)
-  sim_data$Beta <- Beta
+  # Main effects
+  beta_main <- c(0.5, -0.4, 0.3, 0.2, 0.1, rep(0, 5))
+  
+  # Interaction effects
+  beta_inter <- matrix(0, nrow = n_features, ncol = n_features)
+  beta_inter[1, 2] <- 0.3
+  beta_inter[1, 3] <- 0.2
+  beta_inter[1, 5] <- -0.1
+  beta_inter[2, 3] <- -0.1
+  beta_inter[2, 4] <- 0.3
+  beta_inter[3, 4] <- 0.2
+  beta_inter[1, 6] <- 0.3
+  beta_inter[1, 9] <- 0.2
+  beta_inter[3, 6] <- -0.2
+  beta_inter[4, 7] <- 0.1
+  beta_inter[6, 7] <- 0.3
+  beta_inter[6, 8] <- 0.1
+  beta_inter[9, 10] <- -0.2
+  
+  beta_inter_t = t(beta_inter)
+  Beta = c(beta_main, beta_inter_t[lower.tri(beta_inter_t, diag = FALSE)])
+  names(Beta) = names(design_matrix)
+  sim_data$Beta = Beta
+  
   
   # Generate simulated survival data
   survival_data <- simsurv(
@@ -136,7 +140,8 @@ DataGenerator <- function(n_samples = 500, n_features = 10) {
       censtime = runif(n_samples, 0.5, 2),
       status = as.numeric(eventtime <= censtime),
       obstime = pmin(eventtime, censtime)
-    ) |> select("obstime", "status")
+    ) 
+  survival_data <- survival_data[, c("status", "obstime")]
   
   dataset <- cbind(survival_data, design_matrix)
   sim_data$dataset <- dataset
