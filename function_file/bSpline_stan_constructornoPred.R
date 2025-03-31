@@ -109,6 +109,7 @@ stan_bSpline_data_Constructer1 <- function (training_dataset, testing_dataset, o
   # Construct data
   #----------------
   stan_data = list(
+    basis = basehaz$bs_basis, 
     #----- for model fitting --------
     p = p,
     q = q,
@@ -450,7 +451,7 @@ handle_basehaz_surv <- function(times,
   degree <- 3
 
     
-  tt <- times[status == 1] # uncensored event times
+  tt <- sort(times[status == 1]) # uncensored event times
 
   bknots <- c(min_t, max_t)
   iknots <- get_iknots(tt, df = df, degree = degree)

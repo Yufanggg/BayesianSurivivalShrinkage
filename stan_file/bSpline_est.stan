@@ -127,7 +127,7 @@ model {
   
   
   //Prior
-  coefs ~ normal(0, 1);
+  coefs ~ normal(0, 100);
   tau2int ~ uniform(0.01,1);
   for (k in 1:p){
     gam2[k] ~ inv_gamma(0.5, 1);

@@ -127,7 +127,7 @@ DataGenerator <- function(n_samples = 210, n_features = 10) {
     dist = "weibull",
     lambdas = 2,
     # scale
-    gammas = 5,
+    gammas = 10,
     # shape for weibull
     betas = Beta,
     x = design_matrix,
@@ -255,7 +255,7 @@ Bayesian_Survival_model_check <- function(bayesian_model_fit, criteria = c("MCMC
 #         (2) predictive survival probability for the testing dataset (i.e., sp); and (3) the information 
 #         of selected/non-selected variables (i.e., variableSelection): TRUE if selected, otherwise FALSE.
 
-Bayesian_Survival_result_Extract <- function(bayesian_model_fit,
+Bayesian_Survival_result_Extract <- function(bayesian_model_fit, model_type,
                                              criteria = c("DesignCoefficients",
                                                           "Prediction_SurvivalProb",
                                                           "variableSelection",
@@ -285,7 +285,7 @@ Bayesian_Survival_result_Extract <- function(bayesian_model_fit,
   }
   
   if ("baseline" %in% criteria) {
-    if (model == "exponential") {
+    if (model_type == "exponential") {
       lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
       model_result$baselinePara <- lambda
       # Extract posterior samples
@@ -303,7 +303,7 @@ Bayesian_Survival_result_Extract <- function(bayesian_model_fit,
         xlab = "Lambda"
       )
     }
-    if (model == "weibull") {
+    if (model_type == "weibull") {
       lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
       shape <- Output[grep("^shape", rownames(Output)), "50%", drop = FALSE]
       model_result$baselinePara <- c(lambda, shape)
@@ -338,7 +338,7 @@ Bayesian_Survival_result_Extract <- function(bayesian_model_fit,
         xlab = "shape"
       )
     }
-    if (model == "bSplines") {
+    if (model_type == "bSplines") {
       coefs <- Output[grep("^coefs", rownames(Output)), "mean", drop = FALSE]
       model_result$baselinePara = coefs
       
