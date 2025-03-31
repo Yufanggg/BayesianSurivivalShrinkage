@@ -34,11 +34,14 @@ set.seed(123)
 n_samples <- 200
 n_features <- 10 
 
-# function for one simulationc
-simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline"), withPrediction = TRUE){
+# function for one simulation
+simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline"), withPrediction = FALSE){
+  output = list()
+  
   simulated_data <- DataGenerator(n_samples = n_samples, n_features = 10)
   dataset <- simulated_data$dataset
   Beta <- simulated_data$Beta
+  output$Beta_true = Beta
   
   #constructor data for the model
   if (withPrediction) {
@@ -89,32 +92,40 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   model_fit_weibull <- Bayesian_Survival_model(stan_data = stan_data_weibull, baseline_assumption = "weibull")
   model_fit_bSplines <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_assumption = "bSplines")
 
-  
-  
   #extract the info from the bayesian model fit
-  model_result_exponential <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_exponential, criteria = criteria)
-  model_result_weibull <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_weibull, criteria = criteria)
-  model_result_bSplines <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines, criteria = criteria)
+  model_result_exponential <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_exponential, model_type = "exponential", criteria = criteria)
+  model_result_weibull <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_weibull,  model_type = "weibull", criteria = criteria)
+  model_result_bSplines <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines, model_type = "bSplines", criteria = criteria)
+  
+  #---------cofficients for X----------
+  if ("DesignCoefficients" %in% criteria){
+    output$Beta_est_exponential = model_result_exponential$Beta_bayesian_est[, "mean"]
+    output$Beta_est_weibull = model_result_weibull$Beta_bayesian_est[, "mean"]
+    output$Beta_est_bSplines = model_result_bSplines$Beta_bayesian_est[, "mean"]
+  }
+  
+  #----------baseline hazard----------
+  # Transfer the param into baseline 
+  # hazard function regarding t
+  #-----------------------------------
   
   if ("baseline" %in% criteria) {
-    model_result_bSplines$baseline <- model_result_exponential$baselinePara
+    time_vec <- sort(dataset$obstime) # obs_window = 5
+    output$baseline_exponential <- rep(model_result_exponential$baselinePara, length(time_vec))
     
     weibull_lambda <- model_result_weibull$baselinePara[1]
     weibull_shape <- model_result_weibull$baselinePara[2]
-    time_vec <- seq(0, 5, 0.1) # obs_window = 5
-    model_result_weibull$baseline <- weibull_shape * weibull_lambda * (time_vec**(weibull_shape -1))
+    output$baseline_weibull <- weibull_shape * weibull_lambda * (time_vec**(weibull_shape -1))
       
-    bSpline_basline <- exp(model_result_bSplines$baselinePara %*% stan_data_bSplines$basis)
-    model_result_bSplines$baseline <- bSpline_basline
+    output$baseline_bSplines <- exp(as.matrix(stan_data_bSplines$basis) %*% as.matrix(model_result_bSplines$baselinePara[, "mean"]))
   }
   
   
-  output = list(
-    Beta_true = Beta,
-    Beta_est_exponential = model_result_exponential$Beta_bayesian_est[, "mean"],
-    Beta_est_weibull = model_result_weibull$Beta_bayesian_est[, "mean"],
-    Beta_est_bSplines = model_result_bSplines$Beta_bayesian_est[, "mean"]
-  )
+  if ("variableSelection" %in% criteria){
+    output$variableSelection_exponential <- model_result_exponential$variableSelection
+    output$variableSelection_weibull <- model_result_weibull$variableSelection
+    output$variableSelection_bSplines <- model_result_bSplines$variableSelection
+  }
   
   return(output)
 }
@@ -162,11 +173,16 @@ abline(v = 10, col = "red", lty = 2)
 legend("topright", legend = c("Exponential", "Weibull", "B-Splines"), col = c("blue", "green", "orange"), pch = 16, lty = 1)
 ```
 
-# Step 3: Model performance metric for the cofficients of design matrix
+# Step 3: visualize the estimated basline hazard
 ```{r, echo=TRUE}
-simulation_for_coefficients <- function(simulation_times){
-  
-}
+a = simulated_results[, 1]
+dim(a$baseline_bSplines)
+
+plot(a$baseline_weibull, col = "green")
+lines(a$baseline_bSplines, col = "orange")
+lines(a$baseline_exponential, col = "blue")
+# Add legend
+legend("topright", legend = c("Exponential", "Weibull", "B-Splines"), col = c("blue", "green", "orange"), pch = 16, lty = 1)
 ```
 
 
