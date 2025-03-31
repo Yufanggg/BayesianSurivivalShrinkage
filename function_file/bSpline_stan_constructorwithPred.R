@@ -166,6 +166,7 @@ stan_bSpline_data_Constructer <- function (training_dataset, testing_dataset, ob
   # Construct data
   #----------------
   stan_data = list(
+    basis = basehaz$bs_basis, 
     #----- for model fitting --------
     p = p,
     q = q,

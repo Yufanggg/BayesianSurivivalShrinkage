@@ -61,11 +61,6 @@ data {
   int g1[q];
   int g2[q];
   
-  // for prediction
-  int<lower=0> nnew;
-  vector[nnew] t_new;
-  matrix[nnew,p] x_new; // for rows with events
-  matrix[nnew,q] x_int_new;
     }
 
 parameters {
@@ -114,9 +109,4 @@ model {
       }
 }
 
-generated quantities{
-      // Predicting the survival time on the new/test dataset
-      vector[nnew] survival_prob;  // 
-      survival_prob = exp(exponential_log_surv(x_new * Beta + x_int_new * Beta_int, t_new, lambda));
-}
 

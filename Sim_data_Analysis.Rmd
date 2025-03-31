@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 
 install_and_load <- function(packages) {
@@ -30,29 +30,83 @@ install_and_load(required_packages)
 
 # Step 2: Generate simulated data
 ```{r, echo=TRUE}
-n_samples <- 210
+set.seed(123)
+n_samples <- 200
 n_features <- 10 
 
-# function for one simulation
-simulation_bayint_survival <- function(criteria = "DesignCoefficients"){
-  simulated_data <- DataGenerator(n_samples = 210, n_features = 10)
+# function for one simulationc
+simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline"), withPrediction = TRUE){
+  simulated_data <- DataGenerator(n_samples = n_samples, n_features = 10)
   dataset <- simulated_data$dataset
   Beta <- simulated_data$Beta
   
   #constructor data for the model
-  stan_data_exponential <- stan_data_Constructer(training_dataset = dataset, testing_dataset = head(dataset, 10), baseline_modelling = "exponential", obs_window = 5)
-  stan_data_weibull <- stan_data_Constructer(training_dataset = dataset, testing_dataset = head(dataset, 10), baseline_modelling = "weibull", obs_window = 5)
-  stan_data_bSplines <- stan_data_Constructer(training_dataset = dataset, testing_dataset = head(dataset, 10), baseline_modelling = "bSplines", obs_window = 5)
-  
+  if (withPrediction) {
+    stan_data_exponential <- stan_data_Constructer(
+      training_dataset = dataset,
+      withPrediction = withPrediction,
+      testing_dataset = head(dataset, 10),
+      baseline_modelling = "exponential",
+      obs_window = 5
+    )
+    stan_data_weibull <- stan_data_Constructer(
+      training_dataset = dataset,
+      withPrediction = withPrediction,
+      testing_dataset = head(dataset, 10),
+      baseline_modelling = "weibull",
+      obs_window = 5
+    )
+    stan_data_bSplines <- stan_data_Constructer(
+      training_dataset = dataset,
+      withPrediction = withPrediction,
+      testing_dataset = head(dataset, 10),
+      baseline_modelling = "bSplines",
+      obs_window = 5
+    )
+  }  else {
+    stan_data_exponential <- stan_data_Constructer(
+      training_dataset = dataset,
+      withPrediction = withPrediction,
+      baseline_modelling = "exponential",
+      obs_window = 5
+    )
+    stan_data_weibull <- stan_data_Constructer(
+      training_dataset = dataset,
+      withPrediction = withPrediction,
+      baseline_modelling = "weibull",
+      obs_window = 5
+    )
+    stan_data_bSplines <- stan_data_Constructer(
+      training_dataset = dataset,
+      testing_dataset = head(dataset, 10),
+      baseline_modelling = "bSplines",
+      obs_window = 5
+    )
+  }
+    
   #fit model
   model_fit_exponential <-  Bayesian_Survival_model(stan_data = stan_data_exponential, baseline_assumption = "exponential")
   model_fit_weibull <- Bayesian_Survival_model(stan_data = stan_data_weibull, baseline_assumption = "weibull")
   model_fit_bSplines <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_assumption = "bSplines")
+
+  
   
   #extract the info from the bayesian model fit
   model_result_exponential <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_exponential, criteria = criteria)
   model_result_weibull <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_weibull, criteria = criteria)
   model_result_bSplines <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines, criteria = criteria)
+  
+  if ("baseline" %in% criteria) {
+    model_result_bSplines$baseline <- model_result_exponential$baselinePara
+    
+    weibull_lambda <- model_result_weibull$baselinePara[1]
+    weibull_shape <- model_result_weibull$baselinePara[2]
+    time_vec <- seq(0, 5, 0.1) # obs_window = 5
+    model_result_weibull$baseline <- weibull_shape * weibull_lambda * (time_vec**(weibull_shape -1))
+      
+    bSpline_basline <- exp(model_result_bSplines$baselinePara %*% stan_data_bSplines$basis)
+    model_result_bSplines$baseline <- bSpline_basline
+  }
   
   
   output = list(
@@ -65,11 +119,11 @@ simulation_bayint_survival <- function(criteria = "DesignCoefficients"){
   return(output)
 }
 
-simulated_results <- replicate(50, simulation_bayint_survival(), simplify = "array") 
+simulated_results <- replicate(1, simulation_bayint_survival(), simplify = "array") 
 ```
 
 ```{r, echo=TRUE}
-replicate_times = 50
+replicate_times = 1
 MSEs_exponential = matrix(nrow = replicate_times, ncol = 55)
 MSEs_weibull = matrix(nrow = replicate_times, ncol = 55)
 MSEs_bSplines = matrix(nrow = replicate_times, ncol = 55)
@@ -88,9 +142,21 @@ mean_MSEs_exponential <- apply(MSEs_exponential, 2, mean)
 mean_MSEs_weibull <- apply(MSEs_weibull, 2, mean)
 mean_MSEs_bSplines <- apply(MSEs_bSplines, 2, mean)
 
+# visualized result
+fill_vector = (simulated_results[, 1]$Beta_true != 0)
+
 plot(mean_MSEs_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.2), main = "MSE for Beta estimation", pch = 16)
+
+# Add background rectangles
+for (i in 1:length(mean_MSEs_exponential)) {
+  if (fill_vector[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+
 lines(mean_MSEs_weibull, type = "o", col = "green", pch = 16)
 lines(mean_MSEs_bSplines, type = "o", col = "orange", pch = 16)
+lines(mean_MSEs_exponential, type = "o", col = "blue", pch = 16)
 abline(v = 10, col = "red", lty = 2)
 # Add legend
 legend("topright", legend = c("Exponential", "Weibull", "B-Splines"), col = c("blue", "green", "orange"), pch = 16, lty = 1)

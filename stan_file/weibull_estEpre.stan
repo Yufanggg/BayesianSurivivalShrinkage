@@ -74,6 +74,12 @@ data {
   // link the interaction effect with the corresponding main effects
   int g1[q];
   int g2[q];
+  
+  // for prediction
+  int<lower=0> nnew;
+  vector[nnew] t_new;
+  matrix[nnew,p] x_new; // for rows with events
+  matrix[nnew,q] x_int_new;
 }
 
 parameters {
@@ -125,4 +131,10 @@ model {
       }
 }
 
+generated quantities{
+      // Predicting the survival time on the new/test dataset
+      vector[nnew] survival_prob;  // 
+      vector[nnew] est_new = x_new * Beta + x_int_new * Beta_int;
+      survival_prob = exp(weibull_log_surv(est_new, t_new, shape, lambda));
+}
 
