@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 
 install_and_load <- function(packages) {
@@ -130,14 +130,16 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   return(output)
 }
 
-simulated_results <- replicate(1, simulation_bayint_survival(), simplify = "array") 
+simulated_results <- replicate(50, simulation_bayint_survival(), simplify = "array")
+save.image(file = "sim_50_para_int.RData")
 ```
 
 ```{r, echo=TRUE}
-replicate_times = 1
+replicate_times = 50
 MSEs_exponential = matrix(nrow = replicate_times, ncol = 55)
 MSEs_weibull = matrix(nrow = replicate_times, ncol = 55)
 MSEs_bSplines = matrix(nrow = replicate_times, ncol = 55)
+
 for (i in 1:replicate_times){
   Beta_true <- simulated_results[,i]$Beta_true
   Beta_est_exponential <- simulated_results[,i]$Beta_est_exponential
@@ -174,6 +176,62 @@ legend("topright", legend = c("Exponential", "Weibull", "B-Splines"), col = c("b
 ```
 
 # Step 3: visualize the estimated basline hazard
+```{r, echo=TRUE}
+replicate_times = 50
+time_vec = time_vec
+baseline_exponential = matrix(nrow = replicate_times, ncol = time_vec)
+baseline_weibull = matrix(nrow = replicate_times, ncol = time_vec)
+baseline_bSplines = matrix(nrow = replicate_times, ncol = time_vec)
+
+for (i in 1:replicate_times){
+  Beta_true <- simulated_results[,i]$Beta_true
+  Beta_est_exponential <- simulated_results[,i]$Beta_est_exponential
+  Beta_est_weibull <- simulated_results[,i]$Beta_est_weibull
+  Beta_est_bSplines <-  simulated_results[,i]$Beta_est_bSplines
+  
+  baseline_exponential[i, ] <- simulated_results[,i]$baseline_exponential
+  baseline_weibull[i, ] <- simulated_results[,i]$baseline_weibull
+  baseline_bSplines[i, ] <- simulated_results[,i]$baseline_bSplines
+}
+
+mean_MSEs_exponential <- apply(MSEs_exponential, 2, mean)
+mean_MSEs_weibull <- apply(MSEs_weibull, 2, mean)
+mean_MSEs_bSplines <- apply(MSEs_bSplines, 2, mean)
+
+
+mean_baseline_exponential <- apply(baseline_exponential, 2, mean)
+mean_baseline_weibull <- apply(baseline_weibull, 2, mean)
+mean_baseline_bSplines <- apply(baseline_bSplines, 2, mean)
+
+# visualized result
+fill_vector = (simulated_results[, 1]$Beta_true != 0)
+
+plot(mean_MSEs_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.2), main = "MSE for Beta estimation", pch = 16)
+
+# Add background rectangles
+for (i in 1:length(mean_MSEs_exponential)) {
+  if (fill_vector[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+
+lines(mean_MSEs_weibull, type = "o", col = "green", pch = 16)
+lines(mean_MSEs_bSplines, type = "o", col = "orange", pch = 16)
+lines(mean_MSEs_exponential, type = "o", col = "blue", pch = 16)
+abline(v = 10, col = "red", lty = 2)
+# Add legend
+legend("topright", legend = c("Exponential", "Weibull", "B-Splines"), col = c("blue", "green", "orange"), pch = 16, lty = 1)
+
+
+
+plot(mean_baseline_exponential, col = "green")
+lines(mean_baseline_weibull, col = "orange")
+lines(mean_baseline_bSplines, col = "blue")
+# Add legend
+legend("topright", legend = c("Exponential", "Weibull", "B-Splines"), col = c("blue", "green", "orange"), pch = 16, lty = 1)
+
+```
+
 ```{r, echo=TRUE}
 a = simulated_results[, 1]
 dim(a$baseline_bSplines)
