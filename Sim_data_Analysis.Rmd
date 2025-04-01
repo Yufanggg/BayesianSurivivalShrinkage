@@ -31,11 +31,11 @@ install_and_load(required_packages)
 # Step 2: Generate simulated data
 ```{r, echo=TRUE}
 set.seed(123)
-n_samples <- 200
+n_samples <- 300
 n_features <- 10 
 
 # function for one simulation
-simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline"), withPrediction = FALSE){
+simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection"), withPrediction = TRUE){
   output = list()
   
   simulated_data <- DataGenerator(n_samples = n_samples, n_features = 10)
@@ -48,21 +48,21 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
     stan_data_exponential <- stan_data_Constructer(
       training_dataset = dataset,
       withPrediction = withPrediction,
-      testing_dataset = head(dataset, 10),
+      testing_dataset = tail(dataset, 100),
       baseline_modelling = "exponential",
       obs_window = 5
     )
     stan_data_weibull <- stan_data_Constructer(
       training_dataset = dataset,
       withPrediction = withPrediction,
-      testing_dataset = head(dataset, 10),
+      testing_dataset = tail(dataset, 100),
       baseline_modelling = "weibull",
       obs_window = 5
     )
     stan_data_bSplines <- stan_data_Constructer(
       training_dataset = dataset,
       withPrediction = withPrediction,
-      testing_dataset = head(dataset, 10),
+      testing_dataset = tail(dataset, 100),
       baseline_modelling = "bSplines",
       obs_window = 5
     )
@@ -81,7 +81,6 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
     )
     stan_data_bSplines <- stan_data_Constructer(
       training_dataset = dataset,
-      testing_dataset = head(dataset, 10),
       baseline_modelling = "bSplines",
       obs_window = 5
     )
@@ -110,32 +109,46 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   #-----------------------------------
   
   if ("baseline" %in% criteria) {
-    time_vec <- sort(dataset$obstime) # obs_window = 5
-    output$baseline_exponential <- rep(model_result_exponential$baselinePara, length(time_vec))
+    time_vec <-
+      sort(dataset[dataset$status == 1, ]$obstime) # obs_window = 5
+    output$baseline_exponential <-
+      rep(model_result_exponential$baselinePara, length(time_vec))
     
     weibull_lambda <- model_result_weibull$baselinePara[1]
     weibull_shape <- model_result_weibull$baselinePara[2]
-    output$baseline_weibull <- weibull_shape * weibull_lambda * (time_vec**(weibull_shape -1))
-      
-    output$baseline_bSplines <- exp(as.matrix(stan_data_bSplines$basis) %*% as.matrix(model_result_bSplines$baselinePara[, "mean"]))
+    output$baseline_weibull <-
+      weibull_shape * weibull_lambda * (time_vec ** (weibull_shape - 1))
+    
+    output$baseline_bSplines <-
+      exp(
+        as.matrix(stan_data_bSplines$basis) %*% as.matrix(model_result_bSplines$baselinePara[, "mean"])
+      )
   }
   
   
-  if ("variableSelection" %in% criteria){
-    output$variableSelection_exponential <- model_result_exponential$variableSelection
-    output$variableSelection_weibull <- model_result_weibull$variableSelection
-    output$variableSelection_bSplines <- model_result_bSplines$variableSelection
+  if ("variableSelection" %in% criteria) {
+    output$variableSelection_exponential <-
+      model_result_exponential$variableSelection
+    output$variableSelection_weibull <-
+      model_result_weibull$variableSelection
+    output$variableSelection_bSplines <-
+      model_result_bSplines$variableSelection
   }
   
+  # if ("Prediction_SurvivalProb" %in% criteria) {
+  #   output$sp_exponential = model_result_exponential$sp
+  #   output$sp_weibull = model_result_weibull$sp
+  #   output$sp_bSplines = model_result_bSplines$sp
+  # }
   return(output)
 }
 
 simulated_results <- replicate(50, simulation_bayint_survival(), simplify = "array")
-save.image(file = "sim_50_para_int.RData")
+# save.image(file = "./Data/sim_50_para_int.RData")
 ```
 
 ```{r, echo=TRUE}
-replicate_times = 50
+replicate_times = 1
 MSEs_exponential = matrix(nrow = replicate_times, ncol = 55)
 MSEs_weibull = matrix(nrow = replicate_times, ncol = 55)
 MSEs_bSplines = matrix(nrow = replicate_times, ncol = 55)
@@ -158,7 +171,7 @@ mean_MSEs_bSplines <- apply(MSEs_bSplines, 2, mean)
 # visualized result
 fill_vector = (simulated_results[, 1]$Beta_true != 0)
 
-plot(mean_MSEs_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.2), main = "MSE for Beta estimation", pch = 16)
+plot(mean_MSEs_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.3), main = "MSE for Beta estimation", pch = 16)
 
 # Add background rectangles
 for (i in 1:length(mean_MSEs_exponential)) {
@@ -177,11 +190,15 @@ legend("topright", legend = c("Exponential", "Weibull", "B-Splines"), col = c("b
 
 # Step 3: visualize the estimated basline hazard
 ```{r, echo=TRUE}
-replicate_times = 50
-time_vec = time_vec
-baseline_exponential = matrix(nrow = replicate_times, ncol = time_vec)
-baseline_weibull = matrix(nrow = replicate_times, ncol = time_vec)
-baseline_bSplines = matrix(nrow = replicate_times, ncol = time_vec)
+replicate_times = 1
+
+MSEs_exponential = matrix(nrow = replicate_times, ncol = 55)
+MSEs_weibull = matrix(nrow = replicate_times, ncol = 55)
+MSEs_bSplines = matrix(nrow = replicate_times, ncol = 55)
+
+baseline_exponential = matrix(nrow = replicate_times, ncol = 200)
+baseline_weibull = matrix(nrow = replicate_times, ncol = 200)
+baseline_bSplines = matrix(nrow = replicate_times, ncol = 200)
 
 for (i in 1:replicate_times){
   Beta_true <- simulated_results[,i]$Beta_true
@@ -189,9 +206,13 @@ for (i in 1:replicate_times){
   Beta_est_weibull <- simulated_results[,i]$Beta_est_weibull
   Beta_est_bSplines <-  simulated_results[,i]$Beta_est_bSplines
   
+  MSEs_exponential[i, ] <- (Beta_est_exponential - Beta_true)**2
+  MSEs_weibull[i, ] <- (Beta_est_weibull - Beta_true)**2
+  MSEs_bSplines[i, ] <- (Beta_est_bSplines - Beta_true)**2
+  
   baseline_exponential[i, ] <- simulated_results[,i]$baseline_exponential
   baseline_weibull[i, ] <- simulated_results[,i]$baseline_weibull
-  baseline_bSplines[i, ] <- simulated_results[,i]$baseline_bSplines
+  baseline_bSplines[i, ] <- as.vector(simulated_results[,i]$baseline_bSplines)
 }
 
 mean_MSEs_exponential <- apply(MSEs_exponential, 2, mean)
