@@ -517,7 +517,7 @@ handle_basehaz_surv <- function(times,
   degree <- 3
 
     
-  tt <- times[status == 1] # uncensored event times
+  tt <- sort(times[status == 1]) # uncensored event times
 
   bknots <- c(min_t, max_t)
   iknots <- get_iknots(tt, df = df, degree = degree)
