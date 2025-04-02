@@ -35,7 +35,7 @@ n_samples <- 300
 n_features <- 10 
 
 # function for one simulation
-simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection"), withPrediction = FALSE){
+simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE){
   output = list()
   
   simulated_data <- DataGenerator(n_samples = n_samples, n_features = 10)
@@ -111,6 +111,8 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   if ("baseline" %in% criteria) {
     time_vec <-
       sort(dataset[dataset$status == 1, ]$obstime) # obs_window = 5
+    output$baseline_true <-  10 * 2 * (time_vec ** (10 - 1))
+    
     output$baseline_exponential <-
       rep(model_result_exponential$baselinePara, length(time_vec))
     
@@ -143,8 +145,8 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   return(output)
 }
 
-simulated_results <- replicate(1, simulation_bayint_survival(), simplify = "array")
-# save.image(file = "./Data/sim_50_para_int.RData")
+simulated_results <- replicate(50, simulation_bayint_survival(), simplify = "array")
+save.image(file = "./Data/sim_50_para_int.RData")
 ```
 
 ```{r, echo=TRUE}

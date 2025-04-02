@@ -99,7 +99,7 @@ model {
       Beta_int[i] ~ normal(0, sqrt(sqrt(tau2[g1[i]]*tau2[g2[i]])*tau2int));
       }
     
-    lambda ~ lognormal(0, 1);
+    lambda ~ lognormal(0, 100);
 
     // log-likelihood, represented by [target]
     if (nevent > 0) {

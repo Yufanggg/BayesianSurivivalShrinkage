@@ -88,9 +88,19 @@ In summary, $\beta$ = c(0.5, -0.4, 0.3, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0,
 ![alt text](./Image/FDR_sim_50.png)
 
 - The $MSE_p$ for predicted survival probability:
-Is that necessary to use cross-validation in the simulating data? 
+?? *Is that necessary to use cross-validation in the simulation data?*
 **Using many rounds of simulations would be enough**.
 
 ## Results on the real-world data:
 The propsed method was also [validated on real-world data](./Real_data_Analysis.Rmd). See the model evaluation results as following:
 
+## Plan
+1. To compare with vs. without shrinkage; 
+2. To look at the data; 
+doner type * doner sex (exist)
+doner sex * doner age (within doner type: less sure)
+
+1. start with strafied datasets (i.e., DBD, DCD for both strata)
+After being straftied, What are all interactions with donor sex within DBD. 
+
+C index, brier score (test data) 
