@@ -125,6 +125,8 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
       exp(
         as.matrix(stan_data_bSplines$basis) %*% as.matrix(model_result_bSplines$baselinePara[, "mean"])
       )
+    
+    output$time_vec <- time_vec
   }
   
   
