@@ -144,7 +144,7 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
 }
 
 simulated_results <- replicate(50, simulation_bayint_survival(), simplify = "array")
-# save.image(file = "./Data/sim_50_para_int.RData")
+save.image(file = "./Data/sim_50_para_int.RData")
 ```
 
 ```{r, echo=TRUE}
