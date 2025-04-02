@@ -78,9 +78,18 @@ In summary, $\beta$ = c(0.5, -0.4, 0.3, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0,
 
 
 *Results of the simulation*:
-
+- The MSE for estimated Beta:
 ![alt text](./Image/sim_50_intpara.png)
 
+- The baseline hazard:
+![alt text](./Image/baseline_sim_one.png)
+
+- The FDR for estimated Beta:
+![alt text](./Image/FDR_sim_50.png)
+
+- The $MSE_p$ for predicted survival probability:
+Is that necessary to use cross-validation in the simulating data? 
+**Using many rounds of simulations would be enough**.
 
 ## Results on the real-world data:
 The propsed method was also [validated on real-world data](./Real_data_Analysis.Rmd). See the model evaluation results as following:

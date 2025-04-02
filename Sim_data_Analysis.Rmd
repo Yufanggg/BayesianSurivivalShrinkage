@@ -35,7 +35,7 @@ n_samples <- 300
 n_features <- 10 
 
 # function for one simulation
-simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection"), withPrediction = TRUE){
+simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection"), withPrediction = FALSE){
   output = list()
   
   simulated_data <- DataGenerator(n_samples = n_samples, n_features = 10)
@@ -148,11 +148,15 @@ simulated_results <- replicate(1, simulation_bayint_survival(), simplify = "arra
 ```
 
 ```{r, echo=TRUE}
-# load(file = "./Data/sim_50_para_int.RData")
-replicate_times = 1
+load(file = "./Data/sim_50_para_int.RData")
+replicate_times = 50
 MSEs_exponential = matrix(nrow = replicate_times, ncol = 55)
 MSEs_weibull = matrix(nrow = replicate_times, ncol = 55)
 MSEs_bSplines = matrix(nrow = replicate_times, ncol = 55)
+
+FDR_exponential = rep(NA, replicate_times)
+FDR_weibull = rep(NA, replicate_times)
+FDR_bSplines = rep(NA, replicate_times)
 
 for (i in 1:replicate_times){
   Beta_true <- simulated_results[,i]$Beta_true
@@ -163,6 +167,17 @@ for (i in 1:replicate_times){
   MSEs_exponential[i, ] <- (Beta_est_exponential - Beta_true)**2
   MSEs_weibull[i, ] <- (Beta_est_weibull - Beta_true)**2
   MSEs_bSplines[i, ] <- (Beta_est_bSplines - Beta_true)**2
+  
+  
+  variableSelection_reference <- ifelse(simulated_results[,i]$Beta_true != 0, TRUE, FALSE)
+  Selection_exponential <- simulated_results[,i]$variableSelection_exponential 
+  Selection_weibull <- simulated_results[,i]$variableSelection_weibull
+  Selection_bSplines <- simulated_results[,i]$variableSelection_bSplines
+  
+  FDR_exponential[i] <- sum(Selection_exponential & !variableSelection_reference) / sum(Selection_exponential)
+  FDR_weibull[i] <- sum(Selection_weibull & !variableSelection_reference) / sum(Selection_weibull)
+  FDR_bSplines[i] <- sum(Selection_bSplines & !variableSelection_reference) / sum(Selection_bSplines)
+  
 }
 
 mean_MSEs_exponential <- apply(MSEs_exponential, 2, mean)
@@ -187,6 +202,11 @@ lines(mean_MSEs_exponential, type = "o", col = "blue", pch = 16)
 abline(v = 10, col = "red", lty = 2)
 # Add legend
 legend("topright", legend = c("Exponential", "Weibull", "B-Splines"), col = c("blue", "green", "orange"), pch = 16, lty = 1)
+
+# Create side-by-side boxplots for FDR
+FDR_list = list(FDR_exponential = FDR_exponential, FDR_weibull = FDR_weibull, FDR_bSplines = FDR_bSplines)
+boxplot(FDR_list, names = c("FDR_exponential", "FDR_weibull", "FDR_bSplines"), col = c("blue", "green", "orange"), main = "Side-by-Side Boxplots", xlab = "", ylab = "FDR")
+
 ```
 
 # Step 3: visualize the estimated basline hazard
@@ -196,12 +216,12 @@ for (i in 1:replicate_times) {
   baseline_weibull <- simulated_results[, i]$baseline_weibull
   baseline_bSplines <- simulated_results[, i]$baseline_bSplines
   
-  plot(baseline_exponential, col = "green")
-  lines(baseline_weibull, col = "orange")
-  lines(baseline_bSplines, col = "blue")
+  plot(baseline_weibull, col = "green", type = "l", pch = 16, lty = 1, lwd = 2)
+  lines(baseline_exponential, col = "blue", pch = 16, lty = 1, lwd = 2)
+  lines(baseline_bSplines, col = "orange", pch = 16, lty = 1, lwd = 2)
   # Add legend
   legend(
-    "topright",
+    "topleft",
     legend = c("Exponential", "Weibull", "B-Splines"),
     col = c("blue", "green", "orange"),
     pch = 16,
@@ -211,18 +231,7 @@ for (i in 1:replicate_times) {
 
 ```
 
-```{r, echo=TRUE}
-a = simulated_results[, 1]
-dim(a$baseline_bSplines)
-
-plot(a$baseline_weibull, col = "green")
-lines(a$baseline_bSplines, col = "orange")
-lines(a$baseline_exponential, col = "blue")
-# Add legend
-legend("topright", legend = c("Exponential", "Weibull", "B-Splines"), col = c("blue", "green", "orange"), pch = 16, lty = 1)
-```
-
-
+# Step 4: use cross validation for prediction.
 ```{r, echo=TRUE}
 cross_validation <- function(whole_dataset, baseline_modelling = "weibull", num_folds = 5){
   # create the cross-validation folds
