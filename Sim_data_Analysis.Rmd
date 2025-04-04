@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 
 install_and_load <- function(packages) {
@@ -22,7 +22,7 @@ install_and_load <- function(packages) {
 }
 
 # List of required packages
-required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret")
+required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret", "parallel")
 # Install and/or load packages
 install_and_load(required_packages)
 ```
@@ -96,7 +96,7 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   model_result_weibull <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_weibull,  model_type = "weibull", criteria = criteria)
   model_result_bSplines <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines, model_type = "bSplines", criteria = criteria)
   
-  #---------cofficients for X----------
+  #---------coefficients for X----------
   if ("DesignCoefficients" %in% criteria){
     output$Beta_est_exponential = model_result_exponential$Beta_bayesian_est[, "mean"]
     output$Beta_est_weibull = model_result_weibull$Beta_bayesian_est[, "mean"]
@@ -139,30 +139,45 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
       model_result_bSplines$variableSelection
   }
   
-  # if ("Prediction_SurvivalProb" %in% criteria) {
-  #   output$sp_exponential = model_result_exponential$sp
-  #   output$sp_weibull = model_result_weibull$sp
-  #   output$sp_bSplines = model_result_bSplines$sp
-  # }
+  if ("Prediction_SurvivalProb" %in% criteria) {
+    output$time = tail(dataset$obstime, 100)
+    output$true_status = tail(dataset$status, 100)
+    output$sp_exponential = model_result_exponential$sp
+    output$sp_weibull = model_result_weibull$sp
+    output$sp_bSplines = model_result_bSplines$sp
+  }
   return(output)
 }
 
-simulated_results <- replicate(50, simulation_bayint_survival(), simplify = "array")
+
+replicate_times = 50
+simulated_results <- replicate(replicate_times, simulation_bayint_survival(), simplify = "array")
 save.image(file = "./Data/sim_50_para_int.RData")
 ```
 
 ```{r, echo=TRUE}
 load(file = "./Data/sim_50_para_int.RData")
-replicate_times = 50
 MSEs_exponential = matrix(nrow = replicate_times, ncol = 55)
 MSEs_weibull = matrix(nrow = replicate_times, ncol = 55)
 MSEs_bSplines = matrix(nrow = replicate_times, ncol = 55)
+
 
 FDR_exponential = rep(NA, replicate_times)
 FDR_weibull = rep(NA, replicate_times)
 FDR_bSplines = rep(NA, replicate_times)
 
+
+CI_index_exponential = matrix(nrow = replicate_times, ncol = 55)
+CI_index_weibull = matrix(nrow = replicate_times, ncol = 55)
+CI_index_bSplines = matrix(nrow = replicate_times, ncol = 55)
+
+
+Brier_score_exponential = matrix(nrow = replicate_times, ncol = 55)
+Brier_score_weibull = matrix(nrow = replicate_times, ncol = 55)
+Brier_score_bSplines = matrix(nrow = replicate_times, ncol = 55)
+
 for (i in 1:replicate_times){
+  # beta MSE
   Beta_true <- simulated_results[,i]$Beta_true
   Beta_est_exponential <- simulated_results[,i]$Beta_est_exponential
   Beta_est_weibull <- simulated_results[,i]$Beta_est_weibull
@@ -173,6 +188,7 @@ for (i in 1:replicate_times){
   MSEs_bSplines[i, ] <- (Beta_est_bSplines - Beta_true)**2
   
   
+  # FDR
   variableSelection_reference <- ifelse(simulated_results[,i]$Beta_true != 0, TRUE, FALSE)
   Selection_exponential <- simulated_results[,i]$variableSelection_exponential 
   Selection_weibull <- simulated_results[,i]$variableSelection_weibull
@@ -181,6 +197,22 @@ for (i in 1:replicate_times){
   FDR_exponential[i] <- sum(Selection_exponential & !variableSelection_reference) / sum(Selection_exponential)
   FDR_weibull[i] <- sum(Selection_weibull & !variableSelection_reference) / sum(Selection_weibull)
   FDR_bSplines[i] <- sum(Selection_bSplines & !variableSelection_reference) / sum(Selection_bSplines)
+  
+  #Brier_score
+  true_status <- simulated_results[,i]$true_status
+  sp_pre_exponential <- simulated_results[,i]$sp_exponential
+  sp_pre_weibull <- simulated_results[,i]$sp_weibull
+  sp_pre_bSplines <- simulated_results[,i]$sp_bSplines
+  
+  Brier_score_exponential[i, ] <- (true_status - sp_pre_exponential)**2
+  Brier_score_weibull[i, ] <- (true_status - sp_pre_weibull)**2
+  Brier_score_bSplines[i, ] <- (true_status - sp_pre_bSplines)**2
+  
+  CI_index_exponential[i, ] <- rcorr.cens(sp_pre_exponential, Surv(time, true_status))[["C Index"]] # rcorr.cens
+  CI_index_weibull[i, ] <- rcorr.cens(sp_pre_weibull, Surv(time, true_status))[["C Index"]] 
+  CI_index_bSplines[i, ] <- rcorr.cens(sp_pre_bSplines, Surv(time, true_status))[["C Index"]] 
+  
+  
   
 }
 
@@ -209,25 +241,27 @@ legend("topright", legend = c("Exponential", "Weibull", "B-Splines"), col = c("b
 
 # Create side-by-side boxplots for FDR
 FDR_list = list(FDR_exponential = FDR_exponential, FDR_weibull = FDR_weibull, FDR_bSplines = FDR_bSplines)
-boxplot(FDR_list, names = c("FDR_exponential", "FDR_weibull", "FDR_bSplines"), col = c("blue", "green", "orange"), main = "Side-by-Side Boxplots", xlab = "", ylab = "FDR")
+boxplot(FDR_list, names = c("FDR_exponential", "FDR_weibull", "FDR_bSplines"), col = c("blue", "green", "orange"), main = "FDR Boxplots", xlab = "", ylab = "FDR")
 
 ```
 
 # Step 3: visualize the estimated basline hazard
 ```{r, echo=TRUE}
 for (i in 1:replicate_times) {
+  baseline_true <- simulated_results[, i]$baseline_true 
   baseline_exponential <- simulated_results[, i]$baseline_exponential
   baseline_weibull <- simulated_results[, i]$baseline_weibull
   baseline_bSplines <- simulated_results[, i]$baseline_bSplines
   
-  plot(baseline_weibull, col = "green", type = "l", pch = 16, lty = 1, lwd = 2)
+  plot(baseline_true, col = "red", type = "l", pch = 16, lty = 1, lwd = 2)
+  lines(baseline_weibull, col = "green", type = "l", pch = 16, lty = 1, lwd = 2)
   lines(baseline_exponential, col = "blue", pch = 16, lty = 1, lwd = 2)
   lines(baseline_bSplines, col = "orange", pch = 16, lty = 1, lwd = 2)
   # Add legend
   legend(
     "topleft",
-    legend = c("Exponential", "Weibull", "B-Splines"),
-    col = c("blue", "green", "orange"),
+    legend = c("True", "Exponential", "Weibull", "B-Splines"),
+    col = c("red", "blue", "green", "orange"),
     pch = 16,
     lty = 1
   )
