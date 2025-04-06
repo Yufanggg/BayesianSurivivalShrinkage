@@ -1,5 +1,5 @@
 ---
-title: "Generate_sim_data"
+title: "01_Sim_data_Analysisbaseline"
 author: "Yufang Wang"
 date: "2025-03-18"
 output: pdf_document

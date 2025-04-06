@@ -30,11 +30,16 @@ g <- function(main_indices_for_int, index){
 
 # Function to fit a Bayesian survival model with different baseline assumptions
 # @param: stan_data, a list including items for the corresponding stan model
-Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponential", withPrediction = TRUE, 
+Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponential", withPrediction = TRUE, shrinkage = TRUE,
                                                 niter = 10000, 
                                                 nwarmup = 1000,
                                                 thin = 10,
                                                 chains = 1) {
+  if (shrinkage){
+    message("we only applied the non shrinage code for bSpline baseline hazard.")
+  }
+  
+  
   if (!withPrediction) {
     if (baseline_assumption == "exponential") {
       # compile the model
@@ -73,7 +78,12 @@ Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponentia
       message("We utilized B-splines to estimate the log baseline hazard function.")
       
       # compile the model
-      bayesian_model <- stan_model("./stan_file/bSpline_estEpre.stan")
+      if (shrinkage){
+        bayesian_model <- stan_model("./stan_file/bSpline_estEpre.stan")
+      } else {
+        bayesian_model <- stan_model("./stan_file/bSpline_estEprenoShrinkage.stan")
+      }
+      
     }
   }
   
