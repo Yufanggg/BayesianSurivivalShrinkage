@@ -45,27 +45,32 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   
   #constructor data for the model
   if (withPrediction) {
+    samples <- sample(1:nrow(dataset), 100)
+    training_dataset <- dataset[-samples, ]
+    testing_dataset <- dataset[samples, ]
+    
     stan_data_exponential <- stan_data_Constructer(
-      training_dataset = dataset,
+      training_dataset = training_dataset,
       withPrediction = withPrediction,
-      testing_dataset = tail(dataset, 100),
+      testing_dataset = testing_dataset,
       baseline_modelling = "exponential",
       obs_window = 5
     )
     stan_data_weibull <- stan_data_Constructer(
-      training_dataset = dataset,
+      training_dataset = training_dataset,
       withPrediction = withPrediction,
-      testing_dataset = tail(dataset, 100),
+      testing_dataset = testing_dataset,
       baseline_modelling = "weibull",
       obs_window = 5
     )
     stan_data_bSplines <- stan_data_Constructer(
-      training_dataset = dataset,
+      training_dataset = training_dataset,
       withPrediction = withPrediction,
-      testing_dataset = tail(dataset, 100),
+      testing_dataset = testing_dataset,
       baseline_modelling = "bSplines",
       obs_window = 5
     )
+    rm(training_dataset, testing_dataset)
   }  else {
     stan_data_exponential <- stan_data_Constructer(
       training_dataset = dataset,

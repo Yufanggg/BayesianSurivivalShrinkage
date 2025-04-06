@@ -45,13 +45,18 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   
   #constructor data for the model
   if (withPrediction) {
+    samples <- sample(1:nrow(dataset), 100)
+    training_dataset <- dataset[-samples, ]
+    testing_dataset <- dataset[samples, ]
+    
     stan_data_bSplines <- stan_data_Constructer(
-      training_dataset = dataset,
+      training_dataset = training_dataset,
       withPrediction = withPrediction,
-      testing_dataset = tail(dataset, 100),
+      testing_dataset = testing_dataset,
       baseline_modelling = "bSplines",
       obs_window = 5
     )
+    rm(training_dataset, testing_dataset)
   }  else {
     
     stan_data_bSplines <- stan_data_Constructer(
@@ -62,7 +67,7 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   }
     
   #fit model
-  model_fit_bSplines_withShrinkage <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_assumption = "bSplines")
+  model_fit_bSplines_withShrinkage <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_assumption = "bSplines", shrinkage = TRUE)
   model_fit_bSplines_noShrinkage <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_assumption = "bSplines", shrinkage = FALSE)
 
   #extract the info from the bayesian model fit
@@ -94,7 +99,7 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   
   
   if ("variableSelection" %in% criteria) {
-    output$model_result_bSplines_withShrinkage <-
+    output$variableSelection_bSplines_withShrinkage <-
       model_result_bSplines_withShrinkage$variableSelection
     
     output$variableSelection_bSplines_noShrinkage <-
@@ -117,32 +122,50 @@ save.image(file = "./Data/sim_50_para_shrinkagenowith.RData")
 ```
 
 ```{r, echo=TRUE}
-# load(file = "./Data/sim_50_para_shrinkagenowith.RData")
+load(file = "./Data/sim_50_para_shrinkagenowith.RData")
 
-MSEs_bSplines = matrix(nrow = replicate_times, ncol = 55)
-FDR_bSplines = rep(NA, replicate_times)
-CI_index_bSplines = rep(NA, replicate_times)
-Brier_score_bSplines = rep(NA, replicate_times)
+MSEs_bSplines_withShrinkage = matrix(nrow = replicate_times, ncol = 55)
+FDR_bSplines_withShrinkage = rep(NA, replicate_times)
+CI_index_bSplines_withShrinkage = rep(NA, replicate_times)
+Brier_score_bSplines_withShrinkage = rep(NA, replicate_times)
+
+MSEs_bSplines_noShrinkag = matrix(nrow = replicate_times, ncol = 55)
+FDR_bSplines_noShrinkag = rep(NA, replicate_times)
+CI_index_bSplines_noShrinkag = rep(NA, replicate_times)
+Brier_score_bSplines_noShrinkag = rep(NA, replicate_times)
 
 for (i in 1:replicate_times){
   # beta MSE
   Beta_true <- simulated_results[,i]$Beta_true
-  Beta_est_bSplines <-  simulated_results[,i]$Beta_est_bSplines
-  MSEs_bSplines[i, ] <- (Beta_est_bSplines - Beta_true)**2
+  Beta_est_bSplines_withShrinkage <-  simulated_results[,i]$Beta_est_bSplines_withShrinkage
+  MSEs_bSplines_withShrinkage[i, ] <- (Beta_est_bSplines_withShrinkage - Beta_true)**2
+  
+  
+  Beta_est_bSplines_noShrinkage <-  simulated_results[,i]$Beta_est_bSplines_noShrinkage
+  MSEs_bSplines_noShrinkage[i, ] <- (Beta_est_bSplines_noShrinkage - Beta_true)**2
   
   
   # FDR
   variableSelection_reference <- ifelse(simulated_results[,i]$Beta_true != 0, TRUE, FALSE)
-  Selection_bSplines <- simulated_results[,i]$variableSelection_bSplines
-  FDR_bSplines[i] <- sum(Selection_bSplines & !variableSelection_reference) / sum(Selection_bSplines)
+  Selection_bSplines_withShrinkage <- simulated_results[,i]$variableSelection_bSplines_withShrinkage
+  FDR_bSplines_withShrinkage[i] <- sum(Selection_bSplines_withShrinkage & !variableSelection_reference) / sum(Selection_bSplines_withShrinkage)
+  
+  Selection_bSplines_noShrinkage <- simulated_results[,i]$variableSelection_bSplines_noShrinkage
+  FDR_bSplines_noShrinkage[i] <- sum(Selection_bSplines_noShrinkage & !variableSelection_reference) / sum(Selection_bSplines_withShrinkage)
+  
   
   #Brier_score
   true_status <- simulated_results[,i]$true_status
-  sp_pre_bSplines <- simulated_results[,i]$sp_bSplines
-  Brier_score_bSplines[i] <- (true_status - sp_pre_bSplines)**2
+  sp_pre_bSplines_withShrinkage <- simulated_results[,i]$sp_bSplines_withShrinkage
+  Brier_score_bSplines_withShrinkage[i] <- (true_status - sp_pre_bSplines_withShrinkage)**2
+  
+  sp_pre_bSplines_noShrinkage <- simulated_results[,i]$sp_bSplines_noShrinkage
+  Brier_score_bSplines_noShrinkage[i] <- (true_status - sp_pre_bSplines_noShrinkage)**2
+  
   
   time <- simulated_results[,i]$time
-  CI_index_bSplines[i] <- rcorr.cens(sp_pre_bSplines, Surv(time, true_status))[["C Index"]] # rcorr.cens
+  CI_index_bSplines_withShrinkage[i] <- rcorr.cens(sp_pre_bSplines_withShrinkage, Surv(time, true_status))[["C Index"]] # rcorr.cens
+  CI_index_bSplines_noShrinkage[i] <- rcorr.cens(sp_pre_bSplines_noShrinkage, Surv(time, true_status))[["C Index"]] 
   
 }
 
