@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 
 install_and_load <- function(packages) {
@@ -160,7 +160,7 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
 }
 
 
-replicate_times = 50
+replicate_times = 2
 simulated_results <- replicate(replicate_times, simulation_bayint_survival(), simplify = "array")
 save.image(file = "./Data/sim_50_para_int.RData")
 ```
@@ -218,6 +218,7 @@ for (i in 1:replicate_times){
   Brier_score_weibull[i] <- mean((true_status - sp_pre_weibull)**2)
   Brier_score_bSplines[i] <- mean((true_status - sp_pre_bSplines)**2)
   
+  # CI 
   time <- simulated_results[,i]$time
   CI_index_exponential[i] <- rcorr.cens(sp_pre_exponential, Surv(time, true_status))[["C Index"]] # rcorr.cens
   CI_index_weibull[i] <- rcorr.cens(sp_pre_weibull, Surv(time, true_status))[["C Index"]] 
@@ -285,46 +286,5 @@ for (i in 1:replicate_times) {
 
 ```
 
-# Step 4: use cross validation for prediction.
-```{r, echo=TRUE}
-cross_validation <- function(whole_dataset, baseline_modelling = "weibull", num_folds = 5){
-  # create the cross-validation folds
-  folds <- createFolds(whole_dataset$status, k = num_folds, list = TRUE, returnTrain = FALSE)
-  cross_val_metric <- list()
-  rMSE_s = matrix(nrow = 5, ncol = 55); Brier_scores =  rep(NA, 5); C_indices =  rep(NA, 5); FDR_vals =  rep(NA, 5)
-  for (i in 1:num_folds){
-    fold_indices <- folds[[i]]
-    training_data = whole_dataset[-fold_indices, ]
-    testing_data = whole_dataset[fold_indices, ]
-    stan_data <- stan_data_Constructer(training_dataset = training_data, testing_dataset = testing_data, baseline_modelling = baseline_modelling, obs_window = 5)
-    model_fit <- Bayesian_Survival_model(stan_data = stan_data, baseline_assumption = baseline_modelling)
-    
-    #extract the info from the bayesian model fit
-    model_result <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit)
-    
-    ComparsionValues <- list(
-      Beta_reference = c(beta, rep(0, 45)),
-      test_t = testing_data$obstime,
-      test_status = testing_data$status,
-      Selection_reference = c(rep(TRUE, 10), rep(FALSE, 45))
-      )
-    model_metric <- Model_performance_eval(model_result = model_result, ComparsionValues)
-    rMSE_s[i, ] <- model_metric$rMSE
-    Brier_scores[i] <- model_metric$Brier_score
-    C_indices[i] <- model_metric$C_index
-    FDR_vals[i] <- model_metric$FDR
-  }
-  cross_val_metric$rMSE_s <- rMSE_s
-  cross_val_metric$Brier_scores <- Brier_scores
-  cross_val_metric$C_indices <- C_indices
-  cross_val_metric$FDR_vals <- FDR_vals
-  
-  return(cross_val_metric)
-}
 
-cross_val_metric <- cross_validation(whole_dataset = sim_data, baseline_modelling = "bSplines") # exponential, weibull, bSplines
-
-# Step 3: visualize the model metric results
-metric_visualization(cross_val_metric)
-```
 
