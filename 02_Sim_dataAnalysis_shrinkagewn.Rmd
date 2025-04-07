@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 
 install_and_load <- function(packages) {
@@ -85,14 +85,20 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   #-----------------------------------
   
   if ("baseline" %in% criteria) {
-    output$time_vec <-
+    if (withPrediction){
+      output$time_vec <-
+      sort(training_dataset[training_dataset$status == 1, ]$obstime) # obs_window = 5
+    } else {
+       output$time_vec <-
       sort(dataset[dataset$status == 1, ]$obstime) # obs_window = 5
+    }
+   
     output$baseline_true <-  10 * 2 * (output$time_vec ** (10 - 1))
     
-    output$Beta_est_bSplines_withShrinkage <-
+    output$baseline_bSplines_withShrinkage <-
       exp(as.matrix(stan_data_bSplines$basis) %*% as.matrix(model_result_bSplines_withShrinkage$baselinePara[, "mean"]))
     
-    output$model_result_bSplines_noShrinkage <-
+    output$baseline_bSplines_noShrinkage <-
       exp(as.matrix(stan_data_bSplines$basis) %*% as.matrix(model_result_bSplines_noShrinkage$baselinePara[, "mean"]))
   }
   
@@ -116,7 +122,7 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
 }
 
 
-replicate_times = 50
+replicate_times = 2
 simulated_results <- replicate(replicate_times, simulation_bayint_survival_shrinkage(), simplify = "array")
 save.image(file = "./Data/sim_50_para_shrinkagenowith.RData")
 ```
@@ -142,7 +148,7 @@ for (i in 1:replicate_times){
   
   
   Beta_est_bSplines_noShrinkage <-  simulated_results[,i]$Beta_est_bSplines_noShrinkage
-  MSEs_bSplines_noShrinkage[i, ] <- (Beta_est_bSplines_noShrinkage - Beta_true)**2
+  MSEs_bSplines_noShrinkag[i, ] <- (Beta_est_bSplines_noShrinkage - Beta_true)**2
   
   
   # FDR
@@ -151,56 +157,54 @@ for (i in 1:replicate_times){
   FDR_bSplines_withShrinkage[i] <- sum(Selection_bSplines_withShrinkage & !variableSelection_reference) / sum(Selection_bSplines_withShrinkage)
   
   Selection_bSplines_noShrinkage <- simulated_results[,i]$variableSelection_bSplines_noShrinkage
-  FDR_bSplines_noShrinkage[i] <- sum(Selection_bSplines_noShrinkage & !variableSelection_reference) / sum(Selection_bSplines_withShrinkage)
+  FDR_bSplines_noShrinkag[i] <- sum(Selection_bSplines_noShrinkage & !variableSelection_reference) / sum(Selection_bSplines_withShrinkage)
   
   
   #Brier_score
   true_status <- simulated_results[,i]$true_status
   sp_pre_bSplines_withShrinkage <- simulated_results[,i]$sp_bSplines_withShrinkage
-  Brier_score_bSplines_withShrinkage[i] <- (true_status - sp_pre_bSplines_withShrinkage)**2
+  Brier_score_bSplines_withShrinkage[i] <- sum((true_status - sp_pre_bSplines_withShrinkage)**2)
   
   sp_pre_bSplines_noShrinkage <- simulated_results[,i]$sp_bSplines_noShrinkage
-  Brier_score_bSplines_noShrinkage[i] <- (true_status - sp_pre_bSplines_noShrinkage)**2
+  Brier_score_bSplines_noShrinkag[i] <- sum((true_status - sp_pre_bSplines_noShrinkage)**2)
   
   
   time <- simulated_results[,i]$time
   CI_index_bSplines_withShrinkage[i] <- rcorr.cens(sp_pre_bSplines_withShrinkage, Surv(time, true_status))[["C Index"]] # rcorr.cens
-  CI_index_bSplines_noShrinkage[i] <- rcorr.cens(sp_pre_bSplines_noShrinkage, Surv(time, true_status))[["C Index"]] 
+  CI_index_bSplines_noShrinkag[i] <- rcorr.cens(sp_pre_bSplines_noShrinkage, Surv(time, true_status))[["C Index"]] 
   
 }
 
-mean_MSEs_bSplines <- apply(MSEs_bSplines, 2, mean)
+mean_MSEs_bSplines_withShrinkage <- apply(MSEs_bSplines_withShrinkage, 2, mean)
+mean_MSEs_bSplines_noShrinkag <- apply(MSEs_bSplines_noShrinkag, 2, mean)
 
 # visualized result
 fill_vector = (simulated_results[, 1]$Beta_true != 0)
 
-plot(mean_MSEs_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.3), main = "MSE for Beta estimation", pch = 16)
+plot(mean_MSEs_bSplines_withShrinkage, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.3), main = "MSE for Beta estimation", pch = 16)
 
 # Add background rectangles
-for (i in 1:length(mean_MSEs_exponential)) {
+for (i in 1:length(mean_MSEs_bSplines_withShrinkage)) {
   if (fill_vector[i]) {
     rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
   }
 }
 
-lines(mean_MSEs_weibull, type = "o", col = "green", pch = 16)
-lines(mean_MSEs_bSplines, type = "o", col = "orange", pch = 16)
-lines(mean_MSEs_exponential, type = "o", col = "blue", pch = 16)
-abline(v = 10, col = "red", lty = 2)
+lines(mean_MSEs_bSplines_noShrinkag, type = "o", col = "green", pch = 16)
 # Add legend
-legend("topright", legend = c("Exponential", "Weibull", "B-Splines"), col = c("blue", "green", "orange"), pch = 16, lty = 1)
+legend("topright", legend = c("bSplinewithshrinkage", "bSplinenoshrinkage"), col = c("blue", "green"), pch = 16, lty = 1)
 
 # Create side-by-side boxplots for FDR
-FDR_list = list(FDR_exponential = FDR_exponential, FDR_weibull = FDR_weibull, FDR_bSplines = FDR_bSplines)
-boxplot(FDR_list, names = c("FDR_exponential", "FDR_weibull", "FDR_bSplines"), col = c("blue", "green", "orange"), main = "FDR Boxplots", xlab = "", ylab = "FDR")
+FDR_list = list(FDR_bSplines_withShrinkage = FDR_bSplines_withShrinkage, FDR_bSplines_noShrinkag = FDR_bSplines_noShrinkag)
+boxplot(FDR_list, names = c("bSplinewithshrinkage", "bSplinenoshrinkage"), col = c("blue", "green"), main = "FDR Boxplots", xlab = "", ylab = "FDR")
 
 # Create the Brier score
-Brier_score_list = list(Brier_score_exponential = Brier_score_exponential, Brier_score_weibull = Brier_score_weibull, Brier_score_bSplines = Brier_score_bSplines)
-boxplot(Brier_score_list, names = c("Brier_score_exponential", "Brier_score_weibull", "Brier_score_bSplines"), col = c("blue", "green", "orange"), main = "Brier score Boxplots", xlab = "", ylab = "Brier score")
+Brier_score_list = list(Brier_score_bSplines_withShrinkage = Brier_score_bSplines_withShrinkage, Brier_score_bSplines_noShrinkag = Brier_score_bSplines_noShrinkag)
+boxplot(Brier_score_list, names = c("Brier_score_bSplines_withshrinkage", "Brier_score_bSplines_noshrinkage"), col = c("blue", "green"), main = "Brier score Boxplots", xlab = "", ylab = "Brier score")
 
 # Create the CI index
-CI_index_list = list(CI_index_exponential = CI_index_exponential, CI_index_weibull = CI_index_weibull, CI_index_bSplines = CI_index_bSplines)
-boxplot(CI_index_list, names = c("CI_index_exponential", "CI_index_weibull", "CI_index_bSplines"), col = c("blue", "green", "orange"), main = "CI index Boxplots", xlab = "", ylab = "CI index")
+CI_index_list = list(CI_index_bSplines_withShrinkage = CI_index_bSplines_withShrinkage, CI_index_bSplines_noShrinkag = CI_index_bSplines_noShrinkag)
+boxplot(CI_index_list, names = c("CI_index_bSplineswithshrinkage", "CI_index_bSplinesnoshrinkage"), col = c("blue", "green"), main = "CI index Boxplots", xlab = "", ylab = "CI index")
 ```
 
 # Step 3: visualize the estimated basline hazard

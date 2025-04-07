@@ -70,7 +70,6 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
       baseline_modelling = "bSplines",
       obs_window = 5
     )
-    rm(training_dataset, testing_dataset)
   }  else {
     stan_data_exponential <- stan_data_Constructer(
       training_dataset = dataset,
@@ -145,8 +144,9 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   }
   
   if ("Prediction_SurvivalProb" %in% criteria) {
-    output$time = tail(dataset$obstime, 100)
-    output$true_status = tail(dataset$status, 100)
+    
+    output$time = testing_dataset$obstime
+    output$true_status = testing_dataset$status
     output$sp_exponential = model_result_exponential$sp
     output$sp_weibull = model_result_weibull$sp
     output$sp_bSplines = model_result_bSplines$sp
