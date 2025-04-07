@@ -113,8 +113,13 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   #-----------------------------------
   
   if ("baseline" %in% criteria) {
-    time_vec <-
+    if (withPrediction){
+      output$time_vec <-
+      sort(training_dataset[training_dataset$status == 1, ]$obstime) # obs_window = 5
+    } else {
+       output$time_vec <-
       sort(dataset[dataset$status == 1, ]$obstime) # obs_window = 5
+    }
     output$baseline_true <-  10 * 2 * (time_vec ** (10 - 1))
     
     output$baseline_exponential <-
@@ -209,9 +214,9 @@ for (i in 1:replicate_times){
   sp_pre_weibull <- simulated_results[,i]$sp_weibull
   sp_pre_bSplines <- simulated_results[,i]$sp_bSplines
   
-  Brier_score_exponential[i] <- (true_status - sp_pre_exponential)**2
-  Brier_score_weibull[i] <- (true_status - sp_pre_weibull)**2
-  Brier_score_bSplines[i] <- (true_status - sp_pre_bSplines)**2
+  Brier_score_exponential[i] <- mean((true_status - sp_pre_exponential)**2)
+  Brier_score_weibull[i] <- mean((true_status - sp_pre_weibull)**2)
+  Brier_score_bSplines[i] <- mean((true_status - sp_pre_bSplines)**2)
   
   time <- simulated_results[,i]$time
   CI_index_exponential[i] <- rcorr.cens(sp_pre_exponential, Surv(time, true_status))[["C Index"]] # rcorr.cens
