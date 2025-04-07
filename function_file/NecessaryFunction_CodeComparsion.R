@@ -1,5 +1,6 @@
 # Necessary function for code comparsion
 # Generate a simulate dateset
+# Generate a simulate dateset
 DataGenerator <- function(n_samples = 210, n_features = 10) {
   sim_data <- list()
   
@@ -54,7 +55,7 @@ DataGenerator <- function(n_samples = 210, n_features = 10) {
     dist = "weibull",
     lambdas = 2,
     # scale
-    gammas = 5,
+    gammas = 10,
     # shape for weibull
     betas = Beta,
     x = design_matrix,
@@ -81,18 +82,24 @@ DataGenerator <- function(n_samples = 210, n_features = 10) {
 # @para: training_dataset: 
 stan_data_Constructer <- function(training_dataset, withPrediction = FALSE, testing_dataset = NULL, baseline_modelling = "bSplines", obs_window = 5){
   if (withPrediction) {
+    if (is.null(testing_dataset)) {
+      stop("For predictions, the testing_dataset cannot be empty!")
+    }
+    if (baseline_modelling == "bSplines") {
       source("./function_file/bSpline_stan_constructorwithPred.R")
       stan_data = stan_bSpline_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset,
                                                 obs_window = 5)
+    }
   }
   else{
+    if (baseline_modelling == "bSplines") {
       source("./function_file/bSpline_stan_constructornoPred.R")
       stan_data = stan_bSpline_data_Constructer1(training_dataset = training_dataset,
                                                  obs_window = 5)
+    }
   }
   return(stan_data)
 }
-
 
 # Function to fit a Bayesian survival model with different baseline assumptions
 # @param: stan_data, a list including items for the corresponding stan model
@@ -144,7 +151,7 @@ Bayesian_Survival_model_check <- function(bayesian_model_fit, criteria = c("MCMC
 }
 
 
-Bayesian_Survival_result_Extract <- function(bayesian_model_fit,
+Bayesian_Survival_result_Extract <- function(bayesian_model_fit, model_type,
                                              criteria = c("DesignCoefficients",
                                                           "Prediction_SurvivalProb",
                                                           "variableSelection",
@@ -174,220 +181,44 @@ Bayesian_Survival_result_Extract <- function(bayesian_model_fit,
   }
   
   if ("baseline" %in% criteria) {
-    if (model == "exponential") {
-      lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
-      model_result$baselinePara <- lambda
-      # Extract posterior samples
-      posterior_samples <- extract(bayesian_model_fit,
-                                   pars = "lambda",
-                                   permuted = TRUE)
-      
-      # Posterior samples for beta
-      lambda_samples <- posterior_samples$lambda
-      # Plot the posterior distribution
-      hist(
-        lambda_samples,
-        breaks = 30,
-        main = "Posterior Distribution of lambda",
-        xlab = "Lambda"
-      )
-    }
-    if (model == "weibull") {
-      lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
-      shape <- Output[grep("^shape", rownames(Output)), "50%", drop = FALSE]
-      model_result$baselinePara <- c(lambda, shape)
-      
-      # Extract posterior samples
-      posterior_samples <- extract(bayesian_model_fit,
-                                   pars = "lambda",
-                                   permuted = TRUE)
-      
-      # Posterior samples for beta
-      lambda_samples <- posterior_samples$lambda
-      # Plot the posterior distribution
-      hist(
-        lambda_samples,
-        breaks = 30,
-        main = "Posterior Distribution of lambda",
-        xlab = "lambda"
-      )
-      
-      # Extract posterior samples
-      posterior_samples <- extract(bayesian_model_fit,
-                                   pars = "shape",
-                                   permuted = TRUE)
-      
-      # Posterior samples for beta
-      shape_samples <- posterior_samples$shape
-      # Plot the posterior distribution
-      hist(
-        shape_samples,
-        breaks = 30,
-        main = "Posterior Distribution of shape",
-        xlab = "shape"
-      )
-    }
-    if (model == "bSplines") {
+    if (model_type == "bSplines") {
       coefs <- Output[grep("^coefs", rownames(Output)), "mean", drop = FALSE]
       model_result$baselinePara = coefs
       
-      # Extract posterior samples
-      posterior_samples <- extract(bayesian_model_fit,
-                                   pars = "coefs",
-                                   permuted = TRUE)
+      # # Extract posterior samples
+      # posterior_samples <- extract(bayesian_model_fit,
+      #                              pars = "coefs",
+      #                              permuted = TRUE)
       
-      # Posterior samples for beta
-      coefs_samples <- posterior_samples$coefs
-      # Plot the posterior distribution
-      hist(
-        coefs_samples[, 1],
-        breaks = 30,
-        main = "Posterior Distribution of lambda",
-        xlab = "coefs[1]"
-      )
-      hist(
-        coefs_samples[, 2],
-        breaks = 30,
-        main = "Posterior Distribution of lambda",
-        xlab = "coefs[2]"
-      )
-      hist(
-        coefs_samples[, 3],
-        breaks = 30,
-        main = "Posterior Distribution of lambda",
-        xlab = "coefs[3]"
-      )
+      # # Posterior samples for beta
+      # coefs_samples <- posterior_samples$coefs
+      # # Plot the posterior distribution
+      # hist(
+      #   coefs_samples[, 1],
+      #   breaks = 30,
+      #   main = "Posterior Distribution of lambda",
+      #   xlab = "coefs[1]"
+      # )
+      # hist(
+      #   coefs_samples[, 2],
+      #   breaks = 30,
+      #   main = "Posterior Distribution of lambda",
+      #   xlab = "coefs[2]"
+      # )
+      # hist(
+      #   coefs_samples[, 3],
+      #   breaks = 30,
+      #   main = "Posterior Distribution of lambda",
+      #   xlab = "coefs[3]"
+      # )
     }
   }
   
   return(model_result)
 }
 
-# Function to extract the results from the Bayesian model that are useful for model comparison.
-# @param bayesian_model_fit: a model fitted by the Bayesian method.
-# @param criteria: the results to be extracted from the fitted model.
-# @return: a list including (1) the estimated coefficients for the design matrix (i.e., Beta_bayesian_est);
-#         (2) predictive survival probability for the testing dataset (i.e., sp); and (3) the information 
-#         of selected/non-selected variables (i.e., variableSelection): TRUE if selected, otherwise FALSE.
 
-Bayesian_Survival_result_Extract <- function(bayesian_model_fit,
-                                             criteria = c("DesignCoefficients",
-                                                          "Prediction_SurvivalProb",
-                                                          "variableSelection",
-                                                          "baseline")) {
-  # Ensure the Output object is available
-  Output <- summary(bayesian_model_fit)$summary
-  
-  # Initialize the result list
-  model_result <- list()
-  
-  if ("DesignCoefficients" %in% criteria) {
-    Beta_bayesian_est <- Output[grep("^Beta", rownames(Output)), "mean", drop = FALSE]
-    model_result$Beta_bayesian_est <- Beta_bayesian_est
-  }
-  
-  if ("Prediction_SurvivalProb" %in% criteria) {
-    sp <- Output[grep("^survival_prob", rownames(Output)), "mean", drop = FALSE]
-    model_result$sp <- sp
-  }
-  
-  if ("variableSelection" %in% criteria) {
-    Beta_bayesian_est_LB <- Output[grep("^Beta", rownames(Output)), "2.5%", drop = FALSE]
-    Beta_bayesian_est_UB <- Output[grep("^Beta", rownames(Output)), "97.5%", drop = FALSE]
-    includes_zero <- (Beta_bayesian_est_LB <= 0) &
-      (Beta_bayesian_est_UB >= 0)
-    model_result$variableSelection <- !includes_zero
-  }
-  
-  if ("baseline" %in% criteria) {
-    if (model == "exponential") {
-      lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
-      model_result$baselinePara <- lambda
-      # Extract posterior samples
-      posterior_samples <- extract(bayesian_model_fit,
-                                   pars = "lambda",
-                                   permuted = TRUE)
-      
-      # Posterior samples for beta
-      lambda_samples <- posterior_samples$lambda
-      # Plot the posterior distribution
-      hist(
-        lambda_samples,
-        breaks = 30,
-        main = "Posterior Distribution of lambda",
-        xlab = "Lambda"
-      )
-    }
-    if (model == "weibull") {
-      lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
-      shape <- Output[grep("^shape", rownames(Output)), "50%", drop = FALSE]
-      model_result$baselinePara <- c(lambda, shape)
-      
-      # Extract posterior samples
-      posterior_samples <- extract(bayesian_model_fit,
-                                   pars = "lambda",
-                                   permuted = TRUE)
-      
-      # Posterior samples for beta
-      lambda_samples <- posterior_samples$lambda
-      # Plot the posterior distribution
-      hist(
-        lambda_samples,
-        breaks = 30,
-        main = "Posterior Distribution of lambda",
-        xlab = "lambda"
-      )
-      
-      # Extract posterior samples
-      posterior_samples <- extract(bayesian_model_fit,
-                                   pars = "shape",
-                                   permuted = TRUE)
-      
-      # Posterior samples for beta
-      shape_samples <- posterior_samples$shape
-      # Plot the posterior distribution
-      hist(
-        shape_samples,
-        breaks = 30,
-        main = "Posterior Distribution of shape",
-        xlab = "shape"
-      )
-    }
-    if (model == "bSplines") {
-      coefs <- Output[grep("^coefs", rownames(Output)), "mean", drop = FALSE]
-      model_result$baselinePara = coefs
-      
-      # Extract posterior samples
-      posterior_samples <- extract(bayesian_model_fit,
-                                   pars = "coefs",
-                                   permuted = TRUE)
-      
-      # Posterior samples for beta
-      coefs_samples <- posterior_samples$coefs
-      # Plot the posterior distribution
-      hist(
-        coefs_samples[, 1],
-        breaks = 30,
-        main = "Posterior Distribution of lambda",
-        xlab = "coefs[1]"
-      )
-      hist(
-        coefs_samples[, 2],
-        breaks = 30,
-        main = "Posterior Distribution of lambda",
-        xlab = "coefs[2]"
-      )
-      hist(
-        coefs_samples[, 3],
-        breaks = 30,
-        main = "Posterior Distribution of lambda",
-        xlab = "coefs[3]"
-      )
-    }
-  }
-  
-  return(model_result)
-}
+
 # Function to find indices of main effects for interaction effects
 # @param: interaction_effects, a vector with the names of the interaction effects
 # @param: main_effects, a vector with the names of the main effects
