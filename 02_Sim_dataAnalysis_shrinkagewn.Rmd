@@ -56,7 +56,6 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
       baseline_modelling = "bSplines",
       obs_window = 5
     )
-    rm(training_dataset, testing_dataset)
   }  else {
     
     stan_data_bSplines <- stan_data_Constructer(
@@ -107,10 +106,11 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   }
   
   if ("Prediction_SurvivalProb" %in% criteria) {
-    output$time = tail(dataset$obstime, 100)
-    output$true_status = tail(dataset$status, 100)
+    output$time = testing_dataset$obstime
+    output$true_status = testing_dataset$status
     output$sp_bSplines_withShrinkage = model_result_bSplines_withShrinkage$sp
     output$sp_bSplines_noShrinkage = model_result_bSplines_noShrinkage$sp
+    rm(training_dataset, testing_dataset)
   }
   return(output)
 }
