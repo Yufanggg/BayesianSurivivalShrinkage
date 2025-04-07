@@ -163,10 +163,10 @@ for (i in 1:replicate_times){
   #Brier_score
   true_status <- simulated_results[,i]$true_status
   sp_pre_bSplines_withShrinkage <- simulated_results[,i]$sp_bSplines_withShrinkage
-  Brier_score_bSplines_withShrinkage[i] <- sum((true_status - sp_pre_bSplines_withShrinkage)**2)
+  Brier_score_bSplines_withShrinkage[i] <- mean((true_status - sp_pre_bSplines_withShrinkage)**2)
   
   sp_pre_bSplines_noShrinkage <- simulated_results[,i]$sp_bSplines_noShrinkage
-  Brier_score_bSplines_noShrinkag[i] <- sum((true_status - sp_pre_bSplines_noShrinkage)**2)
+  Brier_score_bSplines_noShrinkag[i] <- mean((true_status - sp_pre_bSplines_noShrinkage)**2)
   
   
   time <- simulated_results[,i]$time
@@ -211,66 +211,20 @@ boxplot(CI_index_list, names = c("CI_index_bSplineswithshrinkage", "CI_index_bSp
 ```{r, echo=TRUE}
 for (i in 1:replicate_times) {
   baseline_true <- simulated_results[, i]$baseline_true 
-  baseline_exponential <- simulated_results[, i]$baseline_exponential
-  baseline_weibull <- simulated_results[, i]$baseline_weibull
-  baseline_bSplines <- simulated_results[, i]$baseline_bSplines
+  baseline_bSplines_withShrinkage <- simulated_results[, i]$baseline_bSplines_withShrinkage
+  baseline_bSplines_noShrinkage <- simulated_results[, i]$baseline_bSplines_noShrinkage
   
   plot(baseline_true, col = "red", type = "l", pch = 16, lty = 1, lwd = 2)
-  lines(baseline_weibull, col = "green", type = "l", pch = 16, lty = 1, lwd = 2)
-  lines(baseline_exponential, col = "blue", pch = 16, lty = 1, lwd = 2)
-  lines(baseline_bSplines, col = "orange", pch = 16, lty = 1, lwd = 2)
+  lines(baseline_bSplines_withShrinkage, col = "green", type = "l", pch = 16, lty = 1, lwd = 2)
+  lines(baseline_bSplines_noShrinkage, col = "blue", pch = 16, lty = 1, lwd = 2)
   # Add legend
   legend(
     "topleft",
-    legend = c("True", "Exponential", "Weibull", "B-Splines"),
-    col = c("red", "blue", "green", "orange"),
+    legend = c("True", "bSplines_withShrinkage", "bSplines_noShrinkage"),
+    col = c("red", "blue", "green"),
     pch = 16,
     lty = 1
   )
 }
-
-```
-
-# Step 4: use cross validation for prediction.
-```{r, echo=TRUE}
-cross_validation <- function(whole_dataset, baseline_modelling = "weibull", num_folds = 5){
-  # create the cross-validation folds
-  folds <- createFolds(whole_dataset$status, k = num_folds, list = TRUE, returnTrain = FALSE)
-  cross_val_metric <- list()
-  rMSE_s = matrix(nrow = 5, ncol = 55); Brier_scores =  rep(NA, 5); C_indices =  rep(NA, 5); FDR_vals =  rep(NA, 5)
-  for (i in 1:num_folds){
-    fold_indices <- folds[[i]]
-    training_data = whole_dataset[-fold_indices, ]
-    testing_data = whole_dataset[fold_indices, ]
-    stan_data <- stan_data_Constructer(training_dataset = training_data, testing_dataset = testing_data, baseline_modelling = baseline_modelling, obs_window = 5)
-    model_fit <- Bayesian_Survival_model(stan_data = stan_data, baseline_assumption = baseline_modelling)
-    
-    #extract the info from the bayesian model fit
-    model_result <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit)
-    
-    ComparsionValues <- list(
-      Beta_reference = c(beta, rep(0, 45)),
-      test_t = testing_data$obstime,
-      test_status = testing_data$status,
-      Selection_reference = c(rep(TRUE, 10), rep(FALSE, 45))
-      )
-    model_metric <- Model_performance_eval(model_result = model_result, ComparsionValues)
-    rMSE_s[i, ] <- model_metric$rMSE
-    Brier_scores[i] <- model_metric$Brier_score
-    C_indices[i] <- model_metric$C_index
-    FDR_vals[i] <- model_metric$FDR
-  }
-  cross_val_metric$rMSE_s <- rMSE_s
-  cross_val_metric$Brier_scores <- Brier_scores
-  cross_val_metric$C_indices <- C_indices
-  cross_val_metric$FDR_vals <- FDR_vals
-  
-  return(cross_val_metric)
-}
-
-cross_val_metric <- cross_validation(whole_dataset = sim_data, baseline_modelling = "bSplines") # exponential, weibull, bSplines
-
-# Step 3: visualize the model metric results
-metric_visualization(cross_val_metric)
 ```
 
