@@ -120,22 +120,20 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
        output$time_vec <-
       sort(dataset[dataset$status == 1, ]$obstime) # obs_window = 5
     }
-    output$baseline_true <-  10 * 2 * (time_vec ** (10 - 1))
+    output$baseline_true <-  10 * 2 * (output$time_vec  ** (10 - 1))
     
     output$baseline_exponential <-
-      rep(model_result_exponential$baselinePara, length(time_vec))
+      rep(model_result_exponential$baselinePara, length(output$time_vec ))
     
     weibull_lambda <- model_result_weibull$baselinePara[1]
     weibull_shape <- model_result_weibull$baselinePara[2]
     output$baseline_weibull <-
-      weibull_shape * weibull_lambda * (time_vec ** (weibull_shape - 1))
+      weibull_shape * weibull_lambda * (output$time_vec  ** (weibull_shape - 1))
     
     output$baseline_bSplines <-
       exp(
         as.matrix(stan_data_bSplines$basis) %*% as.matrix(model_result_bSplines$baselinePara[, "mean"])
       )
-    
-    output$time_vec <- time_vec
   }
   
   
