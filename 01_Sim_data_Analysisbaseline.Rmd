@@ -9,8 +9,8 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
-source("./function_file/Functions.R")
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+
 
 install_and_load <- function(packages) {
   for (pkg in packages) {
@@ -22,7 +22,7 @@ install_and_load <- function(packages) {
 }
 
 # List of required packages
-required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret")
+required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret", "foreach", "doParallel")
 # Install and/or load packages
 install_and_load(required_packages)
 ```
@@ -36,6 +36,8 @@ n_features <- 10
 
 # function for one simulation
 simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE){
+  source("./function_file/Functions.R")
+  
   output = list()
   
   simulated_data <- DataGenerator(n_samples = n_samples, n_features = 10)
@@ -157,8 +159,7 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   return(output)
 }
 
-
-replicate_times = 2
+replicate_times = 50
 simulated_results <- replicate(replicate_times, simulation_bayint_survival(), simplify = "array")
 save.image(file = "./Data/sim_50_para_int.RData")
 ```
@@ -231,6 +232,7 @@ mean_MSEs_bSplines <- apply(MSEs_bSplines, 2, mean)
 # visualized result
 fill_vector = (simulated_results[, 1]$Beta_true != 0)
 
+par(mfrow = c(2, 2))
 plot(mean_MSEs_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.3), main = "MSE for Beta estimation", pch = 16)
 
 # Add background rectangles
