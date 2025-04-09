@@ -139,7 +139,7 @@ saveRDS(completed_df_, "./Data/imputed_NOTR_DGF.rds")
 ```
 
 ```{r, echo=TRUE}
-completed_df_ <- readRDS("./preprocessed_NOTR_DGF.rds")
+# completed_df_ <- readRDS("./preprocessed_NOTR_DGF.rds")
 # # group the InitialPrimaryDiseaseET
 InitialPrimaryDiseaseET_group = read.csv("../Data/tx_all_primary disease.csv")
 head(InitialPrimaryDiseaseET_group)
