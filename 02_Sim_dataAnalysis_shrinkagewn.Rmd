@@ -35,7 +35,7 @@ n_samples <- 300
 n_features <- 10 
 
 # function for one simulation
-simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE)
+simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE){
   
   output = list()
   
@@ -124,10 +124,10 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
     rm(training_dataset, testing_dataset)
   }
   return(output)
-}
+  }
 
 
-replicate_times = 50
+replicate_times = 2
 simulated_results <- replicate(replicate_times, simulation_bayint_survival_shrinkage(), simplify = "array")
 save.image(file = "./Data/sim_50_para_shrinkagenowith.RData")
 ```
