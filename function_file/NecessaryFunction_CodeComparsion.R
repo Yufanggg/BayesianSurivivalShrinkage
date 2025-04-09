@@ -103,18 +103,28 @@ stan_data_Constructer <- function(training_dataset, withPrediction = FALSE, test
 
 # Function to fit a Bayesian survival model with different baseline assumptions
 # @param: stan_data, a list including items for the corresponding stan model
-Bayesian_Survival_model <- function(stan_data,
-                                    baseline_assumption = "exponential",
-                                    school = "Bayesian",
-                                    niter = 10000,
+Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponential", withPrediction = TRUE, 
+                                    niter = 10000, 
                                     nwarmup = 1000,
                                     thin = 10,
                                     chains = 1) {
-  if (school == "Bayesian") {
-    message("We utilized B-splines to estimate the log baseline hazard function.")
-    # compile the model
-    bayesian_model <- stan_model("./stan_file/bSpline_est.stan")
+   if (!withPrediction) {
+     if (baseline_assumption == "bSplines") {
+      message("We utilized B-splines to estimate the log baseline hazard function.")
+      
+      # compile the model
+      bayesian_model <- stan_model("./stan_file/bSpline_est.stan")
+    }
+  } else {
+     if (baseline_assumption == "bSplines") {
+      message("We utilized B-splines to estimate the log baseline hazard function.")
+      
+      # compile the model
+        bayesian_model <- stan_model("./stan_file/bSpline_estEpre.stan")
+      
+    }
   }
+  
   
   # Model fitting
   bayesian_model_fit <- suppressWarnings(
@@ -124,7 +134,7 @@ Bayesian_Survival_model <- function(stan_data,
       iter = niter,
       warmup = nwarmup,
       thin = 10,
-      chain = 1
+      chain = 2
     )
   )
   

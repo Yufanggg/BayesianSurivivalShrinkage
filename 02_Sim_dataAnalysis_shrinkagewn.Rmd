@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 install_and_load <- function(packages) {
   for (pkg in packages) {
     if (!require(pkg, character.only = TRUE)) {
@@ -23,6 +23,8 @@ install_and_load <- function(packages) {
 required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret")
 # Install and/or load packages
 install_and_load(required_packages)
+
+source("./function_file/Functions.R")
 ```
 
 
@@ -33,8 +35,7 @@ n_samples <- 300
 n_features <- 10 
 
 # function for one simulation
-simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE){
-  source("./function_file/Functions.R")
+simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE)
   
   output = list()
   
