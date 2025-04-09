@@ -52,8 +52,8 @@ The method was validated from two following perspectivess.
 
 2. `Model performance`: The model performance focused on three levels: (1) parameter estimation estimation; (2) survival probability prediction; and (3) variable selection.
 
-## Results on the simulated data:
-With the listed code, [a simulated bayesian survival analysis](./Sim_data_Analysis.Rmd) (i.e., a bayesian survival model for time-to -event data under high-dimensional setting was conducted on a simulated dataset) was conducted to validate the research setting. The simulated data can be obtained from the file of [Simulated_Data](./Data/imputed_NOTR_DGF.rds), in which a weibull baseline hazard function were assumed. With this simulated data, the following three models have been built: (1). *the exponential model*; (2) *the weibull model*; and (3) *the bSpline models*. 
+## method on the simulated data:
+With the listed code, [a simulated bayesian survival analysis](./01_Sim_data_Analysisbaseline.Rmd) (i.e., a bayesian survival model for time-to -event data under high-dimensional setting was conducted on a simulated dataset) was conducted to validate the research setting. In the simulated, a weibull baseline hazard function were used. With this simulated data, the following three models have been built: (1). *the exponential model*; (2) *the weibull model*; and (3) *the bSpline models*. 
 
 *Detailed information about the simulation*:
 - number of simultaions: 50
@@ -78,18 +78,15 @@ In summary, $\beta$ = c(0.5, -0.4, 0.3, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0,
 
 
 *Results of the simulation*:
-- The MSE for estimated Beta:
 ![alt text](./Image/sim_50_intpara.png)
-
-- The baseline hazard:
-![alt text](./Image/baseline_sim_one.png)
-
-- The FDR for estimated Beta:
-![alt text](./Image/FDR_sim_50.png)
-
-- The $MSE_p$ for predicted survival probability:
 ?? *Is that necessary to use cross-validation in the simulation data?*
 **Using many rounds of simulations would be enough**.
+
+## bSpline log baseline hazard with vs. without Bayesian shrinkage for interactions
+With a similar simulation setting, [bSpline log baseline hazard with vs. without Bayesian shrinkage for interactions](./02_Sim_dataAnalysis_shrinkagewn.Rmd) was conducted to investigate the advantages vs. disadvantages in between them. 
+
+*Results of the simulation*:
+![alt text](./Image/sim_50_intshrinkage.png)
 
 ## Results on the real-world data:
 The propsed method was also [validated on real-world data](./Real_data_Analysis.Rmd). See the model evaluation results as following:
