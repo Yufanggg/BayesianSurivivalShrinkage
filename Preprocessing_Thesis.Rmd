@@ -129,7 +129,7 @@ methods = make.method(df_using)
 methods["Smoking"] = "pmm" #Predictive mean matching
 
 # Perform the imputation with more iterations in parallel
-imputed_df_using <- mice(df_using, method = methods, m = 5, maxit = 5, seed = 500)
+imputed_df_using <- mice(df_using, method = methods, m = 5, maxit = 5, seed = 500, ridge = 1e-4)
 
 
 # Complete the dataset with the imputed values
