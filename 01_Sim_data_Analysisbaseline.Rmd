@@ -99,9 +99,10 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   model_fit_weibull <- Bayesian_Survival_model(stan_data = stan_data_weibull, baseline_assumption = "weibull")
   model_fit_bSplines <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_assumption = "bSplines")
   
-  print(model_fit_exponential)
-  print(model_fit_weibull)
-  print(model_fit_bSplines)
+  #collect diagnostics
+  output$diagnostics_exponential <- summary(model_fit_exponential)$summary[, c("Rhat", "n_eff")]
+  output$diagnostics_weibull <- summary(model_fit_weibull)$summary[, c("Rhat", "n_eff")]
+  output$diagnostics_bSplines <- summary(model_fit_bSplines)$summary[, c("Rhat", "n_eff")]
   
 
   #extract the info from the bayesian model fit
@@ -166,9 +167,9 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   return(output)
 }
 
-replicate_times = 50
+replicate_times = 2
 simulated_results <- replicate(replicate_times, simulation_bayint_survival(), simplify = "array")
-save.image(file = "./Data/sim_50_para_int.RData")
+#save.image(file = "./Data/sim_50_para_int.RData")
 ```
 
 ```{r, echo=TRUE}
