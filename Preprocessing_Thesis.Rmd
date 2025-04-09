@@ -18,7 +18,7 @@ library(survival)
 library(mstate)
 library(ggplot2)
 library(corrplot)
-setwd("G:/MasterThesis/Code" )
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/" ) #    G:/MasterThesis/Code
 df <- readRDS("./Data/NOTR_DGF.rds")
 sort(colnames(df))
 ```
@@ -127,7 +127,7 @@ df_using <- df_using[, !(colnames(df_using) %in% c("Dateoftransplant", "status2"
 library(mice)
 methods = make.method(df_using)
 methods["Smoking"] = "pmm" #Predictive mean matching
-
+methods[setdiff(names(df_using), "Smoking")]
 # Perform the imputation with more iterations in parallel
 imputed_df_using <- mice(df_using, method = methods, m = 5, maxit = 5, seed = 500, ridge = 1e-4)
 
