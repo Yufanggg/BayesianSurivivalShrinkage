@@ -23,8 +23,17 @@ This project is updated from codes used in my Master work in Statistics & Data S
 ## Requirments
 To run this Project, you will need the following:
 - R (> 3.6)
-<!-- - lmer (install.library("lmer")) 
-- lmerTest (install.library(")) --> 
+- rstan
+- MASS
+- rstantools
+- coda
+- readr
+- survival
+- splines2
+- dplyr
+- simsurv
+- Hmisc
+- caret
 
 ## Installation
 
@@ -55,7 +64,7 @@ The method was validated from two following perspectivess.
 ## method on the simulated data:
 With the listed code, [a simulated bayesian survival analysis](./01_Sim_data_Analysisbaseline.Rmd) (i.e., a bayesian survival model for time-to -event data under high-dimensional setting was conducted on a simulated dataset) was conducted to validate the research setting. In the simulated, a weibull baseline hazard function were used. With this simulated data, the following three models have been built: (1). *the exponential model*; (2) *the weibull model*; and (3) *the bSpline models*. 
 
-*Detailed information about the simulation*:
+***Detailed information about the simulation***:
 - number of simultaions: 50
 - n = 200;
 - p = 10. All two-way interactions are considered, i.e., q = p(p-1)/2 = 45;
@@ -77,10 +86,15 @@ In summary, $\beta$ = c(0.5, -0.4, 0.3, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0,
                                                                    0.0, 0.0,     -0.2)
 
 
-*Results of the simulation*:
+***Results of the simulation***:
+
 ![alt text](./Image/sim_50_intpara.png)
-?? *Is that necessary to use cross-validation in the simulation data?*
+
+***Relevant questions in this section***:
+1. *Is that necessary to use cross-validation in the simulation data?*
 **Using many rounds of simulations would be enough**.
+
+2. *Do we need to check model convergence in each simulation?*
 
 ## bSpline log baseline hazard with vs. without Bayesian shrinkage for interactions
 With a similar simulation setting, [bSpline log baseline hazard with vs. without Bayesian shrinkage for interactions](./02_Sim_dataAnalysis_shrinkagewn.Rmd) was conducted to investigate the advantages vs. disadvantages in between them. 
