@@ -18,6 +18,7 @@ library(survival)
 library(mstate)
 library(ggplot2)
 library(corrplot)
+library(doParallel)
 setwd("G:/MasterThesis/Code" )
 df <- readRDS("./Data/NOTR_DGF.rds")
 sort(colnames(df))
@@ -123,14 +124,16 @@ df_using$InitialOnmachineindicator = if_else(is.na(df_using$InitialOnmachineindi
 df_using[] <- lapply(df_using, function(x) if(is.character(x)) as.factor(x) else x)
 
 df_using <- df_using[, !(colnames(df_using) %in% c("Dateoftransplant", "status2"))]
+
+
+
 # impute the missing Smoking data
 library(mice)
 methods = make.method(df_using)
 methods["Smoking"] = "pmm" #Predictive mean matching
 
 # Perform the imputation with more iterations in parallel
-imputed_df_using <- mice(df_using, method = methods, m = 5, maxit = 5, seed = 500, ridge = 1e-4)
-
+imputed_df_using <- mice(df_using, method = methods, m = 5, maxit = 5, seed = 500, ridge = 0.001)
 
 # Complete the dataset with the imputed values
 completed_df_ <- complete(imputed_df_using)
