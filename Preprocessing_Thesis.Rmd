@@ -56,7 +56,7 @@ variableName_using = variableName_using[!variableName_using %in% c("InitialPrima
                                                                   "InitialPrimaryDiseaserenine",
                                                                   "DonorHLAstring")]
 library(dplyr)
-variableName_using <- c(variableName_using, c("time", "status", "status2", "HLA_mismatch")) # including survival related variables
+variableName_using <- c(variableName_using, c("ID", "time", "status", "status2", "HLA_mismatch")) # including survival related variables
 df_using_ <- df_using |> select(variableName_using)
 df_using_$Lowestcreatinineµmoll <- df_using$Lowestcreatinineμmoll
 df_using <- df_using_
@@ -124,7 +124,7 @@ df_using$InitialOnmachineindicator = if_else(is.na(df_using$InitialOnmachineindi
 df_using[] <- lapply(df_using, function(x) if(is.character(x)) as.factor(x) else x)
 
 df_using <- df_using[, !(colnames(df_using) %in% c("Dateoftransplant", "status2"))]
-
+rm(ci, df, df_using_, results, sfall, variableName_df, unique_values_str, var, variableName, variableName_using)
 
 
 # impute the missing Smoking data
@@ -133,16 +133,16 @@ methods = make.method(df_using)
 methods["Smoking"] = "pmm" #Predictive mean matching
 
 # Perform the imputation with more iterations in parallel
-imputed_df_using <- mice(df_using, method = methods, m = 5, maxit = 5, seed = 500, ridge = 0.001)
+imputed_df_using <- mice(df_using, method = methods, m = 1, maxit = 5, seed = 500, ridge = 0.001)
 
 # Complete the dataset with the imputed values
 completed_df_ <- complete(imputed_df_using)
 print(completed_df_)
-saveRDS(completed_df_, "./Data/imputed_NOTR_DGF.rds")
+saveRDS(completed_df_, "./Data/imputed_NOTR_DGF_.rds")
 ```
 
 ```{r, echo=TRUE}
-# completed_df_ <- readRDS("./preprocessed_NOTR_DGF.rds")
+completed_df_ <- readRDS("./Data/imputed_NOTR_DGF_.rds")
 # # group the InitialPrimaryDiseaseET
 InitialPrimaryDiseaseET_group = read.csv("../Data/tx_all_primary disease.csv")
 head(InitialPrimaryDiseaseET_group)

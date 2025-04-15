@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 
 install_and_load <- function(packages) {
@@ -28,11 +28,38 @@ install_and_load(required_packages)
 ```
 
 
-# Step 2: Generate simulated data
+# Step 2: Organize the real-world data
 ```{r, echo=TRUE}
-set.seed(123)
-n_samples <- 300
-n_features <- 10 
+real_df <- readRDS("./Data/preprocessed_NOTR_DGF.rds")
+sum(complete.cases(real_df))
+str(real_df)
+real_df <- subset(real_df, select = -c(Typeofdonor, InitialPrimaryDiseaseET, RecipientfullmatchHLAstring))
+
+#sum-coded all factor variables
+factor_var <- sapply(real_df, is.factor)
+for (var in names(real_df)[factor_var]){
+  if (var != "status"){
+    contrasts(real_df[[var]]) <- contr.sum(levels(real_df[[var]]))
+  }
+}
+lapply(real_df[, factor_var], contrasts)
+
+
+# build up interaction effect
+predictors <- subset(real_df, select = -c(status, time))
+
+interaction_formula <- as.formula(paste("~ (", paste(colnames(predictors), collapse = " + "), ")^2 - 1"))
+interaction_matrix <- model.matrix(interaction_formula, data = real_df)
+
+interaction_df <- as.data.frame(interaction_matrix)
+interaction_df$id = real_df$ID
+interaction_df$status = real_df$status
+stan_data_bSplines <- stan_data_Constructer(
+      training_dataset = interaction_df,
+      baseline_modelling = "bSplines",
+      obs_window = 5
+    )
+
 
 # function for one simulation
 simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE){
@@ -42,7 +69,11 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   dataset <- simulated_data$dataset
   Beta <- simulated_data$Beta
   output$Beta_true = Beta
-  
+  stan_data_bSplines <- stan_data_Constructer(
+      training_dataset = dataset,
+      baseline_modelling = "bSplines",
+      obs_window = 5
+    )
   #constructor data for the model
   if (withPrediction) {
     samples <- sample(1:nrow(dataset), 100)
