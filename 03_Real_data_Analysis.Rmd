@@ -34,67 +34,87 @@ real_df <- readRDS("./Data/preprocessed_NOTR_DGF.rds")
 sum(complete.cases(real_df))
 str(real_df)
 real_df <- subset(real_df, select = -c(Typeofdonor, InitialPrimaryDiseaseET, RecipientfullmatchHLAstring))
+strafied_Data_DBD <- subset(real_df, real_df$TypecadavericDBDDCD == "Donation after brain death")
+strafied_Data_DCD <- subset(real_df, real_df$TypecadavericDBDDCD == "Donation after circulatory death")
 
+strafied_Data_DBD <- subset(strafied_Data_DBD, select = -c(Typeofdonor, InitialPrimaryDiseaseET, RecipientfullmatchHLAstring, TypecadavericDBDDCD))
 
-#sum-coded all factor variables
-factor_var <- sapply(real_df, is.factor)
-for (var in names(real_df)[factor_var]){
-  if (var != "status"){
-    contrasts(real_df[[var]]) <- contr.sum(levels(real_df[[var]]))
+strafied_Data_DCD <- subset(strafied_Data_DBD, select = -c(Typeofdonor, InitialPrimaryDiseaseET, RecipientfullmatchHLAstring, TypecadavericDBDDCD))
+
+includingInter <- function(dataframe_) {
+  #sum-coded all factor variables
+  factor_var <- sapply(dataframe_, is.factor)
+  for (var in names(dataframe_)[factor_var]) {
+    if (var != "status") {
+      contrasts(dataframe_[[var]]) <- contr.sum(levels(dataframe_[[var]]))
+    }
   }
+  # lapply(dataframe_[, factor_var], contrasts)
+  
+  
+  # build up interaction effect
+  predictors <- subset(dataframe_, select = -c(status, time))
+  
+  interaction_formula <- as.formula(paste("~ (", paste(colnames(predictors), collapse = " + "), ")^2 - 1"))
+  interaction_matrix <- model.matrix(interaction_formula, data = dataframe_)
+  
+  interaction_df <- as.data.frame(interaction_matrix)
+  interaction_df$id = 1:nrow(dataframe_)#dataframe_$ID
+  interaction_df$status = dataframe_$status
+  interaction_df$obstime = interaction_df$time
+  interaction_df = interaction_df[-1]
+  
+  return(interaction_df)
 }
-# lapply(real_df[, factor_var], contrasts)
 
-
-# build up interaction effect
-predictors <- subset(real_df, select = -c(status, time))
-
-interaction_formula <- as.formula(paste("~ (", paste(colnames(predictors), collapse = " + "), ")^2 - 1"))
-interaction_matrix <- model.matrix(interaction_formula, data = real_df)
-
-interaction_df <- as.data.frame(interaction_matrix)
-interaction_df$id = real_df$ID
-interaction_df$status = real_df$status
-stan_data_bSplines <- stan_data_Constructer(
-      training_dataset = interaction_df,
-      baseline_modelling = "bSplines",
-      obs_window = 5
-    )
-
-
-predictors <- subset(real_df, select = -c(status, time))
-
-interaction_formula <- as.formula(paste("~ (", paste(colnames(predictors), collapse = " + "), ")^2"))
-interaction_matrix <- model.matrix(interaction_formula, data = real_df)
-
-interaction_df <- as.data.frame(interaction_matrix)
-interaction_df$id = 1:nrow(interaction_df) #real_df$ID
-interaction_df$status = ifelse(real_df$status== "graftloss", 1, 0) # death  censored graftloss
-interaction_df$obstime =  real_df$time
-obs_window = 3415 #max(df_using$time_tx_date_max2)
-interaction_df = interaction_df[-1]
 ```
 
-# estimate the Betas
+# estimate the Betas for DBD
 ```{r, echo=TRUE}
+obs_window = 3415 #max(df_using$time_tx_date_max2)
 # only for estimating the Betas
-stan_data_bSplines <- stan_data_Constructer(
-      training_dataset = interaction_df,
+interaction_strafied_Data_DBD <- includingInter(strafied_Data_DBD)
+stan_data_bSplines_DBD <- stan_data_Constructer(
+      training_dataset = interaction_strafied_Data_DBD,
       baseline_modelling = "bSplines",
       obs_window = obs_window
     )
 
-model_fit_bSplines <- Bayesian_Survival_model(stan_data = stan_data_bSplines, withPrediction = FALSE, baseline_assumption = "bSplines")
+model_fit_bSplines_DBD <- Bayesian_Survival_model(stan_data = stan_data_bSplines_DBD, withPrediction = FALSE, baseline_assumption = "bSplines")
 
 #model diagnotics
-diagnostics_bSplines <- summary(model_fit_bSplines)$summary[, c("Rhat", "n_eff")]
+diagnostics_bSplines_DBD <- summary(model_fit_bSplines_DBD)$summary[, c("Rhat", "n_eff")]
 
 #extract the info from the bayesian model fit
-model_result_bSplines <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines, model_type = "bSplines", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
+model_result_bSplines_DBD <- Bayesian_Survival_result_Extract(bayesian_model_fit = diagnostics_bSplines_DBD, model_type = "bSplines", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
 
-fit = model_result_bSplines$
-mean_beta = model_result_bSplines$Beta_bayesian_est[, "mean"]
-FDR_beta = model_result_bSplines$variableSelection
+
+mean_beta_DBD = model_result_bSplines_DBD$Beta_bayesian_est[, "mean"]
+FDR_beta_DBD = model_result_bSplines_DBD$variableSelection
+```
+
+# estimate the Betas for DCD
+```{r, echo=TRUE}
+obs_window = 3415 #max(df_using$time_tx_date_max2)
+# only for estimating the Betas
+interaction_strafied_Data_DCD <- includingInter(strafied_Data_DCD)
+stan_data_bSplines_DCD <- stan_data_Constructer(
+      training_dataset = interaction_strafied_Data_DCD,
+      baseline_modelling = "bSplines",
+      obs_window = obs_window
+    )
+
+model_fit_bSplines_DCD <- Bayesian_Survival_model(stan_data = stan_data_bSplines_DCD, withPrediction = FALSE, baseline_assumption = "bSplines")
+
+#model diagnotics
+diagnostics_bSplines_DCD <- summary(model_fit_bSplines)$summary[, c("Rhat", "n_eff")]
+
+#extract the info from the bayesian model fit
+model_result_bSplines_DCD <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines_DCD, model_type = "bSplines", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
+
+
+mean_beta_DCD = model_result_bSplines_DCD$Beta_bayesian_est[, "mean"]
+FDR_beta_DCD = model_result_bSplines_DCD$variableSelection
 ```
 
 # Cross-validation for Predictions
@@ -103,101 +123,34 @@ cross_validation <- function(whole_dataset, baseline_modelling = "weibull", num_
   # create the cross-validation folds
   folds <- createFolds(whole_dataset$status, k = num_folds, list = TRUE, returnTrain = FALSE)
   cross_val_metric <- list()
-  rMSE_s = matrix(nrow = 5, ncol = 55); Brier_scores =  rep(NA, 5); C_indices =  rep(NA, 5); FDR_vals =  rep(NA, 5)
+  Brier_scores =  rep(NA, 5); C_indices =  rep(NA, 5)
   for (i in 1:num_folds){
     fold_indices <- folds[[i]]
     training_data = whole_dataset[-fold_indices, ]
     testing_data = whole_dataset[fold_indices, ]
-    stan_data <- stan_data_Constructer(training_dataset = training_data, testing_dataset = testing_data, baseline_modelling = baseline_modelling, obs_window = 5)
-    model_fit <- Bayesian_Survival_model(stan_data = stan_data, baseline_assumption = baseline_modelling)
-    
+    stan_data_bSplines_cv <- stan_data_Constructer(training_dataset = training_data, testing_dataset = testing_data, baseline_modelling = "bSplines", obs_window = obs_window)
+    model_fit <- Bayesian_Survival_model(stan_data = stan_data_bSplines_cv, withPrediction = TRUE, baseline_assumption = "bSplines")
     #extract the info from the bayesian model fit
     model_result <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit)
     
-    ComparsionValues <- list(
-      Beta_reference = c(beta, rep(0, 45)),
-      test_t = testing_data$obstime,
-      test_status = testing_data$status,
-      Selection_reference = c(rep(TRUE, 10), rep(FALSE, 45))
-      )
-    model_metric <- Model_performance_eval(model_result = model_result, ComparsionValues)
-    rMSE_s[i, ] <- model_metric$rMSE
-    Brier_scores[i] <- model_metric$Brier_score
-    C_indices[i] <- model_metric$C_index
-    FDR_vals[i] <- model_metric$FDR
-  }
-  cross_val_metric$rMSE_s <- rMSE_s
-  cross_val_metric$Brier_scores <- Brier_scores
-  cross_val_metric$C_indices <- C_indices
-  cross_val_metric$FDR_vals <- FDR_vals
-  
-  return(cross_val_metric)
-}
-
-cross_val_metric <- cross_validation(whole_dataset = sim_data, baseline_modelling = "bSplines") # exponential, weibull, bSplines
-
-# Step 3: visualize the model metric results
-metric_visualization(cross_val_metric)
-
-
-
-
-
-
-  if ("Prediction_SurvivalProb" %in% criteria) {
-    
-    output$time = testing_dataset$obstime
-    output$true_status = testing_dataset$status
-    output$sp_exponential = model_result_exponential$sp
-    output$sp_weibull = model_result_weibull$sp
-    output$sp_bSplines = model_result_bSplines$sp
-  }
-
-}
-
-```
-
-
-# Step 4: use cross validation for prediction.
-```{r, echo=TRUE}
-cross_validation <- function(whole_dataset, baseline_modelling = "weibull", num_folds = 5){
-  # create the cross-validation folds
-  folds <- createFolds(whole_dataset$status, k = num_folds, list = TRUE, returnTrain = FALSE)
-  cross_val_metric <- list()
-  rMSE_s = matrix(nrow = 5, ncol = 55); Brier_scores =  rep(NA, 5); C_indices =  rep(NA, 5); FDR_vals =  rep(NA, 5)
-  for (i in 1:num_folds){
-    fold_indices <- folds[[i]]
-    training_data = whole_dataset[-fold_indices, ]
-    testing_data = whole_dataset[fold_indices, ]
-    stan_data <- stan_data_Constructer(training_dataset = training_data, testing_dataset = testing_data, baseline_modelling = baseline_modelling, obs_window = 5)
-    model_fit <- Bayesian_Survival_model(stan_data = stan_data, baseline_assumption = baseline_modelling)
+    #model diagnotics
+    diagnostics_bSplines <- summary(model_fit_bSplines)$summary[, c("Rhat", "n_eff")]
+    disp("The covergence for", i)
+    print(diagnostics_bSplines)
     
     #extract the info from the bayesian model fit
-    model_result <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit)
+    model_result_bSplines <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines, model_type = "bSplines", criteria = "Prediction_SurvivalProb")
     
-    ComparsionValues <- list(
-      Beta_reference = c(beta, rep(0, 45)),
-      test_t = testing_data$obstime,
-      test_status = testing_data$status,
-      Selection_reference = c(rep(TRUE, 10), rep(FALSE, 45))
-      )
-    model_metric <- Model_performance_eval(model_result = model_result, ComparsionValues)
-    rMSE_s[i, ] <- model_metric$rMSE
     Brier_scores[i] <- model_metric$Brier_score
     C_indices[i] <- model_metric$C_index
-    FDR_vals[i] <- model_metric$FDR
   }
-  cross_val_metric$rMSE_s <- rMSE_s
   cross_val_metric$Brier_scores <- Brier_scores
   cross_val_metric$C_indices <- C_indices
-  cross_val_metric$FDR_vals <- FDR_vals
-  
   return(cross_val_metric)
 }
 
-cross_val_metric <- cross_validation(whole_dataset = sim_data, baseline_modelling = "bSplines") # exponential, weibull, bSplines
+cross_val_metric_DBD <- cross_validation(whole_dataset = strafied_Data_DBD, baseline_modelling = "bSplines") # exponential, weibull, bSplines
 
-# Step 3: visualize the model metric results
-metric_visualization(cross_val_metric)
+cross_val_metric_DCD <- cross_validation(whole_dataset = strafied_Data_DCD, baseline_modelling = "bSplines") # exponential, weibull, bSplines
 ```
 
