@@ -57,7 +57,7 @@ variableName_using = variableName_using[!variableName_using %in% c("InitialPrima
                                                                   "DonorHLAstring")]
 library(dplyr)
 variableName_using <- c(variableName_using, c("ID", "time", "status", "status2", "HLA_mismatch")) # including survival related variables
-df_using_ <- df_using |> select(variableName_using)
+df_using_ <- subset(df_using, select = variableName_using)
 df_using_$Lowestcreatinineµmoll <- df_using$Lowestcreatinineμmoll
 df_using <- df_using_
 head(df_using)
@@ -138,7 +138,7 @@ imputed_df_using <- mice(df_using, method = methods, m = 1, maxit = 5, seed = 50
 # Complete the dataset with the imputed values
 completed_df_ <- complete(imputed_df_using)
 print(completed_df_)
-saveRDS(completed_df_, "./Data/imputed_NOTR_DGF_.rds")
+saveRDS(completed_df_, "./Data/imputed_NOTR_DGF_f.rds")
 ```
 
 ```{r, echo=TRUE}
