@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 
 install_and_load <- function(packages) {
@@ -35,6 +35,7 @@ sum(complete.cases(real_df))
 str(real_df)
 real_df <- subset(real_df, select = -c(Typeofdonor, InitialPrimaryDiseaseET, RecipientfullmatchHLAstring))
 
+
 #sum-coded all factor variables
 factor_var <- sapply(real_df, is.factor)
 for (var in names(real_df)[factor_var]){
@@ -43,6 +44,22 @@ for (var in names(real_df)[factor_var]){
   }
 }
 # lapply(real_df[, factor_var], contrasts)
+
+
+# build up interaction effect
+predictors <- subset(real_df, select = -c(status, time))
+
+interaction_formula <- as.formula(paste("~ (", paste(colnames(predictors), collapse = " + "), ")^2 - 1"))
+interaction_matrix <- model.matrix(interaction_formula, data = real_df)
+
+interaction_df <- as.data.frame(interaction_matrix)
+interaction_df$id = real_df$ID
+interaction_df$status = real_df$status
+stan_data_bSplines <- stan_data_Constructer(
+      training_dataset = interaction_df,
+      baseline_modelling = "bSplines",
+      obs_window = 5
+    )
 
 
 predictors <- subset(real_df, select = -c(status, time))
