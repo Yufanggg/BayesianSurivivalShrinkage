@@ -7,7 +7,7 @@ output: pdf_document
 ```{r, echo=TRUE}
 rm(list = ls())
 library(dplyr)
-df_using <- readRDS("./preprocessed_NOTR_DGF.rds")
+df_using <- readRDS("./Data/preprocessed_NOTR_DGF.rds")
 ```
 
 ###  summarize of data 2: to get the variable description

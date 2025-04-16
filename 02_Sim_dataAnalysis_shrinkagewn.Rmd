@@ -127,13 +127,13 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   }
 
 
-replicate_times = 2
+replicate_times = 50
 simulated_results <- replicate(replicate_times, simulation_bayint_survival_shrinkage(), simplify = "array")
 save.image(file = "./Data/sim_50_para_shrinkagenowith.RData")
 ```
 
 ```{r, echo=TRUE}
-# load(file = "./Data/sim_50_para_shrinkagenowith.RData")
+load(file = "./Data/sim_50_para_shrinkagenowith.RData")
 
 MSEs_bSplines_withShrinkage = matrix(nrow = replicate_times, ncol = 55)
 FDR_bSplines_withShrinkage = rep(NA, replicate_times)
