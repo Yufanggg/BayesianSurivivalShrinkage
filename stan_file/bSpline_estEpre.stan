@@ -35,6 +35,20 @@ functions{
   real quadrature_log_surv(vector qwts, vector log_hazard) {
     return - dot_product(qwts, exp(log_hazard)); // sum across all individuals
   }
+  
+    /** for predicting the eta **/
+  vector predictor_rng(matrix x_new, vector Beta, matrix x_int_new, vector Beta_int){
+    vector [rows(x_new)] eta;
+    vector [rows(x_new)] mu;
+    mu = x_new * Beta + x_int_new * Beta_int;
+    
+    for (n in 1:rows(x_new)){
+      eta[n] = normal_rng(mu[n], 1);
+    }
+    return eta;
+  }
+  
+  
   }
 
 
@@ -104,8 +118,8 @@ data {
   vector[nnew] t_new;
   matrix[qevent_new, p] x_new_qpts_event;
   matrix[qevent_new, q] x_new_int_qpts_event;
-  matrix[qevent_new,nvars] basis_new_qpts_event;
-  vector[qevent_new] eta_qpts_event_new;
+  matrix[qevent_new,nvars] basis_qpts_event_new;
+  vector[qevent_new] qwts_event_new;
 
 }
 
@@ -175,15 +189,14 @@ model {
 
 generated quantities{
   // Predicting the survival time on the new/test dataset
-      vector[nnew] survival_prob;  // 
+  vector[nnew] survival_prob;
+  vector[qevent_new] eta_epts_event_new = predictor_rng(x_new_qpts_event, Beta, x_new_int_qpts_event, Beta_int); #linear predictor
+  vector[qevent_new] lhaz_epts_event_new = bspline_log_haz(eta_epts_event_new, basis_qpts_event_new, coefs); #log hazard
+  vector[qevent_new] log_surv_ = - (qwts_event_new .* exp(lhaz_epts_event_new)); # log survival for all points + individuals, not summed yet
       
-      vector[qevent_new] eta_epts_event_new = x_new_qpts_event * Beta + x_new_int_qpts_event * Beta_int;
-      vector[qevent_new] lhaz_epts_event_new = bspline_log_haz(eta_qpts_event_new, basis_new_qpts_event, coefs);
-      vector[qevent_new] quadrature_log_surv_qwtsindiv = - (eta_qpts_event_new .* exp(lhaz_epts_event_new));
-      matrix[qnodes, nnew] quadrature_log_surv_indiv = to_matrix(quadrature_log_surv_qwtsindiv, qnodes, nnew);
+  matrix[qnodes, nnew] log_surv_indiv = to_matrix(log_surv_, qnodes, nnew);
       
-      for (n in 1:nnew){
-        survival_prob[n] = exp(sum(quadrature_log_surv_indiv[,n]));
-      }
+  for (n in 1:nnew){
+    survival_prob[n] = exp(sum(log_surv_indiv[,n]));
+    }
   }
-

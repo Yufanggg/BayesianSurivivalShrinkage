@@ -216,8 +216,8 @@ stan_bSpline_data_Constructer <- function (training_dataset, testing_dataset, ob
     t_new = testing_dataset$obstime,
     x_new_qpts_event = x_new_qpts_event,
     x_new_int_qpts_event = x_new_int_qpts_event,
-    basis_new_qpts_event = basis_new_qpts_event,
-    eta_qpts_event_new = qwts_new_event
+    basis_qpts_event_new = basis_new_qpts_event,
+    qwts_event_new = qwts_new_event
   )
   
   return(stan_data)

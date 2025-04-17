@@ -64,7 +64,7 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
       training_dataset = training_dataset,
       withPrediction = withPrediction,
       testing_dataset = testing_dataset,
-      baseline_modelling = "weibull",
+      baseline_modelling = "weibull", 
       obs_window = 5
     )
     stan_data_bSplines <- stan_data_Constructer(
@@ -95,8 +95,8 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   }
     
   #fit model
-  model_fit_exponential <-  Bayesian_Survival_model(stan_data = stan_data_exponential, baseline_assumption = "exponential")
-  model_fit_weibull <- Bayesian_Survival_model(stan_data = stan_data_weibull, baseline_assumption = "weibull")
+  model_fit_exponential <-  Bayesian_Survival_model(stan_data = stan_data_exponential, withPrediction = TRUE, baseline_assumption = "exponential")
+  model_fit_weibull <- Bayesian_Survival_model(stan_data = stan_data_weibull, withPrediction = TRUE, baseline_assumption = "weibull")
   model_fit_bSplines <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_assumption = "bSplines")
   
   #collect diagnostics
@@ -167,9 +167,9 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   return(output)
 }
 
-replicate_times = 50
+replicate_times = 1
 simulated_results <- replicate(replicate_times, simulation_bayint_survival(), simplify = "array")
-save.image(file = "./Data/sim_50_para_int.RData")
+save.image(file = "./Data/sim_50_para_int_test.RData")
 ```
 
 ```{r, echo=TRUE}
@@ -229,7 +229,7 @@ for (i in 1:replicate_times){
   time <- simulated_results[,i]$time
   CI_index_exponential[i] <- rcorr.cens(sp_pre_exponential, Surv(time, true_status))[["C Index"]] # rcorr.cens
   CI_index_weibull[i] <- rcorr.cens(sp_pre_weibull, Surv(time, true_status))[["C Index"]] 
-  CI_index_bSplines[i] <- rcorr.cens(sp_pre_bSplines, Surv(time, true_status))[["C Index"]] 
+  CI_index_bSplines[i] <- rcorr.cens(sp_pre_bSplines, Surv(time, true_status))[["C Index"]]
   
 }
 
