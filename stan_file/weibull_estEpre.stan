@@ -17,7 +17,7 @@ functions{
   * @return A vector
   */
   vector weibull_log_haz(vector eta, vector t, real shape, real lambda) {
-    return log(shape) + (shape - 1) * log(t) + eta + log(lambda);
+    return log(lambda) + log(shape) + (shape - 1) * log(t) + eta;
   }
 
   
@@ -46,25 +46,10 @@ functions{
   */
   vector weibull_log_surv(vector eta, vector t, real shape, real lambda) {
     vector[rows(eta)] res;
-    res = - pow_vec(t, shape) .* exp(eta) * lambda;
+    res = - (lambda * pow_vec(t, shape) .* exp(eta));
     return res;
   }
-  
-    /**
-    for predicting the eta
-  */
-  
-  vector predictor_rng(matrix x_new, vector Beta, matrix x_int_new, vector Beta_int){
-    vector [rows(x_new)] eta;
-    vector [rows(x_new)] mu;
-    mu = x_new * Beta + x_int_new * Beta_int;
-    
-    for (n in 1:rows(x_new)){
-      eta[n] = normal_rng(mu[n], 1);
-    }
-    return eta;
-  }
-  }
+}
 
 
 data {
@@ -106,8 +91,7 @@ parameters {
   real<lower=0>  gam2[p];
   real<lower=0>  shape;
   real<lower=0>  lambda;
-  
-       }
+  }
 
 model {
        // pre-allocated variables
@@ -148,10 +132,13 @@ model {
 }
 
 generated quantities{
-  // For prediction
-  vector[nnew] survival_prob;
-  vector[nnew] eta_new = predictor_rng(x_new, Beta, x_int_new, Beta_int);
-  survival_prob = exp(weibull_log_surv(eta_new, t_new, shape, lambda));
+      // Predicting the survival time on the new/test dataset
+      vector[nnew] survival_prob;  // 
+      vector[nnew] eta_new;
+      
+      for (n in 1:nnew)
+        eta_new[n] =  normal_rng(x_new[n] * Beta + x_int_new[n] * Beta_int, 1);
+        
+      survival_prob = exp(weibull_log_surv(eta_new, t_new, shape, lambda));
 }
-
 

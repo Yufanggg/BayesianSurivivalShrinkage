@@ -100,7 +100,7 @@ data {
   vector[nnew] t_new;
   matrix[qevent_new, p] x_new_qpts_event;
   matrix[qevent_new, q] x_new_int_qpts_event;
-  matrix[qevent_new,nvars] basis_new_qpts_event;
+  matrix[qevent_new,nvars] basis_qpts_event_new;
   vector[qevent_new] eta_qpts_event_new;
 
 }
@@ -174,7 +174,7 @@ generated quantities{
       vector[nnew] survival_prob;  // 
       
       vector[qevent_new] eta_epts_event_new = x_new_qpts_event * Beta + x_new_int_qpts_event * Beta_int;
-      vector[qevent_new] lhaz_epts_event_new = bspline_log_haz(eta_qpts_event_new, basis_new_qpts_event, coefs);
+      vector[qevent_new] lhaz_epts_event_new = bspline_log_haz(eta_qpts_event_new, basis_qpts_event_new, coefs);
       vector[qevent_new] quadrature_log_surv_qwtsindiv = - (eta_qpts_event_new .* exp(lhaz_epts_event_new));
       matrix[qnodes, nnew] quadrature_log_surv_indiv = to_matrix(quadrature_log_surv_qwtsindiv, qnodes, nnew);
       

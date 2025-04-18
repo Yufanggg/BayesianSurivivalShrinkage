@@ -18,7 +18,7 @@ functions{
   * @return A vector
   */
   vector exponential_log_haz(vector eta, real lambda) {
-    return eta + log(lambda);
+    return log(lambda) + eta;
   }
   
   /**
@@ -30,20 +30,8 @@ functions{
   */
   vector exponential_log_surv(vector eta, vector t, real lambda) {
     vector[rows(eta)] res;
-    res = (- t .* exp(eta)) * lambda;
+    res = - ((lambda * t) .* exp(eta));
     return res;
-  }
-  
-  /** for predicting the eta **/
-  vector predictor_rng(matrix x_new, vector Beta, matrix x_int_new, vector Beta_int){
-    vector [rows(x_new)] eta;
-    vector [rows(x_new)] mu;
-    mu = x_new * Beta + x_int_new * Beta_int;
-    
-    for (n in 1:rows(x_new)){
-      eta[n] = normal_rng(mu[n], 1);
-    }
-    return eta;
   }
   
   
@@ -89,6 +77,7 @@ parameters {
   real<lower=0>  gam2[p];
   real<lower=0>  lambda;
   
+  
   }
 
 model {
@@ -125,14 +114,16 @@ model {
       eta_rcens = x_rcens * Beta + x_int_rcens * Beta_int;
       target +=  exponential_log_surv(eta_rcens, t_rcens, lambda); // right censored data log(S(t))
       }
-      
 }
 
 generated quantities{
-  // For prediction
-  vector[nnew] survival_prob;
-  vector[nnew] eta_new = predictor_rng(x_new, Beta, x_int_new, Beta_int);
-  survival_prob = exp(exponential_log_surv(eta_new, t_new, lambda));
-  
+      // Predicting the survival time on the new/test dataset
+      vector[nnew] survival_prob;  // 
+      vector[nnew] eta_new;
+      
+      for (n in 1:nnew)
+        eta_new[n] =  normal_rng(x_new[n] * Beta + x_int_new[n] * Beta_int, 1);
+      
+      survival_prob = exp(exponential_log_surv(eta_new, t_new, lambda));
 }
 
