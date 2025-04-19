@@ -126,7 +126,7 @@ DataGenerator <- function(n_samples = 210, n_features = 10) {
     }
   }
 
-  print(names(design_matrix))
+  # print(names(design_matrix))
   
   # generate the cofficents of design matrix
   # Main effects
@@ -169,7 +169,7 @@ DataGenerator <- function(n_samples = 210, n_features = 10) {
   
   survival_data <- survival_data |>
     mutate(
-      censtime = runif(n_samples, 0.5, 2),
+      censtime = runif(n_samples, 0.5, 5),
       status = as.numeric(eventtime <= censtime),
       obstime = pmin(eventtime, censtime)
     ) 
@@ -304,7 +304,9 @@ Bayesian_Survival_result_Extract <- function(bayesian_model_fit, model_type,
   }
   
   if ("Prediction_SurvivalProb" %in% criteria) {
-    sp <- Output[grep("^survival_prob", rownames(Output)), "mean", drop = FALSE]
+    eta_pred <- Output[grep("^eta_new", rownames(Output)), "mean", drop = FALSE]
+    model_result$eta_pred <- eta_pred
+    sp <- Output[grep("^survival_prob", rownames(Output)), "50%", drop = FALSE]
     model_result$sp <- sp
   }
   

@@ -133,12 +133,10 @@ model {
 
 generated quantities{
       // Predicting the survival time on the new/test dataset
-      vector[nnew] survival_prob;  // 
+      vector[nnew] survival_prob_pred;  // 
       vector[nnew] eta_new;
-      
-      for (n in 1:nnew)
-        eta_new[n] =  normal_rng(x_new[n] * Beta + x_int_new[n] * Beta_int, 1);
+      eta_new = x_new * Beta + x_int_new * Beta_int;
         
-      survival_prob = exp(weibull_log_surv(eta_new, t_new, shape, lambda));
+      survival_prob_pred = exp(weibull_log_surv(eta_new, t_new, shape, lambda));
 }
 
