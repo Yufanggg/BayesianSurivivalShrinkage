@@ -176,24 +176,24 @@ model {
 generated quantities{
   // Predicting the survival time on the new/test dataset
       vector[nnew] survival_prob_pred;  // 
-      vector[qevent_new] eta_new_epts_event;
-      vector[qevent_new] lhaz_epts_event_new;
-      vector[qevent_new] quadrature_log_surv_qwtsindiv;
-      matrix[nnew, qnodes] quadrature_log_surv_indiv;
+      // vector[qevent_new] eta_new_epts_event;
+      // vector[qevent_new] lhaz_epts_event_new;
+      // vector[qevent_new] quadrature_log_surv_qwtsindiv;
+      // matrix[nnew, qnodes] quadrature_log_surv_indiv;
       
       
-      eta_new_epts_event = x_new_qpts_event * Beta + x_new_int_qpts_event * Beta_int;
-      print(eta_new_epts_event);
-      lhaz_epts_event_new = bspline_log_haz(eta_new_epts_event, basis_qpts_event_new, coefs);
+      vector[qevent_new] eta_new_epts_event = x_new_qpts_event * Beta + x_new_int_qpts_event * Beta_int;
+      // print(eta_new_epts_event);
+      vector[qevent_new] lhaz_epts_event_new = bspline_log_haz(eta_new_epts_event, basis_qpts_event_new, coefs);
       
-      quadrature_log_surv_qwtsindiv = (qwts_event_new .* exp(lhaz_epts_event_new));
-      print(quadrature_log_surv_qwtsindiv);
-      quadrature_log_surv_indiv = to_matrix(quadrature_log_surv_qwtsindiv, nnew, qnodes);
-      print(quadrature_log_surv_indiv);
+      vector[qevent_new] quadrature_log_surv_qwtsindiv = (qwts_event_new .* exp(lhaz_epts_event_new));
+      // print(quadrature_log_surv_qwtsindiv);
+      matrix[nnew, qnodes] quadrature_log_surv_indiv = to_matrix(quadrature_log_surv_qwtsindiv, nnew, qnodes);
+      // print(quadrature_log_surv_indiv);
       
       for (n in 1:nnew){
         survival_prob_pred[n] = exp(- sum(quadrature_log_surv_indiv[n,]));
       }
-      print(survival_prob_pred);
+      // print(survival_prob_pred);
   }
 

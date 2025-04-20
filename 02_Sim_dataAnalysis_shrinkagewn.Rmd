@@ -127,9 +127,9 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   }
 
 
-replicate_times = 1
+replicate_times = 5
 simulated_results <- replicate(replicate_times, simulation_bayint_survival_shrinkage(), simplify = "array")
-save.image(file = "./Data/sim_para_shrinkagenowith_test.RData")
+save.image(file = "./Data/sim_para_5_shrinkagenowith_test.RData")
 ```
 
 ```{r, echo=TRUE}
