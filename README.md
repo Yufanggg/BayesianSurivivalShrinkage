@@ -88,7 +88,7 @@ In summary, $\beta$ = c(0.5, -0.4, 0.3, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0,
 
 ***Results of the simulation***:
 
-![alt text](./Image/sim_50_intpara.png)
+![alt text](./Image/sim_50_intpara.png) (6*8 inch)
 
 ***Relevant questions in this section***:
 1. *Is that necessary to use cross-validation in the simulation data?*

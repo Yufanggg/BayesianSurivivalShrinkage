@@ -96,7 +96,7 @@ Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponentia
         iter = niter,
         warmup = nwarmup,
         thin = 10,
-        chain = 1
+        chain = 2
       )
     )
     

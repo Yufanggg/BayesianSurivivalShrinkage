@@ -19,12 +19,11 @@ library(mstate)
 library(ggplot2)
 library(corrplot)
 library(doParallel)
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/" )
-df <- readRDS("./Data/NOTR_DGF.rds")
-sort(colnames(df))
+setwd("G:/MasterThesis/Code/" ) #G:/MasterThesis/Code/   C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/
 ```
 
 ```{r, echo=FALSE}
+df <- readRDS("./Data/NOTR_DGF.rds")
 ## INCLUSION & EXCLUSION CRITERIA
 df_using <- subset(df,Typeofdonor=='Deceased' 
                       & Recipientage >17
@@ -142,7 +141,7 @@ saveRDS(completed_df_, "./Data/imputed_NOTR_DGF_f.rds")
 ```
 
 ```{r, echo=TRUE}
-completed_df_ <- readRDS("./Data/imputed_NOTR_DGF_.rds")
+completed_df_ <- readRDS("./Data/imputed_NOTR_DGF_f.rds")
 # # group the InitialPrimaryDiseaseET
 InitialPrimaryDiseaseET_group = read.csv("../Data/tx_all_primary disease.csv")
 head(InitialPrimaryDiseaseET_group)

@@ -33,13 +33,11 @@ install_and_load(required_packages)
 real_df <- readRDS("./Data/preprocessed_NOTR_DGF.rds")
 sum(complete.cases(real_df))
 str(real_df)
+
 real_df <- subset(real_df, select = -c(Typeofdonor, InitialPrimaryDiseaseET, RecipientfullmatchHLAstring))
 strafied_Data_DBD <- subset(real_df, real_df$TypecadavericDBDDCD == "Donation after brain death")
 strafied_Data_DCD <- subset(real_df, real_df$TypecadavericDBDDCD == "Donation after circulatory death")
 
-strafied_Data_DBD <- subset(strafied_Data_DBD, select = -c(Typeofdonor, InitialPrimaryDiseaseET, RecipientfullmatchHLAstring, TypecadavericDBDDCD))
-
-strafied_Data_DCD <- subset(strafied_Data_DBD, select = -c(Typeofdonor, InitialPrimaryDiseaseET, RecipientfullmatchHLAstring, TypecadavericDBDDCD))
 
 includingInter <- function(dataframe_) {
   #sum-coded all factor variables
@@ -49,33 +47,40 @@ includingInter <- function(dataframe_) {
       contrasts(dataframe_[[var]]) <- contr.sum(levels(dataframe_[[var]]))
     }
   }
+  numeric_var <- sapply(dataframe_, is.numeric)
+  for (var in names(dataframe_)[numeric_var]){
+    if (var != "time"){
+      dataframe_[[var]] <- (dataframe_[[var]] - mean(dataframe_[[var]], na.rm = TRUE)) / sd(dataframe_[[var]], na.rm = TRUE)
+    }
+    
+  }
+  
   # lapply(dataframe_[, factor_var], contrasts)
   
   
   # build up interaction effect
   predictors <- subset(dataframe_, select = -c(status, time))
   
-  interaction_formula <- as.formula(paste("~ (", paste(colnames(predictors), collapse = " + "), ")^2 - 1"))
+  interaction_formula <- as.formula(paste("~ (", paste(colnames(predictors), collapse = " + "), ")^2"))
   interaction_matrix <- model.matrix(interaction_formula, data = dataframe_)
   
   interaction_df <- as.data.frame(interaction_matrix)
+  interaction_df <- interaction_df[, -1]
   interaction_df$id = 1:nrow(dataframe_)#dataframe_$ID
-  interaction_df$status = dataframe_$status
-  interaction_df$obstime = interaction_df$time
-  interaction_df = interaction_df[-1]
+  interaction_df$status = ifelse(dataframe_$status == "graftloss", 1, 0)
+  interaction_df$obstime = dataframe_$time
   
   return(interaction_df)
 }
-
 ```
 
 # estimate the Betas for DBD
 ```{r, echo=TRUE}
 obs_window = 3415 #max(df_using$time_tx_date_max2)
 # only for estimating the Betas
-interaction_strafied_Data_DBD <- includingInter(strafied_Data_DBD)
+strafied_Data_DBD_int <- includingInter(strafied_Data_DBD)
 stan_data_bSplines_DBD <- stan_data_Constructer(
-      training_dataset = interaction_strafied_Data_DBD,
+      training_dataset = strafied_Data_DBD_int,
       baseline_modelling = "bSplines",
       obs_window = obs_window
     )
@@ -86,7 +91,7 @@ model_fit_bSplines_DBD <- Bayesian_Survival_model(stan_data = stan_data_bSplines
 diagnostics_bSplines_DBD <- summary(model_fit_bSplines_DBD)$summary[, c("Rhat", "n_eff")]
 
 #extract the info from the bayesian model fit
-model_result_bSplines_DBD <- Bayesian_Survival_result_Extract(bayesian_model_fit = diagnostics_bSplines_DBD, model_type = "bSplines", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
+model_result_bSplines_DBD <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines_DBD, model_type = "bSplines", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
 
 
 mean_beta_DBD = model_result_bSplines_DBD$Beta_bayesian_est[, "mean"]
@@ -97,9 +102,9 @@ FDR_beta_DBD = model_result_bSplines_DBD$variableSelection
 ```{r, echo=TRUE}
 obs_window = 3415 #max(df_using$time_tx_date_max2)
 # only for estimating the Betas
-interaction_strafied_Data_DCD <- includingInter(strafied_Data_DCD)
+strafied_Data_DCD_int <- includingInter(strafied_Data_DCD)
 stan_data_bSplines_DCD <- stan_data_Constructer(
-      training_dataset = interaction_strafied_Data_DCD,
+      training_dataset = strafied_Data_DCD_int,
       baseline_modelling = "bSplines",
       obs_window = obs_window
     )
@@ -107,14 +112,14 @@ stan_data_bSplines_DCD <- stan_data_Constructer(
 model_fit_bSplines_DCD <- Bayesian_Survival_model(stan_data = stan_data_bSplines_DCD, withPrediction = FALSE, baseline_assumption = "bSplines")
 
 #model diagnotics
-diagnostics_bSplines_DCD <- summary(model_fit_bSplines)$summary[, c("Rhat", "n_eff")]
+diagnostics_bSplines_DCD <- summary(model_fit_bSplines_DCD)$summary[, c("Rhat", "n_eff")]
 
 #extract the info from the bayesian model fit
 model_result_bSplines_DCD <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines_DCD, model_type = "bSplines", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
 
 
-mean_beta_DCD = model_result_bSplines_DCD$Beta_bayesian_est[, "mean"]
-FDR_beta_DCD = model_result_bSplines_DCD$variableSelection
+mean_beta_DBD = model_result_bSplines_DCD$Beta_bayesian_est[, "mean"]
+FDR_beta_DBD = model_result_bSplines_DCD$variableSelection
 ```
 
 # Cross-validation for Predictions

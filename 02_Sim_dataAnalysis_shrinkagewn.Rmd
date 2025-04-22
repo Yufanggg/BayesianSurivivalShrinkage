@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 install_and_load <- function(packages) {
   for (pkg in packages) {
     if (!require(pkg, character.only = TRUE)) {
@@ -127,13 +127,13 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   }
 
 
-replicate_times = 5
+replicate_times = 50
 simulated_results <- replicate(replicate_times, simulation_bayint_survival_shrinkage(), simplify = "array")
-save.image(file = "./Data/sim_para_5_shrinkagenowith_test.RData")
+save.image(file = "./Data/sim_para_shrinkagenowith.RData")
 ```
 
 ```{r, echo=TRUE}
-#load(file = "./Data/sim_50_para_shrinkagenowith_test.RData")
+#load(file = "./Data/sim_50_para_shrinkagenowith.RData")
 
 MSEs_bSplines_withShrinkage = matrix(nrow = replicate_times, ncol = 55)
 FDR_bSplines_withShrinkage = rep(NA, replicate_times)
@@ -175,8 +175,8 @@ for (i in 1:replicate_times){
   
   
   time <- simulated_results[,i]$time
-  CI_index_bSplines_withShrinkage[i] <- rcorr.cens(sp_pre_bSplines_withShrinkage, Surv(time, true_status))[["C Index"]] # rcorr.cens
-  CI_index_bSplines_noShrinkag[i] <- rcorr.cens(sp_pre_bSplines_noShrinkage, Surv(time, true_status))[["C Index"]] 
+  CI_index_bSplines_withShrinkage[i] <- rcorr.cens(1-sp_pre_bSplines_withShrinkage, Surv(time, true_status))[["C Index"]] # rcorr.cens
+  CI_index_bSplines_noShrinkag[i] <- rcorr.cens(1-sp_pre_bSplines_noShrinkage, Surv(time, true_status))[["C Index"]] 
   
 }
 
