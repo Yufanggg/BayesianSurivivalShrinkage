@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 install_and_load <- function(packages) {
   for (pkg in packages) {
     if (!require(pkg, character.only = TRUE)) {
@@ -119,6 +119,10 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   if ("Prediction_SurvivalProb" %in% criteria) {
     output$time = testing_dataset$obstime
     output$true_status = testing_dataset$status
+    
+    output$eta_pred_bSplines_withShrinkage = model_result_bSplines_withShrinkage$eta_pred
+    output$eta_pred_bSplines_noShrinkage = model_result_bSplines_noShrinkage$eta_pred
+    
     output$sp_bSplines_withShrinkage = model_result_bSplines_withShrinkage$sp
     output$sp_bSplines_noShrinkage = model_result_bSplines_noShrinkage$sp
     rm(training_dataset, testing_dataset)
@@ -133,7 +137,7 @@ save.image(file = "./Data/sim_para_shrinkagenowith.RData")
 ```
 
 ```{r, echo=TRUE}
-#load(file = "./Data/sim_50_para_shrinkagenowith.RData")
+load(file = "./Data/sim_50_para_shrinkagenowith.RData")
 
 MSEs_bSplines_withShrinkage = matrix(nrow = replicate_times, ncol = 55)
 FDR_bSplines_withShrinkage = rep(NA, replicate_times)
@@ -167,6 +171,10 @@ for (i in 1:replicate_times){
   
   #Brier_score
   true_status <- simulated_results[,i]$true_status
+  eta_pre_bSplines_withShrinkage <- simulated_results[,i]$eta_pred_bSplines_withShrinkage
+  eta_pre_bSplines_noShrinkage <- simulated_results[,i]$eta_pred_bSplines_noShrinkage
+  
+  
   sp_pre_bSplines_withShrinkage <- simulated_results[,i]$sp_bSplines_withShrinkage
   Brier_score_bSplines_withShrinkage[i] <- mean((true_status - sp_pre_bSplines_withShrinkage)**2)
   
@@ -175,8 +183,8 @@ for (i in 1:replicate_times){
   
   
   time <- simulated_results[,i]$time
-  CI_index_bSplines_withShrinkage[i] <- rcorr.cens(1-sp_pre_bSplines_withShrinkage, Surv(time, true_status))[["C Index"]] # rcorr.cens
-  CI_index_bSplines_noShrinkag[i] <- rcorr.cens(1-sp_pre_bSplines_noShrinkage, Surv(time, true_status))[["C Index"]] 
+  CI_index_bSplines_withShrinkage[i] <- rcorr.cens(eta_pre_bSplines_withShrinkage, Surv(time, true_status))[["concordant"]] # rcorr.cens
+  CI_index_bSplines_noShrinkag[i] <- rcorr.cens(eta_pre_bSplines_withShrinkage, Surv(time, true_status))[["concordant"]] 
   
 }
 

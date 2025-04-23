@@ -106,6 +106,8 @@ data {
   matrix[qevent_new, q] x_new_int_qpts_event;
   matrix[qevent_new,nvars] basis_qpts_event_new;
   vector[qevent_new] qwts_event_new;
+  matrix[nnew,p] x_new; // for rows with events
+  matrix[nnew,q] x_int_new;
 
 }
 
@@ -176,12 +178,12 @@ model {
 generated quantities{
   // Predicting the survival time on the new/test dataset
       vector[nnew] survival_prob_pred;  // 
-      // vector[qevent_new] eta_new_epts_event;
+      vector[nnew] eta_new;
       // vector[qevent_new] lhaz_epts_event_new;
       // vector[qevent_new] quadrature_log_surv_qwtsindiv;
       // matrix[nnew, qnodes] quadrature_log_surv_indiv;
       
-      
+      eta_new =  x_new * Beta + x_new_int * Beta_int;
       vector[qevent_new] eta_new_epts_event = x_new_qpts_event * Beta + x_new_int_qpts_event * Beta_int;
       // print(eta_new_epts_event);
       vector[qevent_new] lhaz_epts_event_new = bspline_log_haz(eta_new_epts_event, basis_qpts_event_new, coefs);

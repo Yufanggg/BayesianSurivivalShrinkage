@@ -76,7 +76,9 @@ includingInter <- function(dataframe_) {
 
 
 ```{r, echo = TRUE}
-cor_matrix <- cor(strafied_Data_DBD[, sapply(strafied_Data_DBD, is.numeric)])
+# only for estimating the Betas
+strafied_Data_DBD_int <- includingInter(strafied_Data_DBD)
+cor_matrix <- cor(strafied_Data_DBD_int[, sapply(strafied_Data_DBD_int, is.numeric)])
 library(corrplot)
 # Plot the correlation matrix
 corrplot(cor_matrix, method = "color", type = "upper", 
@@ -87,8 +89,6 @@ corrplot(cor_matrix, method = "color", type = "upper",
 # estimate the Betas for DBD
 ```{r, echo=TRUE}
 obs_window = 3415 #max(df_using$time_tx_date_max2)
-# only for estimating the Betas
-strafied_Data_DBD_int <- includingInter(strafied_Data_DBD)
 stan_data_bSplines_DBD <- stan_data_Constructer(
       training_dataset = strafied_Data_DBD_int,
       baseline_modelling = "bSplines",

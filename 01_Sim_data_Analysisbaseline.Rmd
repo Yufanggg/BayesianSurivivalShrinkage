@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 
 
 install_and_load <- function(packages) {
@@ -160,6 +160,11 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
     
     output$time = testing_dataset$obstime
     output$true_status = testing_dataset$status
+    
+    output$eta_pred_exponential = model_result_exponential$eta_pred
+    output$eta_pred_weibulll = model_result_weibull$eta_pred
+    output$eta_pred_bSplines = model_result_bSplines$eta_pred
+    
     output$sp_exponential = model_result_exponential$sp
     output$sp_weibull = model_result_weibull$sp
     output$sp_bSplines = model_result_bSplines$sp
@@ -167,13 +172,13 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   return(output)
 }
 
-replicate_times = 50
+replicate_times = 1
 simulated_results <- replicate(replicate_times, simulation_bayint_survival(), simplify = "array")
-save.image(file = "./Data/sim_50_para_int.RData")
+#save.image(file = "./Data/sim_50_para_int.RData")
 ```
 
 ```{r, echo=TRUE}
-load(file = "./Data/sim_50_para_int.RData")
+#load(file = "./Data/sim_50_para_int.RData")
 MSEs_exponential = matrix(nrow = replicate_times, ncol = 55)
 MSEs_weibull = matrix(nrow = replicate_times, ncol = 55)
 MSEs_bSplines = matrix(nrow = replicate_times, ncol = 55)
@@ -217,6 +222,10 @@ for (i in 1:replicate_times){
   
   #Brier_score
   true_status <- simulated_results[,i]$true_status
+  eta_pre_exponential <- simulated_results[, i]$eta_pred_exponential
+  eta_pre_weibull <- simulated_results[, i]$eta_pred_weibulll
+  eta_pre_bSplines <- simulated_results[, i]$eta_pred_bSplines
+  
   sp_pre_exponential <- simulated_results[,i]$sp_exponential
   sp_pre_weibull <- simulated_results[,i]$sp_weibull
   sp_pre_bSplines <- simulated_results[,i]$sp_bSplines
@@ -227,9 +236,9 @@ for (i in 1:replicate_times){
   
   # CI 
   time <- simulated_results[,i]$time
-  CI_index_exponential[i] <- Cindex(Surv(time, true_status), 1- sp_pre_exponential, time) # rcorr.cens
-  CI_index_weibull[i] <- Cindex(Surv(time, true_status), 1-sp_pre_weibull, time)
-  CI_index_bSplines[i] <- Cindex(Surv(time, true_status), 1-sp_pre_bSplines, time)
+  CI_index_exponential[i] <- rcorr.cens(eta_pre_exponential, Surv(time, true_status))["concordant"] # rcorr.cens
+  CI_index_weibull[i] <- rcorr.cens(eta_pre_weibull, Surv(time, true_status))["concordant"]
+  CI_index_bSplines[i] <- rcorr.cens(eta_pre_bSplines, Surv(time, true_status))["concordant"]
 }
 
 mean_MSEs_exponential <- apply(MSEs_exponential, 2, mean)
