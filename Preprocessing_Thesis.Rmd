@@ -253,7 +253,6 @@ other_conditions <- c("Medical complication: Diagnostic treatment",
                       "Not Otherwise Specified",
                       "Status Epilepticus", #***
                       "Suicide: Drugs", #***
-                      "N/A",
                       "rej Epilepticus",
                       "Suicide: Not Otherwise Specified",
                       "Meningitis: Bacterial",
@@ -300,13 +299,22 @@ df_using$Recipient_BMI <- df_using$Recipient_weight/((df_using$Recipient_height/
 
 
 df_using <- subset(df_using, select = -c(Typeofdonor, Lowestcreatinine¦Ìmoll, RecipientfullmatchHLAstring, Donorcauseofdeath, Donorweight, Donorheight, Recipient_weight, Recipient_height))
+
+# get a general idea about the dataset
+for (i in 1:ncol(df_using)) { 
+  if (is.factor(df_using[[i]])) {
+    print(names(df_using)[i])
+    print(length(unique(df_using[[i]])))
+    print(unique(df_using[[i]]))
+    }
+}
 ```
 
 ```{r, echo=TRUE}
 # impute the missing Smoking data
 library(mice)
 methods = make.method(df_using)
-methods["Smoking"] = "pmm" #Predictive mean matching
+# methods["Smoking"] = "pmm" #Predictive mean matching
 
 # Perform the imputation with more iterations in parallel
 imputed_df_using <- mice(df_using, method = methods, m = 1, maxit = 5, seed = 500, ridge = 0.001)
