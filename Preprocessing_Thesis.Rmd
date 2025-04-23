@@ -19,7 +19,7 @@ library(mstate)
 library(ggplot2)
 library(corrplot)
 library(doParallel)
-setwd("G:/MasterThesis/Code/" ) #G:/MasterThesis/Code/   C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/") #G:/MasterThesis/Code/   C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/
 ```
 
 ```{r, echo=FALSE}
@@ -114,7 +114,7 @@ sum(!complete.cases(df_using))
 sum(complete.cases(df_using))
 ```
 
-## deal with missing data issues
+## regroup variables 1
 ```{r, echo=TRUE}
 # set the missing InitialOnmachineindicator being an additional category
 df_using$InitialOnmachineindicator = if_else(is.na(df_using$InitialOnmachineindicator), "Unknown", df_using$InitialOnmachineindicator)
@@ -125,31 +125,12 @@ df_using[] <- lapply(df_using, function(x) if(is.character(x)) as.factor(x) else
 df_using <- df_using[, !(colnames(df_using) %in% c("Dateoftransplant", "status2"))]
 rm(ci, df, df_using_, results, sfall, variableName_df, unique_values_str, var, variableName, variableName_using)
 
-
-# impute the missing Smoking data
-library(mice)
-methods = make.method(df_using)
-methods["Smoking"] = "pmm" #Predictive mean matching
-
-# Perform the imputation with more iterations in parallel
-imputed_df_using <- mice(df_using, method = methods, m = 1, maxit = 5, seed = 500, ridge = 0.001)
-
-# Complete the dataset with the imputed values
-completed_df_ <- complete(imputed_df_using)
-print(completed_df_)
-saveRDS(completed_df_, "./Data/imputed_NOTR_DGF_f.rds")
-```
-
-```{r, echo=TRUE}
-completed_df_ <- readRDS("./Data/imputed_NOTR_DGF_f.rds")
 # # group the InitialPrimaryDiseaseET
 InitialPrimaryDiseaseET_group = read.csv("../Data/tx_all_primary disease.csv")
 head(InitialPrimaryDiseaseET_group)
-```
 
-```{r, echo=TRUE}
 Num_overlap <- 0
-for (InitialPrimaryDiseaseET in sort(unique(as.character(completed_df_$InitialPrimaryDiseaseET)))){
+for (InitialPrimaryDiseaseET in sort(unique(as.character(df_using$InitialPrimaryDiseaseET)))){
   if (InitialPrimaryDiseaseET %in% colnames(InitialPrimaryDiseaseET_group)){
     Num_overlap = Num_overlap + 1
     print(InitialPrimaryDiseaseET)
@@ -158,9 +139,12 @@ for (InitialPrimaryDiseaseET in sort(unique(as.character(completed_df_$InitialPr
     
   }
 }
+
 Num_overlap
+
+
 library(dplyr)
-completed_df_ <- completed_df_ |> mutate(InitialPrimaryDiseaseET_regroup = case_when(
+df_using <- df_using |> mutate(InitialPrimaryDiseaseET_regroup = case_when(
   InitialPrimaryDiseaseET == "Amyloidosis" ~ "Other multisystem diseases",
   InitialPrimaryDiseaseET == "Chronic renal failure - etiology uncertain"~ "Chronic renal failure; aetiology uncertain", #"Chronic.renal.failure...etiology.uncertain",
   InitialPrimaryDiseaseET == "Congenital renal dysplasia with/without urinary tract malformation" ~ "Other congenital and hereditary kidney diseases", #"Congenital.renal.dysplasia.with.without.urinary.tract.malformation",
@@ -244,18 +228,105 @@ completed_df_ <- completed_df_ |> mutate(InitialPrimaryDiseaseET_regroup = case_
 ))
 
 
-df_using <- subset(completed_df_, select = -InitialPrimaryDiseaseET)
+df_using <- subset(df_using, select = -InitialPrimaryDiseaseET)
 df_using$InitialPrimaryDiseaseET_regroup = factor(df_using$InitialPrimaryDiseaseET_regroup)
 str(df_using)
 ```
 
+# regroup variable 2
+```{r, echo=TRUE}
+# Create a vector of conditions for each cause of death group
+circulatory_conditions <- c("Circulational: Acute Myocard Infarct",
+                            "Circulational: Cardiac Arrest",
+                            "Circulational: Not Otherwise Specified",
+                            "Circulational: Recidief Myocard Infarct")
+icva_conditions <- c("CVA: Cerebral Ischemia",
+                     "CVA: Cerebro Vascular Accident Not Otherwise Specified")
+
+bcva_conditions <- c(
+  "CVA: Intra Cerebral Bleeding",
+  "SAB: Sub Arachnoidal Bleeding")
+
+other_conditions <- c("Medical complication: Diagnostic treatment",
+                      "Medical complication: Surgical / Medical treatment",
+                      "Non-accident: Not Otherwise Specified",
+                      "Not Otherwise Specified",
+                      "Status Epilepticus", #***
+                      "Suicide: Drugs", #***
+                      "N/A",
+                      "rej Epilepticus",
+                      "Suicide: Not Otherwise Specified",
+                      "Meningitis: Bacterial",
+                      "Brain Tumor: Astrocytoma grade 1 or 2", 
+                      "Brain Tumor: Astrocytoma grade 3",
+                      "Brain Tumor: Benign",
+                      "Brain Tumor: Malignant",
+                      "Brain Tumor: Not Otherwise Specified" #***
+                      )
+
+respiratory_conditions <- c("Respirational: Epiglotitis / Laryngitis",
+                            "Respirational: Not Otherwise Specified",
+                            "Respirational: rej Asthmaticus",
+                            "Respirational: Status Asthmaticus", #****
+                            "Suicide: Respiratory",
+                            "Trauma: Suffocation",
+                            "Trauma: Drowning")
+trauma_conditions <- c("Suicide: Head injury",
+                       "Suicide: Jump",
+                       "Trauma: Capitis",
+                       "Trauma: Falling",
+                       "Trauma: Mechanical",
+                       "Trauma: Travel accident on land",
+                       "Trauma: Travel accident on water", #***
+                       "Trauma: Not Otherwise Specified",
+                       "EDH: Epi Dural Hematoma",
+                       "SDH: Sub Dural Hematoma")
+
+
+
+df_using$Donorcauseofdeath_group <-
+  case_when(
+    is.element(df_using$Donorcauseofdeath, circulatory_conditions) ~ "Cardiac",
+    is.element(df_using$Donorcauseofdeath , icva_conditions) |
+      is.element(df_using$Donorcauseofdeath , bcva_conditions) ~ "CVA",
+    is.element(df_using$Donorcauseofdeath , respiratory_conditions) |
+      is.element(df_using$Donorcauseofdeath , other_conditions) ~ "Other",
+    is.element(df_using$Donorcauseofdeath , trauma_conditions) ~ "Trauma",
+  )
+df_using$Donorcauseofdeath_group <- factor(df_using$Donorcauseofdeath_group)
+
+df_using$DonorBMI <- df_using$Donorweight / ((df_using$Donorheight/100)^2)
+df_using$Recipient_BMI <- df_using$Recipient_weight/((df_using$Recipient_height/100)^2)
+
+
+df_using <- subset(df_using, select = -c(Typeofdonor, Lowestcreatinine¦Ìmoll, RecipientfullmatchHLAstring, Donorcauseofdeath, Donorweight, Donorheight, Recipient_weight, Recipient_height))
+```
+
+```{r, echo=TRUE}
+# impute the missing Smoking data
+library(mice)
+methods = make.method(df_using)
+methods["Smoking"] = "pmm" #Predictive mean matching
+
+# Perform the imputation with more iterations in parallel
+imputed_df_using <- mice(df_using, method = methods, m = 1, maxit = 5, seed = 500, ridge = 0.001)
+
+# Complete the dataset with the imputed values
+completed_df_ <- complete(imputed_df_using)
+print(completed_df_)
+saveRDS(completed_df_, "./Data/imputed_NOTR_DGF.rds")
+sum(complete.cases(completed_df_))
+```
+
+
 ### re-label/factorization variables which have 2 or three unique values
 ```{r, echo=FALSE}
-df_using = df_using |>
+completed_df_ = df_using |>
   mutate(Recipientsex = factor(Recipientsex, levels = c("Female", "Male"), labels  = c("Female", "Male")),
          Donorsex = factor(Donorsex, levels = c("Female", "Male"), labels  = c("Female", "Male")),
          Smoking = factor(Smoking, levels = c("Yes", "No"), labels  = c("Yes", "No")),
-         TypecadavericDBDDCD = factor(TypecadavericDBDDCD, levels = c("Donation after circulatory death", "Donation after brain death"), labels  = c("DCD", "DBD"))
+         TypecadavericDBDDCD = factor(TypecadavericDBDDCD, levels = c("Donation after circulatory death", "Donation after brain death"), labels  = c("DCD", "DBD")),
+         InitialPrimaryDiseaseET_regroup = factor(InitialPrimaryDiseaseET_regroup)
          )
 
 ## Done with the data cleaning. on to the creatinine imputation

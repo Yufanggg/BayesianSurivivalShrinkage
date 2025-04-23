@@ -31,12 +31,20 @@ install_and_load(required_packages)
 # Step 2: Organize the real-world data
 ```{r, echo=TRUE}
 real_df <- readRDS("./Data/preprocessed_NOTR_DGF.rds")
-sum(complete.cases(real_df))
+sum(!complete.cases(real_df))
 str(real_df)
 
-real_df <- subset(real_df, select = -c(Typeofdonor, InitialPrimaryDiseaseET, RecipientfullmatchHLAstring))
-strafied_Data_DBD <- subset(real_df, real_df$TypecadavericDBDDCD == "Donation after brain death")
-strafied_Data_DCD <- subset(real_df, real_df$TypecadavericDBDDCD == "Donation after circulatory death")
+# get a general idea about the dataset
+for (i in 1:ncol(real_df)) { 
+  if (is.factor(real_df[[i]])) {
+    print(names(real_df)[i])
+    print(length(unique(real_df[[i]])))
+    }
+}
+
+
+strafied_Data_DBD <- subset(subset(real_df, real_df$TypecadavericDBDDCD == "DBD"), select = -c(TypecadavericDBDDCD))
+strafied_Data_DCD <- subset(subset(real_df, real_df$TypecadavericDBDDCD == "DCD"), select = -c(TypecadavericDBDDCD))
 
 
 includingInter <- function(dataframe_) {
