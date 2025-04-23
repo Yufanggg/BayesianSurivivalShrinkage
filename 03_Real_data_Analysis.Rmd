@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 
 install_and_load <- function(packages) {
@@ -72,6 +72,16 @@ includingInter <- function(dataframe_) {
   
   return(interaction_df)
 }
+```
+
+
+```{r, echo = TRUE}
+cor_matrix <- cor(strafied_Data_DBD[, sapply(strafied_Data_DBD, is.numeric)])
+library(corrplot)
+# Plot the correlation matrix
+corrplot(cor_matrix, method = "color", type = "upper", 
+         tl.col = "black", tl.srt = 45, 
+         addCoef.col = "black", number.cex = 0.7)
 ```
 
 # estimate the Betas for DBD
