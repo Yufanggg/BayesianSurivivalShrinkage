@@ -310,6 +310,19 @@ for (i in 1:ncol(df_using)) {
 }
 ```
 
+### re-label/factorization variables which have 2 or three unique values
+```{r, echo=FALSE}
+df_using = df_using |>
+  mutate(Recipientsex = factor(Recipientsex, levels = c("Female", "Male"), labels  = c("Female", "Male")),
+         Donorsex = factor(Donorsex, levels = c("Female", "Male"), labels  = c("Female", "Male")),
+         Smoking = factor(Smoking, levels = c("Yes", "No"), labels  = c("Yes", "No")),
+         TypecadavericDBDDCD = factor(TypecadavericDBDDCD, levels = c("Donation after circulatory death", "Donation after brain death"), labels  = c("DCD", "DBD")),
+         InitialPrimaryDiseaseET_regroup = factor(InitialPrimaryDiseaseET_regroup),
+         ID = factor(ID)
+         )
+str(df_using)
+```
+
 ```{r, echo=TRUE}
 # impute the missing Smoking data
 library(mice)
@@ -327,16 +340,8 @@ sum(complete.cases(completed_df_))
 ```
 
 
-### re-label/factorization variables which have 2 or three unique values
+### 
 ```{r, echo=FALSE}
-completed_df_ = df_using |>
-  mutate(Recipientsex = factor(Recipientsex, levels = c("Female", "Male"), labels  = c("Female", "Male")),
-         Donorsex = factor(Donorsex, levels = c("Female", "Male"), labels  = c("Female", "Male")),
-         Smoking = factor(Smoking, levels = c("Yes", "No"), labels  = c("Yes", "No")),
-         TypecadavericDBDDCD = factor(TypecadavericDBDDCD, levels = c("Donation after circulatory death", "Donation after brain death"), labels  = c("DCD", "DBD")),
-         InitialPrimaryDiseaseET_regroup = factor(InitialPrimaryDiseaseET_regroup)
-         )
-
 ## Done with the data cleaning. on to the creatinine imputation
 saveRDS(completed_df_, "./Data/preprocessed_NOTR_DGF.rds")
 ```
