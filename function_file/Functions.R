@@ -97,7 +97,6 @@ Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponentia
         warmup = nwarmup,
         thin = 10,
         chain = 1,
-        algorithm = "HMC", 
         seed = 123
       )
     )
@@ -306,7 +305,7 @@ Bayesian_Survival_result_Extract <- function(bayesian_model_fit, model_type,
   }
   
   if ("Prediction_SurvivalProb" %in% criteria) {
-    eta_pred <- Output[grep("^eta_new", rownames(Output)), "mean", drop = FALSE]
+    eta_pred <- Output[grep("^eta_new", rownames(Output)), "50%", drop = FALSE]
     model_result$eta_pred <- eta_pred
     sp <- Output[grep("^survival_prob", rownames(Output)), "50%", drop = FALSE]
     model_result$sp <- sp

@@ -182,11 +182,11 @@ generated quantities{
       // vector[qevent_new] lhaz_epts_event_new;
       // vector[qevent_new] quadrature_log_surv_qwtsindiv;
       // matrix[nnew, qnodes] quadrature_log_surv_indiv;
+      eta_new = x_new * Beta + x_int_new * Beta_int;
       
-      eta_new =  x_new * Beta + x_new_int * Beta_int;
-      vector[qevent_new] eta_new_epts_event = x_new_qpts_event * Beta + x_new_int_qpts_event * Beta_int;
-      // print(eta_new_epts_event);
-      vector[qevent_new] lhaz_epts_event_new = bspline_log_haz(eta_new_epts_event, basis_qpts_event_new, coefs);
+      vector[qevent_new] eta_epts_event_new = x_new_qpts_event * Beta + x_new_int_qpts_event * Beta_int;
+      // print(eta_epts_event_new);
+      vector[qevent_new] lhaz_epts_event_new = bspline_log_haz(eta_epts_event_new, basis_qpts_event_new, coefs);
       
       vector[qevent_new] quadrature_log_surv_qwtsindiv = (qwts_event_new .* exp(lhaz_epts_event_new));
       // print(quadrature_log_surv_qwtsindiv);
