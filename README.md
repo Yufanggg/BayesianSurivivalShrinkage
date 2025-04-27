@@ -62,7 +62,7 @@ The method was validated from two following perspectivess.
 2. `Model performance`: The model performance focused on three levels: (1) parameter estimation estimation; (2) survival probability prediction; and (3) variable selection.
 
 ## method on the simulated data:
-With the listed code, [a simulated bayesian survival analysis](./01_Sim_data_Analysisbaseline.Rmd) (i.e., a bayesian survival model for time-to -event data under high-dimensional setting was conducted on a simulated dataset) was conducted to validate the research setting. In the simulated, a weibull baseline hazard function were used. With this simulated data, the following three models have been built: (1). *the exponential model*; (2) *the weibull model*; and (3) *the bSpline models*. 
+With the listed code, [a simulated bayesian survival analysis](./01_Sim_data_Analysisbaseline.Rmd) (i.e., a bayesian survival model for time-to -event data under high-dimensional setting was conducted on a simulated dataset) was conducted to validate the research setting. In the simulated, a weibull baseline hazard function were used. With this simulated data, the following three models have been built: (1) *the exponential model*; (2) *the weibull model*; and (3) *the bSpline models*. 
 
 ***Detailed information about the simulation***:
 - number of simultaions: 50
