@@ -19,7 +19,7 @@ library(mstate)
 library(ggplot2)
 library(corrplot)
 library(doParallel)
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/") #G:/MasterThesis/Code/   C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/
+setwd("G:/MasterThesis/Code/") #G:/MasterThesis/Code/   C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/
 ```
 
 ```{r, echo=FALSE}
@@ -253,6 +253,7 @@ other_conditions <- c("Medical complication: Diagnostic treatment",
                       "Not Otherwise Specified",
                       "Status Epilepticus", #***
                       "Suicide: Drugs", #***
+                      "N/A", #***
                       "rej Epilepticus",
                       "Suicide: Not Otherwise Specified",
                       "Meningitis: Bacterial",
@@ -292,13 +293,14 @@ df_using$Donorcauseofdeath_group <-
       is.element(df_using$Donorcauseofdeath , other_conditions) ~ "Other",
     is.element(df_using$Donorcauseofdeath , trauma_conditions) ~ "Trauma",
   )
+
 df_using$Donorcauseofdeath_group <- factor(df_using$Donorcauseofdeath_group)
 
 df_using$DonorBMI <- df_using$Donorweight / ((df_using$Donorheight/100)^2)
 df_using$Recipient_BMI <- df_using$Recipient_weight/((df_using$Recipient_height/100)^2)
 
 
-df_using <- subset(df_using, select = -c(Typeofdonor, Lowestcreatinine¦Ìmoll, RecipientfullmatchHLAstring, Donorcauseofdeath, Donorweight, Donorheight, Recipient_weight, Recipient_height))
+df_using <- subset(df_using, select = -c(Typeofdonor, LowestcreatinineÎ¼moll, RecipientfullmatchHLAstring, Donorcauseofdeath, Donorweight, Donorheight, Recipient_weight, Recipient_height))
 
 # get a general idea about the dataset
 for (i in 1:ncol(df_using)) { 
@@ -330,7 +332,7 @@ methods = make.method(df_using)
 # methods["Smoking"] = "pmm" #Predictive mean matching
 
 # Perform the imputation with more iterations in parallel
-imputed_df_using <- mice(df_using, method = methods, m = 1, maxit = 5, seed = 500, ridge = 0.001)
+imputed_df_using <- mice(df_using, method = methods, m = 1, maxit = 5, seed = 500, ridge = 0.001, MaxNWts = 20000)
 
 # Complete the dataset with the imputed values
 completed_df_ <- complete(imputed_df_using)
