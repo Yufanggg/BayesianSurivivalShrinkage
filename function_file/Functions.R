@@ -410,6 +410,9 @@ Bayesian_Survival_result_Extract <- function(bayesian_model_fit, model_type,
 }
 
 
+# Function for cross-validation
+
+
 # Function to evaluate the Bayesian survival model with certain criteria
 # @model_result: a list of model results extracted from the Bayesian survival model via Bayesian_Survival_result_Extract function.
 # @ComparsionValues: a list of ground-truth/model results extracted from other models, including the following components: Beta_reference, test_t, test_status, and Selection_reference.
@@ -458,6 +461,42 @@ Model_performance_eval <- function(model_result, ComparsionValues, Criteria = c(
   return(model_metric)
 }
 
+
+# Cross valiating
+cross_validation <- function(whole_dataset, baseline_modelling = "bSplines", num_folds = 5, obs_window = 3415){
+  # create the cross-validation folds
+  folds <- createFolds(whole_dataset$status, k = num_folds, list = TRUE, returnTrain = FALSE)
+  cross_val_metric <- list()
+  Brier_scores =  rep(NA, num_folds); C_indices =  rep(NA, num_folds)
+  for (i in 1:num_folds){
+    fold_indices <- folds[[i]]
+    training_data = whole_dataset[-fold_indices, ]
+    testing_data = whole_dataset[fold_indices, ]
+    stan_data_bSplines_cv <- stan_data_Constructer(training_dataset = training_data, withPrediction = TRUE, testing_dataset = testing_data, baseline_modelling = "bSplines", obs_window = obs_window)
+    model_fit <- Bayesian_Survival_model(stan_data = stan_data_bSplines_cv, withPrediction = TRUE, baseline_assumption = "bSplines")
+    #extract the info from the bayesian model fit
+    model_result <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit)
+    
+    #model diagnotics
+    diagnostics_bSplines <- summary(model_fit_bSplines)$summary[, c("Rhat", "n_eff")]
+    disp("The covergence for", i)
+    print(diagnostics_bSplines)
+    
+    #extract the info from the bayesian model fit
+    model_result_bSplines <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines, model_type = "bSplines", criteria = "Prediction_SurvivalProb")
+    
+    predicted_survP <- model_metric$sp
+    predicted_eta <- model_metric$eta_pre
+    
+    real_status <- testing_data$status
+    Brier_scores[i] = mean((predicted_probabilities - actual_outcomes)^2)
+    C_indices[i] = rcorr.cens(-predicted_eta, Surv(time, true_status))[['C Index']]# rcorr.cens
+    
+  }
+  cross_val_metric$Brier_scores <- Brier_scores
+  cross_val_metric$C_indices <- C_indices
+  return(cross_val_metric)
+}
 
 # Function for model evaluation visualization
 # @model_metric: a list, including rMSE_s, Brier_scores, C_indices, C_indices

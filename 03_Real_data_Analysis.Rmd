@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 
 install_and_load <- function(packages) {
@@ -22,7 +22,7 @@ install_and_load <- function(packages) {
 }
 
 # List of required packages
-required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret")
+required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret", "corrplot","ggplot2")
 # Install and/or load packages
 install_and_load(required_packages)
 ```
@@ -82,23 +82,28 @@ includingInter <- function(dataframe_) {
   return(interaction_df)
 }
 ```
-
-
+# Section 1: Data analysis for DBD
+## Step 1: EDA -have a look at the correlation for DBD
 ```{r, echo = TRUE}
 # only for estimating the Betas
 strafied_Data_DBD_int <- includingInter(strafied_Data_DBD)
-num_strafied_Data_DBD_int <- strafied_Data_DBD_int[, sapply(strafied_Data_DBD_int, is.numeric)]
+num_strafied_Data_DBD_int <- strafied_Data_DBD_int
 cor_matrix <- cor(num_strafied_Data_DBD_int)
 
+png(filename = "./Image/correlation_plot.png", width = 6000, height = 6000, res = 300)
+par(mar = c(0.1, 0.1, 0.1, 0.1), oma = c(0.1, 0.1, 0.1, 0.1))
+corrplot(cor_matrix, method = "color", type = "upper", tl.cex = 0.5, 
+         tl.col = "black", cl.cex = 0.5, tl.srt = 45)
 
-library(corrplot)
-# Plot the correlation matrix
-corrplot(cor_matrix, method = "color", type = "upper",
-         tl.col = "black", tl.srt = 45,
-         addCoef.col = "black", number.cex = 0.7)
+# Close the device
+dev.off()
 ```
 
-# estimate the Betas for DBD
+## Step 1: EDA -have a look at the linear vs. non-linear relationship between variables and the survivial data
+```{r, echo=TRUE}
+
+```
+## Step 2: estimate the Betas for DBD
 ```{r, echo=TRUE}
 obs_window = 3415 #max(df_using$time_tx_date_max2)
 stan_data_bSplines_DBD <- stan_data_Constructer(
@@ -117,11 +122,40 @@ model_result_bSplines_DBD <- Bayesian_Survival_result_Extract(bayesian_model_fit
 
 
 mean_beta_DBD = model_result_bSplines_DBD$Beta_bayesian_est[, "mean"]
-FDR_beta_DBD = model_result_bSplines_DBD$variableSelection
-save.image(file = "./Data/03_results.RData")
+variableSelection_DBD = model_result_bSplines_DBD$variableSelection
+
+cross_val_metric_DBD <- cross_validation(whole_dataset = strafied_Data_DBD_int, baseline_modelling = "bSplines", num_folds = 5, obs_window = 3415)
+save.image(file = "./Data/03_results_DBD.RData")
 ```
 
-# estimate the Betas for DCD
+### STEP 3: visualize the results for DBD
+```{r, echo=TRUE}
+load(file = "./Data/03_results_DBD.RData")
+results_DBD_df <- data.frame(variableName = colnames(strafied_Data_DBD_int)[!(colnames(strafied_Data_DBD_int) %in% c("id", "status", "obstime"))],
+                             beta_int = mean_beta_DBD, 
+                             variableSelection = variableSelection_DBD[,1])
+
+# visualized result
+ggplot(results_DBD_df, aes(x = variableName, y = beta_int, color = variableSelection, shape = variableSelection)) + 
+  geom_line() + 
+  geom_point(size = 3) + 
+  theme_minimal() + 
+  labs(title = "Estimated Beta", x = "", y = "Estimated Beta") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+# # Add background rectangles
+# for (i in 1:length(results_DBD_df$variableSelection)) {
+#   if (fill_vector[i]) {
+#     rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+#   }
+# }
+```
+
+## STEP 2: prediction 
+
+# Section 2: Data analysis for DCD
+## STEP 1: estimate the Betas for DCD
 ```{r, echo=TRUE}
 obs_window = 3415 #max(df_using$time_tx_date_max2)
 # only for estimating the Betas
@@ -141,44 +175,13 @@ diagnostics_bSplines_DCD <- summary(model_fit_bSplines_DCD)$summary[, c("Rhat", 
 model_result_bSplines_DCD <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines_DCD, model_type = "bSplines", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
 
 
-mean_beta_DBD = model_result_bSplines_DCD$Beta_bayesian_est[, "mean"]
-FDR_beta_DBD = model_result_bSplines_DCD$variableSelection
+mean_beta_DCD = model_result_bSplines_DCD$Beta_bayesian_est[, "mean"]
+variableSelect_DCD = model_result_bSplines_DCD$variableSelection
+
+cross_val_metric_DCD <- cross_validation(whole_dataset = strafied_Data_DCD, baseline_modelling = "bSplines")
+save.image(file = "./Data/03_results_DCD.RData")
 ```
 
 # Cross-validation for Predictions
-```{r, echo=TRUE}
-cross_validation <- function(whole_dataset, baseline_modelling = "weibull", num_folds = 5){
-  # create the cross-validation folds
-  folds <- createFolds(whole_dataset$status, k = num_folds, list = TRUE, returnTrain = FALSE)
-  cross_val_metric <- list()
-  Brier_scores =  rep(NA, 5); C_indices =  rep(NA, 5)
-  for (i in 1:num_folds){
-    fold_indices <- folds[[i]]
-    training_data = whole_dataset[-fold_indices, ]
-    testing_data = whole_dataset[fold_indices, ]
-    stan_data_bSplines_cv <- stan_data_Constructer(training_dataset = training_data, testing_dataset = testing_data, baseline_modelling = "bSplines", obs_window = obs_window)
-    model_fit <- Bayesian_Survival_model(stan_data = stan_data_bSplines_cv, withPrediction = TRUE, baseline_assumption = "bSplines")
-    #extract the info from the bayesian model fit
-    model_result <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit)
-    
-    #model diagnotics
-    diagnostics_bSplines <- summary(model_fit_bSplines)$summary[, c("Rhat", "n_eff")]
-    disp("The covergence for", i)
-    print(diagnostics_bSplines)
-    
-    #extract the info from the bayesian model fit
-    model_result_bSplines <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines, model_type = "bSplines", criteria = "Prediction_SurvivalProb")
-    
-    Brier_scores[i] <- model_metric$Brier_score
-    C_indices[i] <- model_metric$C_index
-  }
-  cross_val_metric$Brier_scores <- Brier_scores
-  cross_val_metric$C_indices <- C_indices
-  return(cross_val_metric)
-}
 
-cross_val_metric_DBD <- cross_validation(whole_dataset = strafied_Data_DBD, baseline_modelling = "bSplines") # exponential, weibull, bSplines
-
-cross_val_metric_DCD <- cross_validation(whole_dataset = strafied_Data_DCD, baseline_modelling = "bSplines") # exponential, weibull, bSplines
-```
 
