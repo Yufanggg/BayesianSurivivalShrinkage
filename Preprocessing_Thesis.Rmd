@@ -345,6 +345,12 @@ sum(complete.cases(completed_df_))
 ### 
 ```{r, echo=FALSE}
 ## Done with the data cleaning. on to the creatinine imputation
-saveRDS(completed_df_, "./Data/preprocessed_NOTR_DGF.rds")
+imputed_df_using_2 <- mice(df_using, method = methods, m = 1, maxit = 20, seed = 600, ridge = 0.001, MaxNWts = 20000)
+
+# Complete the dataset with the imputed values
+completed_df_2 <- complete(imputed_df_using_2)
+print(completed_df_2)
+saveRDS(completed_df_2, "./Data/imputed_NOTR_DGF_2.rds")
+sum(complete.cases(completed_df_2))
 ```
 
