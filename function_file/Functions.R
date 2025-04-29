@@ -473,24 +473,23 @@ cross_validation <- function(whole_dataset, baseline_modelling = "bSplines", num
     training_data = whole_dataset[-fold_indices, ]
     testing_data = whole_dataset[fold_indices, ]
     stan_data_bSplines_cv <- stan_data_Constructer(training_dataset = training_data, withPrediction = TRUE, testing_dataset = testing_data, baseline_modelling = "bSplines", obs_window = obs_window)
-    model_fit <- Bayesian_Survival_model(stan_data = stan_data_bSplines_cv, withPrediction = TRUE, baseline_assumption = "bSplines")
-    #extract the info from the bayesian model fit
-    model_result <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit)
-    
+    model_fit_bSplines <- Bayesian_Survival_model(stan_data = stan_data_bSplines_cv, withPrediction = TRUE, baseline_assumption = "bSplines")
+   
     #model diagnotics
     diagnostics_bSplines <- summary(model_fit_bSplines)$summary[, c("Rhat", "n_eff")]
-    disp("The covergence for", i)
+    cat("The covergence for", i, "\n")
     print(diagnostics_bSplines)
     
     #extract the info from the bayesian model fit
     model_result_bSplines <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines, model_type = "bSplines", criteria = "Prediction_SurvivalProb")
     
-    predicted_survP <- model_metric$sp
-    predicted_eta <- model_metric$eta_pre
+    predicted_survP <- model_result_bSplines$sp
+    predicted_eta <- model_result_bSplines$eta_pre
     
     real_status <- testing_data$status
-    Brier_scores[i] = mean((predicted_probabilities - actual_outcomes)^2)
-    C_indices[i] = rcorr.cens(-predicted_eta, Surv(time, true_status))[['C Index']]# rcorr.cens
+    time <- testing_data$obstime
+    Brier_scores[i] = mean((predicted_survP - real_status)^2)
+    C_indices[i] = rcorr.cens(-predicted_eta, Surv(time, real_status))[['C Index']]# rcorr.cens
     
   }
   cross_val_metric$Brier_scores <- Brier_scores
