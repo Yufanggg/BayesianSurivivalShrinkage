@@ -30,8 +30,15 @@ install_and_load(required_packages)
 
 # Step 2: Organize the real-world data
 ```{r, echo=TRUE}
-real_df <- readRDS("./Data/preprocessed_NOTR_DGF.rds")
+real_df <- readRDS("./Data/imputed_NOTR_DGF.rds")
 sum(!complete.cases(real_df))
+mean(real_df$status == "graftloss")
+mean(real_df$status == "alive")
+mean(real_df$status == "death")
+
+# Reversed KM for follow-up analysis
+
+
 str(real_df)
 real_df <- real_df[, !names(real_df) %in% "ID"]
 
@@ -42,9 +49,15 @@ for (i in 1:ncol(real_df)) {
     print(length(unique(real_df[[i]])))
     }
 }
+factorName <- sapply(real_df, is.factor)
+factorName["status"] <- FALSE
+
+print(colnames(real_df)[factorName])
 
 
-strafied_Data_DBD <- subset(subset(real_df, real_df$TypecadavericDBDDCD == "DBD"), select = -c(TypecadavericDBDDCD))
+
+strafied_Data_DBD <- subset(subset(real_df, real_df$TypecadavericDBDDCD == "DBD"), select = -c(TypecadavericDBDDCD, factorName))
+
 strafied_Data_DCD <- subset(subset(real_df, real_df$TypecadavericDBDDCD == "DCD"), select = -c(TypecadavericDBDDCD))
 
 
@@ -116,6 +129,8 @@ model_fit_bSplines_DBD <- Bayesian_Survival_model(stan_data = stan_data_bSplines
 
 #model diagnotics
 diagnostics_bSplines_DBD <- summary(model_fit_bSplines_DBD)$summary[, c("Rhat", "n_eff")]
+
+print(diagnostics_bSplines_DBD)
 
 #extract the info from the bayesian model fit
 model_result_bSplines_DBD <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines_DBD, model_type = "bSplines", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
