@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 
 install_and_load <- function(packages) {
@@ -30,7 +30,7 @@ install_and_load(required_packages)
 
 # Step 2: Organize the real-world data
 ```{r, echo=TRUE}
-real_df <- readRDS("./Data/imputed_NOTR_DGF.rds")
+real_df <- readRDS("./Data/imputed_NOTR_DGF_2.rds")
 sum(!complete.cases(real_df))
 mean(real_df$status == "graftloss")
 mean(real_df$status == "alive")
@@ -99,6 +99,14 @@ includingInter <- function(dataframe_) {
     terms_ <- unlist(strsplit(term, ":"))
     Con1 <- any(agrepl(terms_[1], factor_vars))
     Con2 <- any(agrepl(terms_[2], factor_vars))
+    if ((Con2 | Con1)){
+      Con1 = agrepl(terms_[1], "InitialPrimaryDiseaseET_regroup")
+      Con2 = agrepl(terms_[2], "InitialPrimaryDiseaseET_regroup")
+
+      return(any(Con1, Con2))
+      # print(terms_[2])
+      # print(Con2)
+    }
     # print(term)
     # print(all(Con1, Con2))
     return(all(Con1, Con2))
@@ -164,7 +172,7 @@ mean_beta_DBD = model_result_bSplines_DBD$Beta_bayesian_est[, "mean"]
 variableSelection_DBD = model_result_bSplines_DBD$variableSelection
 
 cross_val_metric_DBD <- cross_validation(whole_dataset = strafied_Data_DBD_int, baseline_modelling = "bSplines", num_folds = 5, obs_window = 3415)
-save.image(file = "./Data/03_results_DBD.RData")
+save.image(file = "./Data/03_results_DBD_2.RData")
 ```
 
 ### STEP 3: visualize the results for DBD
@@ -217,10 +225,9 @@ model_result_bSplines_DCD <- Bayesian_Survival_result_Extract(bayesian_model_fit
 mean_beta_DCD = model_result_bSplines_DCD$Beta_bayesian_est[, "mean"]
 variableSelect_DCD = model_result_bSplines_DCD$variableSelection
 
-cross_val_metric_DCD <- cross_validation(whole_dataset = strafied_Data_DCD, baseline_modelling = "bSplines")
-save.image(file = "./Data/03_results_DCD.RData")
+cross_val_metric_DCD <- cross_validation(whole_dataset = strafied_Data_DCD_int, baseline_modelling = "bSplines")
+save.image(file = "./Data/03_results_DCD_2.RData")
 ```
 
-# Cross-validation for Predictions
 
 

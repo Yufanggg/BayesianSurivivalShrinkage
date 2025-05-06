@@ -34,7 +34,7 @@ Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponentia
                                                 niter = 10000, 
                                                 nwarmup = 1000,
                                                 thin = 10,
-                                                chains = 1) {
+                                                chains = 2) {
   if (!shrinkage){
     message("we only applied the non shrinage code for bSpline baseline hazard.")
   }
