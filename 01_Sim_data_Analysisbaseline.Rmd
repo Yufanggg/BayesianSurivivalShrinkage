@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 
 
 install_and_load <- function(packages) {
@@ -39,7 +39,6 @@ n_features <- 10
 # function for one simulation
 simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE){
   
-  
   output = list()
   
   simulated_data <- DataGenerator(n_samples = n_samples, n_features = 10)
@@ -52,52 +51,29 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
     samples <- sample(1:nrow(dataset), 100)
     training_dataset <- dataset[-samples, ]
     testing_dataset <- dataset[samples, ]
-    
-    stan_data_exponential <- stan_data_Constructer(
-      training_dataset = training_dataset,
-      withPrediction = withPrediction,
-      testing_dataset = testing_dataset,
-      baseline_modelling = "exponential",
-      obs_window = 5
-    )
-    stan_data_weibull <- stan_data_Constructer(
-      training_dataset = training_dataset,
-      withPrediction = withPrediction,
-      testing_dataset = testing_dataset,
-      baseline_modelling = "weibull", 
-      obs_window = 5
-    )
-    stan_data_bSplines <- stan_data_Constructer(
-      training_dataset = training_dataset,
-      withPrediction = withPrediction,
-      testing_dataset = testing_dataset,
-      baseline_modelling = "bSplines",
-      obs_window = 5
-    )
-  }  else {
-    stan_data_exponential <- stan_data_Constructer(
-      training_dataset = dataset,
-      withPrediction = withPrediction,
-      baseline_modelling = "exponential",
-      obs_window = 5
-    )
-    stan_data_weibull <- stan_data_Constructer(
-      training_dataset = dataset,
-      withPrediction = withPrediction,
-      baseline_modelling = "weibull",
-      obs_window = 5
-    )
-    stan_data_bSplines <- stan_data_Constructer(
-      training_dataset = dataset,
-      baseline_modelling = "bSplines",
-      obs_window = 5
-    )
+  } else{
+    training_dataset = dataset
+    testing_dataset = NULL
   }
+  
+  stan_data_noBSpline <- stan_data_Constructer(
+    training_dataset = training_dataset,
+    testing_dataset = testing_dataset,
+    baseline_modelling = "noBSplines"
+  )
+  
+  stan_data_bSplines <- stan_data_Constructer(
+    training_dataset = training_dataset,
+    testing_dataset = testing_dataset,
+    baseline_modelling = "bSplines",
+    obs_window = 5
+  )
     
-  #fit model
-  model_fit_exponential <-  Bayesian_Survival_model(stan_data = stan_data_exponential, withPrediction = TRUE, baseline_assumption = "exponential", shrinkage = TRUE)
-  model_fit_weibull <- Bayesian_Survival_model(stan_data = stan_data_weibull, withPrediction = TRUE, baseline_assumption = "weibull", shrinkage = TRUE)
-  model_fit_bSplines <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_assumption = "bSplines", shrinkage = TRUE)
+  fit model
+  model_fit_exponential <-  Bayesian_Survival_model(stan_data = stan_data_noBSpline, withPrediction = TRUE, baseline_modelling = "exponential", shrinkage = TRUE)
+  model_fit_weibull <- Bayesian_Survival_model(stan_data = stan_data_noBSpline, withPrediction = TRUE, baseline_modelling = "weibull", shrinkage = TRUE)
+  # model_fit_PH <- Bayesian_Survival_model(stan_data = stan_data_noBSpline, withPrediction = TRUE, baseline_modelling = "none", shrinkage = TRUE)
+  model_fit_bSplines <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_modelling = "bSplines", shrinkage = TRUE)
   
   #collect diagnostics
   output$diagnostics_exponential <- summary(model_fit_exponential)$summary[, c("Rhat", "n_eff")]

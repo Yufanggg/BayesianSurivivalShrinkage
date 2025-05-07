@@ -1,10 +1,98 @@
 
+# assumptions: all data are right censored data with the observed window being [0, obs_window]
+# Construct stan data structure for baseline hazard of exponential, weibull and partial likelihood.
+stan_data_Constructer_noBSpline <- function (training_dataset, testing_dataset = NULL){
+  
+  #----------------------------
+  # Prepare data for model fitting
+  #-----------------------------
+  
+  #----- organize the data regarding predictor
+  
+  design__matrix = training_dataset[,!(names(training_dataset) %in% c("id", "obstime", "status"))]
+  
+  column_names = colnames(design__matrix)
+  main_names =  column_names[!grepl(":", column_names)] #whether or not having intercept needs to be verified
+  X_main = design__matrix[, main_names]
+  
+  int_names =  column_names[grepl(":", column_names)]
+  X_int = design__matrix[, int_names]
+  
+  p <- dim(X_main)[2]
+  q <- dim(X_int)[2]
+  
+  main_indices_for_int = find_main_effect_indices(int_names, main_names)
+  g1 <- g(main_indices_for_int, 1)
+  g2 <- g(main_indices_for_int, 2)
+  
+ 
+  
+  #----------------
+  # Construct data
+  #----------------
+  stan_data = list(
+    #----- for model fitting --------
+    nevent = nrow(training_dataset[training_dataset$status == 1, ]),
+    nrcens = nrow(training_dataset[training_dataset$status == 0, ]),
+    t_event = training_dataset[training_dataset$status == 1, "obstime"],
+    t_rcens = training_dataset[training_dataset$status == 0, "obstime"],
+    
+    # predictor matrices (time-fixed)
+    p = p,
+    q = q,
+    
+    x_event = X_main[training_dataset$status == 1,],
+    x_int_event =  X_int[training_dataset$status == 1,],
+    
+    x_rcens = X_main[training_dataset$status == 0,],
+    x_int_rcens = X_int[training_dataset$status == 0,],
+    
+    # link the interaction effect with the corresponding main effects
+    g1 = g1,
+    g2 = g2
+  )
+  
+  
+  
+  #----------------------------
+  # Prepare data for prediction
+  #-----------------------------
+  if(! is.null(testing_dataset)){
+    nnew <- nrow(testing_dataset)
+    t_new <- testing_dataset$obstime
+    design__matrix_2 = testing_dataset[,!(names(testing_dataset) %in% c("id", "obstime", "status"))]
+    
+    column_names = colnames(design__matrix_2)
+    main_names =  column_names[!grepl(":", column_names) &
+                                 column_names != "(Intercept)"] #whether or not having intercept needs to be verified
+    X_new_main = design__matrix_2[, main_names]
+    
+    int_names =  column_names[grepl(":", column_names)]
+    X_new_int = design__matrix_2[, int_names]
+    
+    
+    #----------------
+    # add data to Constructed data for prediction
+    #----------------
+    
+    stan_data = c(stan_data, list(
+      nnew = nrow(testing_dataset),
+      x_new = X_new_main,
+      x_int_new = X_new_int,
+      t_new = testing_dataset[, "obstime"]
+    ))
+  }
+  
+  return(stan_data)
+}
+
+
 #' @param qnodes The number of nodes to use for the Gauss-Kronrod quadrature
 #'   that is used to evaluate the cumulative hazard when \code{basehaz = "bs"}
 #'   Options are 15 (the default), 11 or 7.
- 
+
 # assumptions: all data are right censored data with the observed window being [0, obs_window]
-stan_bSpline_data_Constructer1 <- function (training_dataset, testing_dataset, obs_window, qnodes = 15){
+stan_bSpline_data_Constructer <- function (training_dataset, testing_dataset, obs_window, qnodes = 15){
   
   #----------------------------
   # Prepare data for model fitting
@@ -31,7 +119,7 @@ stan_bSpline_data_Constructer1 <- function (training_dataset, testing_dataset, o
   t_event = training_dataset[training_dataset$status == 1, "obstime"]
   t_rcens = training_dataset[training_dataset$status == 0, "obstime"]
   
-
+  
   
   #----- baseline hazard
   basehaz <- handle_basehaz_surv(times          = training_dataset$obstime, 
@@ -39,61 +127,61 @@ stan_bSpline_data_Constructer1 <- function (training_dataset, testing_dataset, o
                                  min_t          = 0,
                                  max_t          = max(c(training_dataset$obstime, obs_window), na.rm = TRUE))
   nvars <- basehaz$nvars # number of basehaz aux parameters
-    
-    
-    
+  
+  
+  
   # model uses quadrature
-    
+  
   # standardised nodes and weights for quadrature
   qq <- get_quadpoints(nodes = qnodes)
   qp <- qq$points
   qw <- qq$weights
-    
+  
   # quadrature points, evaluated for each row of data
   qpts_event <- uapply(qp, unstandardise_qpts, 0, t_event)
   qpts_rcens <- uapply(qp, unstandardise_qpts, 0, t_rcens)
-    
-    
+  
+  
   # quadrature weights, evaluated for each row of data
   qwts_event <- uapply(qw, unstandardise_qwts, 0, t_event)
   qwts_rcens <- uapply(qw, unstandardise_qwts, 0, t_rcens)
-    
-    
+  
+  
   # times at events and all quadrature points
   cpts_list <- list(t_event,
-                      qpts_event,
-                      qpts_rcens)
-    
+                    qpts_event,
+                    qpts_rcens)
+  
   idx_cpts <- get_idx_array(sapply(cpts_list, length))
   # cpts     <- unlist(cpts_list) # as vector 
-    
+  
   # number of quadrature points
   qevent <- length(qwts_event)
   qrcens <- length(qwts_rcens)
-    
-    
+  
+  
   #----- basis terms for baseline hazard
   
   basis_epts_event <- make_basis(t_event,    basehaz)
   basis_qpts_event <- make_basis(qpts_event, basehaz)
   basis_qpts_rcens <- make_basis(qpts_rcens, basehaz)
-    
-    
+  
+  
   #----- model frames for generating predictor matrices
-    
+  
   id_event <- which(training_dataset$status == 1)
   id_rcens <-  which(training_dataset$status == 0)
-    
+  
   # combined model frame, with quadrature  
   X_main_cpts <- rbind(X_main[id_event,],
-                   rep_rows(X_main[id_event,], times = qnodes),
-                   rep_rows(X_main[id_rcens,], times = qnodes))
+                       rep_rows(X_main[id_event,], times = qnodes),
+                       rep_rows(X_main[id_rcens,], times = qnodes))
   X_int_cpts <- rbind(X_int[id_event,],
                       rep_rows(X_int[id_event,], times = qnodes),
                       rep_rows(X_int[id_rcens,], times = qnodes))
-    
-    
-    
+  
+  
+  
   # time-fixed predictor matrices, with quadrature
   x_epts_event <- X_main_cpts[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
   x_qpts_event <- X_main_cpts[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
@@ -104,12 +192,13 @@ stan_bSpline_data_Constructer1 <- function (training_dataset, testing_dataset, o
   x_int_qpts_rcens <- X_int_cpts[idx_cpts[3,1]:idx_cpts[3,2], , drop = FALSE]
   
   
-
+  
+  
   #----------------
   # Construct data
   #----------------
   stan_data = list(
-    basis = basehaz$bs_basis, 
+    basis = basehaz$bs_basis,
     #----- for model fitting --------
     p = p,
     q = q,
@@ -117,7 +206,6 @@ stan_bSpline_data_Constructer1 <- function (training_dataset, testing_dataset, o
     nvars = nvars,
     
     qnodes  = 15,
-    
     
     
     Nevent       = sum(training_dataset$status == 1),
@@ -153,11 +241,85 @@ stan_bSpline_data_Constructer1 <- function (training_dataset, testing_dataset, o
     g1 = g1,
     g2 = g2
   )
+    
+  
+  #----------------------------
+  # Prepare data for prediction
+  #-----------------------------
+
+  if(! is.null(testing_dataset)){
+    nnew <- nrow(testing_dataset)
+    t_new <- testing_dataset$obstime
+    design__matrix_2 = testing_dataset[,!(names(testing_dataset) %in% c("id", "obstime", "status"))]
+
+    column_names = colnames(design__matrix_2)
+    main_names =  column_names[!grepl(":", column_names) &
+                                 column_names != "(Intercept)"] #whether or not having intercept needs to be verified
+    X_new_main = design__matrix_2[, main_names]
+
+    int_names =  column_names[grepl(":", column_names)]
+    X_new_int = design__matrix_2[, int_names]
+
+
+    #----------------------------
+    # prediction the survival probability
+    # for each participant at a specific
+    # time point
+    #-----------------------------
+
+    # quadrature points, evaluated for each row of data
+    qpts_new_event <- uapply(qp, unstandardise_qpts, 0, t_new) #500 first node for all t_new, 500 second node for all t_new
+
+
+    # quadrature weights, evaluated for each row of data
+    qwts_new_event <- uapply(qw, unstandardise_qwts, 0, t_new)
+
+
+
+    # number of quadrature points
+    qevent_new <- length(qwts_new_event)
+
+
+    #----- basis terms for baseline hazard
+    basis_new_qpts_event <- make_basis(qpts_new_event, basehaz) #500 first node for all t_new, 500 second node for all t_new
+
+
+
+    #----- model frames for generating predictor matrices
+
+
+    # combined model frame, with quadrature
+    X_main_cpts_new <- rep_rows(X_new_main, times = qnodes) #X_main first for all t_new; X_main second for all t_new
+    X_int_cpts_new <- rep_rows(X_new_int, times = qnodes)
+
+
+
+    # time-fixed predictor matrices, with quadrature
+    x_new_qpts_event <- X_main_cpts_new[, , drop = FALSE] #X_main first for all t_new; X_main second for all t_new
+
+    x_new_int_qpts_event <- X_int_cpts_new[, , drop = FALSE]
+
+    #----------------
+    # add data to Constructed data for prediction
+    #----------------
+
+    stan_data = c(stan_data, list(
+      #--- for prediction ----
+      nnew = nrow(testing_dataset),
+      qevent_new = qevent_new,
+      t_new = testing_dataset$obstime,
+      x_new_qpts_event = x_new_qpts_event,
+      x_new_int_qpts_event = x_new_int_qpts_event,
+      basis_qpts_event_new = basis_new_qpts_event,
+      qwts_event_new = qwts_new_event,
+      x_new = X_new_main,
+      x_int_new = X_new_int
+    ))
+  }
   
   return(stan_data)
   
 }  
-
 
 
 
@@ -167,10 +329,10 @@ stan_bSpline_data_Constructer1 <- function (training_dataset, testing_dataset, o
 # @param x A matrix.
 # @param rows Logical or numeric vector stating which rows of 'x' to retain.
 keep_rows <- function(x, rows = 1:nrow(x)) {
-    x[rows, , drop = FALSE]
-  }  
-  
-  
+  x[rows, , drop = FALSE]
+}  
+
+
 # Replicate rows of a matrix or data frame
 #
 # @param x A matrix or data frame.
@@ -185,7 +347,7 @@ rep_rows <- function(x, ...) {
   }
   x
 }
-  
+
 # From a vector of length M giving the number of elements (for example number
 # of parameters or observations) for each submodel, create an indexing array 
 # of dimension M * 2, where column 1 is the beginning index and 2 is the end index
@@ -193,14 +355,14 @@ rep_rows <- function(x, ...) {
 # @param x A numeric vector
 # @return A length(x) * 2 array
 get_idx_array <- function(x) {
-    as.array(do.call("rbind", lapply(1:length(x), function(i) {
-      idx_beg <- ifelse(x[i] > 0L, sum(x[0:(i-1)]) + 1, 0L)
-      idx_end <- ifelse(x[i] > 0L, sum(x[0:i]),         0L)
-      c(idx_beg, idx_end)
-    })))
-  }  
-  
-  
+  as.array(do.call("rbind", lapply(1:length(x), function(i) {
+    idx_beg <- ifelse(x[i] > 0L, sum(x[0:(i-1)]) + 1, 0L)
+    idx_end <- ifelse(x[i] > 0L, sum(x[0:i]),         0L)
+    c(idx_beg, idx_end)
+  })))
+}  
+
+
 # Convert a standardised quadrature weight to an unstandardised value based on 
 # the specified integral limits
 #
@@ -208,21 +370,21 @@ get_idx_array <- function(x) {
 # @param a The lower limit(s) of the integral, possibly a vector
 # @param b The upper limit(s) of the integral, possibly a vector
 unstandardise_qwts <- function(x, a, b, na.ok = TRUE) {
-    if (!identical(length(x), 1L) || !is.numeric(x))
-      stop2("'x' should be a single numeric value.")
-    if (!length(a) %in% c(1L, length(b)))
-      stop2("'a' and 'b' should be vectors of length 1, or, be the same length.")
-    if (!na.ok) {
-      if (!all(is.numeric(a), is.numeric(b)))
-        stop2("'a' and 'b' should be numeric.")
-      if (any((b - a) < 0))
-        stop2("The upper limits for the integral ('b' values) should be greater than ",
-              "the corresponding lower limits for the integral ('a' values).")
-    }
-    ((b - a) / 2) * x
+  if (!identical(length(x), 1L) || !is.numeric(x))
+    stop2("'x' should be a single numeric value.")
+  if (!length(a) %in% c(1L, length(b)))
+    stop2("'a' and 'b' should be vectors of length 1, or, be the same length.")
+  if (!na.ok) {
+    if (!all(is.numeric(a), is.numeric(b)))
+      stop2("'a' and 'b' should be numeric.")
+    if (any((b - a) < 0))
+      stop2("The upper limits for the integral ('b' values) should be greater than ",
+            "the corresponding lower limits for the integral ('a' values).")
   }
-  
-  
+  ((b - a) / 2) * x
+}
+
+
 # Convert a standardised quadrature node to an unstandardised value based on 
 # the specified integral limits
 #
@@ -230,22 +392,22 @@ unstandardise_qwts <- function(x, a, b, na.ok = TRUE) {
 # @param a The lower limit(s) of the integral, possibly a vector
 # @param b The upper limit(s) of the integral, possibly a vector
 unstandardise_qpts <- function(x, a, b, na.ok = TRUE) {
-    if (!identical(length(x), 1L) || !is.numeric(x))
-      stop2("'x' should be a single numeric value.")
-    if (!length(a) %in% c(1L, length(b)))
-      stop2("'a' and 'b' should be vectors of length 1, or, be the same length.")
-    if (!na.ok) {
-      if (!all(is.numeric(a), is.numeric(b)))
-        stop2("'a' and 'b' should be numeric.")
-      if (any((b - a) < 0))
-        stop2("The upper limits for the integral ('b' values) should be greater than ",
-              "the corresponding lower limits for the integral ('a' values).")
-    }
-    ((b - a) / 2) * x + ((b + a) / 2)
+  if (!identical(length(x), 1L) || !is.numeric(x))
+    stop2("'x' should be a single numeric value.")
+  if (!length(a) %in% c(1L, length(b)))
+    stop2("'a' and 'b' should be vectors of length 1, or, be the same length.")
+  if (!na.ok) {
+    if (!all(is.numeric(a), is.numeric(b)))
+      stop2("'a' and 'b' should be numeric.")
+    if (any((b - a) < 0))
+      stop2("The upper limits for the integral ('b' values) should be greater than ",
+            "the corresponding lower limits for the integral ('a' values).")
   }
-  
+  ((b - a) / 2) * x + ((b + a) / 2)
+}
 
-  
+
+
 # Return the cutpoints for a specified number of quantiles of 'x'
 #
 # @param x A numeric vector.
@@ -335,89 +497,89 @@ validate_positive_scalar <- function(x, not_greater_than = NULL) {
 #   of which is a numeric vector with length equal to the number of
 #   quadrature nodes
 get_quadpoints <- function(nodes = 15) {
-    if (!is.numeric(nodes) || (length(nodes) > 1L)) {
-      stop("'qnodes' should be a numeric vector of length 1.")
-    } else if (nodes == 15) {
-      list(
-        points = c(
-          -0.991455371120812639207,
-          -0.949107912342758524526,
-          -0.86486442335976907279,
-          -0.7415311855993944398639,
-          -0.5860872354676911302941,
-          -0.4058451513773971669066,
-          -0.2077849550078984676007,
-          0,
-          0.2077849550078984676007,
-          0.405845151377397166907,
-          0.5860872354676911302941,
-          0.741531185599394439864,
-          0.86486442335976907279,
-          0.9491079123427585245262,
-          0.991455371120812639207),
-        weights = c(
-          0.0229353220105292249637,
-          0.063092092629978553291,
-          0.10479001032225018384,
-          0.140653259715525918745,
-          0.1690047266392679028266,
-          0.1903505780647854099133,
-          0.204432940075298892414,
-          0.209482141084727828013,
-          0.204432940075298892414,
-          0.1903505780647854099133,
-          0.169004726639267902827,
-          0.140653259715525918745,
-          0.1047900103222501838399,
-          0.063092092629978553291,
-          0.0229353220105292249637))      
-    } else if (nodes == 11) {
-      list(
-        points = c(
-          -0.984085360094842464496,
-          -0.906179845938663992798,
-          -0.754166726570849220441,
-          -0.5384693101056830910363,
-          -0.2796304131617831934135,
-          0,
-          0.2796304131617831934135,
-          0.5384693101056830910363,
-          0.754166726570849220441,
-          0.906179845938663992798,
-          0.984085360094842464496),
-        weights = c(
-          0.042582036751081832865,
-          0.1152333166224733940246,
-          0.186800796556492657468,
-          0.2410403392286475866999,
-          0.272849801912558922341,
-          0.2829874178574912132043,
-          0.272849801912558922341,
-          0.241040339228647586701,
-          0.186800796556492657467,
-          0.115233316622473394025,
-          0.042582036751081832865))     
-    } else if (nodes == 7) {
-      list(
-        points = c(
-          -0.9604912687080202834235,
-          -0.7745966692414833770359,
-          -0.4342437493468025580021,
-          0,
-          0.4342437493468025580021,
-          0.7745966692414833770359,
-          0.9604912687080202834235),
-        weights = c(
-          0.1046562260264672651938,
-          0.268488089868333440729,
-          0.401397414775962222905,
-          0.450916538658474142345,
-          0.401397414775962222905,
-          0.268488089868333440729,
-          0.104656226026467265194))      
-    } else stop("'qnodes' must be either 7, 11 or 15.")  
-  }
-  
+  if (!is.numeric(nodes) || (length(nodes) > 1L)) {
+    stop("'qnodes' should be a numeric vector of length 1.")
+  } else if (nodes == 15) {
+    list(
+      points = c(
+        -0.991455371120812639207,
+        -0.949107912342758524526,
+        -0.86486442335976907279,
+        -0.7415311855993944398639,
+        -0.5860872354676911302941,
+        -0.4058451513773971669066,
+        -0.2077849550078984676007,
+        0,
+        0.2077849550078984676007,
+        0.405845151377397166907,
+        0.5860872354676911302941,
+        0.741531185599394439864,
+        0.86486442335976907279,
+        0.9491079123427585245262,
+        0.991455371120812639207),
+      weights = c(
+        0.0229353220105292249637,
+        0.063092092629978553291,
+        0.10479001032225018384,
+        0.140653259715525918745,
+        0.1690047266392679028266,
+        0.1903505780647854099133,
+        0.204432940075298892414,
+        0.209482141084727828013,
+        0.204432940075298892414,
+        0.1903505780647854099133,
+        0.169004726639267902827,
+        0.140653259715525918745,
+        0.1047900103222501838399,
+        0.063092092629978553291,
+        0.0229353220105292249637))      
+  } else if (nodes == 11) {
+    list(
+      points = c(
+        -0.984085360094842464496,
+        -0.906179845938663992798,
+        -0.754166726570849220441,
+        -0.5384693101056830910363,
+        -0.2796304131617831934135,
+        0,
+        0.2796304131617831934135,
+        0.5384693101056830910363,
+        0.754166726570849220441,
+        0.906179845938663992798,
+        0.984085360094842464496),
+      weights = c(
+        0.042582036751081832865,
+        0.1152333166224733940246,
+        0.186800796556492657468,
+        0.2410403392286475866999,
+        0.272849801912558922341,
+        0.2829874178574912132043,
+        0.272849801912558922341,
+        0.241040339228647586701,
+        0.186800796556492657467,
+        0.115233316622473394025,
+        0.042582036751081832865))     
+  } else if (nodes == 7) {
+    list(
+      points = c(
+        -0.9604912687080202834235,
+        -0.7745966692414833770359,
+        -0.4342437493468025580021,
+        0,
+        0.4342437493468025580021,
+        0.7745966692414833770359,
+        0.9604912687080202834235),
+      weights = c(
+        0.1046562260264672651938,
+        0.268488089868333440729,
+        0.401397414775962222905,
+        0.450916538658474142345,
+        0.401397414775962222905,
+        0.268488089868333440729,
+        0.104656226026467265194))      
+  } else stop("'qnodes' must be either 7, 11 or 15.")  
+}
+
 # Unlist the result from an lapply call
 #
 # @param X,FUN,... Same as lapply
@@ -449,10 +611,10 @@ handle_basehaz_surv <- function(times,
   
   df     <- 5
   degree <- 3
-
-    
+  
+  
   tt <- sort(times[status == 1]) # uncensored event times
-
+  
   bknots <- c(min_t, max_t)
   iknots <- get_iknots(tt, df = df, degree = degree)
   basis  <- splines2::bSpline(tt, iknots = iknots, Boundary.knots = bknots, degree = 3, intercept = FALSE)      
@@ -460,18 +622,18 @@ handle_basehaz_surv <- function(times,
   
   
   nvars  <- ncol(basis)  # number of aux parameters, basis terms
-
+  
   
   nlist(
-        nvars, 
-        iknots, 
-        bknots,
-        degree,
-        basis,
-        df = nvars,
-        user_df = nvars,
-        knots = iknots,
-        bs_basis = basis)
+    nvars, 
+    iknots, 
+    bknots,
+    degree,
+    basis,
+    df = nvars,
+    user_df = nvars,
+    knots = iknots,
+    bs_basis = basis)
 }
 
 # Return a vector with valid names for elements in the list passed to the
@@ -581,4 +743,3 @@ basis_matrix <- function(times, basis, integrate = FALSE) {
   }
   aa(out)
 }
-

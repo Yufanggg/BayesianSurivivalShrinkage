@@ -30,7 +30,7 @@ g <- function(main_indices_for_int, index){
 
 # Function to fit a Bayesian survival model with different baseline assumptions
 # @param: stan_data, a list including items for the corresponding stan model
-Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponential", withPrediction = TRUE, shrinkage = TRUE,
+Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential", withPrediction = TRUE, shrinkage = TRUE,
                                                 niter = 10000, 
                                                 nwarmup = 1000,
                                                 thin = 10,
@@ -41,40 +41,46 @@ Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponentia
   
   
   if (!withPrediction) {
-    if (baseline_assumption == "exponential") {
+    if (baseline_modelling == "exponential") {
       # compile the model
       message("We assume that the baseline hazard function is exponentially distributed.")
       bayesian_model <-
         stan_model("./stan_file/exponential_est.stan")
     }
     
-    else if (baseline_assumption == "weibull") {
+    else if (baseline_modelling == "weibull") {
       # compile the model
       message("We assume that the baseline hazard function is weibully distributed.")
       bayesian_model <- stan_model("./stan_file/weibull_est.stan")
     }
     
-    else if (baseline_assumption == "bSplines") {
+    else if (baseline_modelling == "bSplines") {
       message("We utilized B-splines to estimate the log baseline hazard function.")
       
       # compile the model
       bayesian_model <- stan_model("./stan_file/bSpline_est.stan")
     }
+    
+    else if (baseline_modelling == "none"){
+      message("we used the partical likelihood to estimate the cofficients of covariates")
+      bayesian_model <- stan_model("./stan_file/PH_est.stan")
+    }
+    
   } else {
-    if (baseline_assumption == "exponential") {
+    if (baseline_modelling == "exponential") {
       # compile the model
       message("We assume that the baseline hazard function is exponentially distributed.")
       bayesian_model <-
         stan_model("./stan_file/exponential_estEpre.stan")
     }
     
-    else if (baseline_assumption == "weibull") {
+    else if (baseline_modelling == "weibull") {
       # compile the model
       message("We assume that the baseline hazard function is weibully distributed.")
       bayesian_model <- stan_model("./stan_file/weibull_estEpre.stan")
     }
     
-    else if (baseline_assumption == "bSplines") {
+    else if (baseline_modelling == "bSplines") {
       message("We utilized B-splines to estimate the log baseline hazard function.")
       
       # compile the model
@@ -84,6 +90,11 @@ Bayesian_Survival_model <- function(stan_data, baseline_assumption = "exponentia
         bayesian_model <- stan_model("./stan_file/bSpline_estEprenoShrinkage.stan")
       }
       
+    }
+    
+    else if (baseline_modelling == "none"){
+      message("we used the partical likelihood to estimate the cofficients of covariates")
+      bayesian_model <- stan_model("./stan_file/PH_estEpre.stan")
     }
   }
   
@@ -223,43 +234,53 @@ cross_simulation <- function(whole_dataset, baseline_modelling = "weibull", num_
 # Function to construct stan_data for model fitting
 # @para: training_dataset: 
 stan_data_Constructer <- function(training_dataset, withPrediction = FALSE, testing_dataset = NULL, baseline_modelling = "bSplines", obs_window = 5){
-  if (withPrediction) {
-    if (is.null(testing_dataset)) {
-      stop("For predictions, the testing_dataset cannot be empty!")
-    }
-    if (baseline_modelling == "exponential") {
-      source("./function_file/exponential_stan_constructorwithPred.R")
-      stan_data = stan_exponential_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset)
-    }
-    
-    if (baseline_modelling == "weibull") {
-      source("./function_file/weibull_stan_constructorwithPred.R")
-      stan_data = stan_weibull_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset)
-    }
-    
-    if (baseline_modelling == "bSplines") {
-      source("./function_file/bSpline_stan_constructorwithPred.R")
-      stan_data = stan_bSpline_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset,
-        obs_window = 5)
-    }
+  source("./function_file/stan_constructor.R")
+  if (baseline_modelling != "bSplines"){
+    stan_data = stan_data_Constructer_noBSpline(training_dataset = training_dataset, testing_dataset = testing_dataset)
   }
-  else{
-    if (baseline_modelling == "exponential") {
-      source("./function_file/exponential_stan_constructornoPred.R")
-      stan_data = stan_exponential_data_Constructer1(training_dataset = training_dataset)
-    }
-    
-    if (baseline_modelling == "weibull") {
-      source("./function_file/weibull_stan_constructornoPred.R")
-      stan_data = stan_weibull_data_Constructer1(training_dataset = training_dataset)
-    }
-    
-    if (baseline_modelling == "bSplines") {
-      source("./function_file/bSpline_stan_constructornoPred.R")
-      stan_data = stan_bSpline_data_Constructer1(training_dataset = training_dataset,
-                                                obs_window = 5)
-    }
+  else if (baseline_modelling == "bSplines"){
+    stan_data = stan_bSpline_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset,  obs_window = 5)
   }
+  
+  # 
+  # 
+  # if (withPrediction) {
+  #   if (is.null(testing_dataset)) {
+  #     stop("For predictions, the testing_dataset cannot be empty!")
+  #   }
+  #   if (baseline_modelling == "exponential") {
+  #     source("./function_file/exponential_stan_constructorwithPred.R")
+  #     stan_data = stan_exponential_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset)
+  #   }
+  #   
+  #   if (baseline_modelling == "weibull") {
+  #     source("./function_file/weibull_stan_constructorwithPred.R")
+  #     stan_data = stan_weibull_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset)
+  #   }
+  #   
+  #   if (baseline_modelling == "bSplines") {
+  #     source("./function_file/bSpline_stan_constructorwithPred.R")
+  #     stan_data = stan_bSpline_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset,
+  #       obs_window = 5)
+  #   }
+  # }
+  # else{
+  #   if (baseline_modelling == "exponential") {
+  #     source("./function_file/exponential_stan_constructornoPred.R")
+  #     stan_data = stan_exponential_data_Constructer1(training_dataset = training_dataset)
+  #   }
+  #   
+  #   if (baseline_modelling == "weibull") {
+  #     source("./function_file/weibull_stan_constructornoPred.R")
+  #     stan_data = stan_weibull_data_Constructer1(training_dataset = training_dataset)
+  #   }
+  #   
+  #   if (baseline_modelling == "bSplines") {
+  #     source("./function_file/bSpline_stan_constructornoPred.R")
+  #     stan_data = stan_bSpline_data_Constructer1(training_dataset = training_dataset,
+  #                                               obs_window = 5)
+  #   }
+  # }
   return(stan_data)
 }
 

@@ -30,12 +30,6 @@ data {
   // link the interaction effect with the corresponding main effects
   int g1[q];
   int g2[q];
-  
-  // for prediction
-  int<lower=0> nnew;
-  vector[nnew] t_new;
-  matrix[nnew,p] x_new; // for rows with events
-  matrix[nnew,q] x_int_new;
 }
 
 parameters {
@@ -81,19 +75,9 @@ model {
       
     if (nrcens > 0) {
       eta_rcens = x_rcens * Beta + x_int_rcens * Beta_int;
-      real log_denom = log_sum_exp(eta_rcens); //log_sum_exp is defined as the logarithm of the sum of exponentials of the input values
-      target += eta_event - log_denom;
+      real log_denom = log_sum_exp(eta_recens); //log_sum_exp is defined as the logarithm of the sum of exponentials of the input values
       }
       
-    
-}
-
-generated quantities{
-      // Predicting the survival time on the new/test dataset
-      vector[nnew] risk_ratio_pred;  // 
-      vector[nnew] eta_new;
-      eta_new = x_new * Beta + x_int_new * Beta_int;
-        
-      risk_ratio_pred = exp(eta_new);
+    target += eta_event - log_denom;
 }
 
