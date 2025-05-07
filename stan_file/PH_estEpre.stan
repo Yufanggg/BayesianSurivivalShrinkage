@@ -53,6 +53,8 @@ model {
        // pre-allocated variables
     vector[nevent] eta_event; // for events
     vector[nrcens] eta_rcens; // for right censored
+    
+    real log_denom;
 
     // prior
     tau2int ~ uniform(0.01,1);
@@ -75,14 +77,18 @@ model {
       
 
     // partical log-likelihood, represented by [target]
-    if (nevent > 0) {
-      eta_event = x_event * Beta + x_int_event * Beta_int;
-   }
-      
     if (nrcens > 0) {
       eta_rcens = x_rcens * Beta + x_int_rcens * Beta_int;
-      real log_denom = log_sum_exp(eta_rcens); //log_sum_exp is defined as the logarithm of the sum of exponentials of the input values
-      target += eta_event - log_denom;
+      log_denom = log_sum_exp(eta_rcens); //log_sum_exp is defined as the logarithm of the sum of exponentials of the input values
+      }
+      
+    if (nevent > 0) {
+      eta_event = x_event * Beta + x_int_event * Beta_int;
+      
+      for (n in 1:nevent){
+        log_denom = log_sum_exp(log_denom, eta_event[n]);
+        target += eta_event[n] - log_denom; // log likelihood
+      }
       }
       
     

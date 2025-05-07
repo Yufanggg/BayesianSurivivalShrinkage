@@ -1,5 +1,5 @@
 ---
-title: "01_Sim_data_Analysisbaseline"
+title: "03_Real_Data_Analysis"
 author: "Yufang Wang"
 date: "2025-03-18"
 output: pdf_document
@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 
 install_and_load <- function(packages) {
@@ -37,7 +37,9 @@ mean(real_df$status == "alive")
 mean(real_df$status == "death")
 
 # Reversed KM for follow-up analysis
-
+fit <- survfit(Surv(real_df$time, real_df$status != "graftloss") ~ 1)
+plot(fit)
+abline(h = 0.5, col = "red", lty = 2)
 
 str(real_df)
 real_df <- real_df[, !names(real_df) %in% "ID"]
@@ -56,11 +58,84 @@ print(colnames(real_df)[factorName])
 
 
 
-strafied_Data_DBD <- subset(subset(real_df, real_df$TypecadavericDBDDCD == "DBD"), select = -c(TypecadavericDBDDCD, factorName))
+strafied_Data_DBD <- subset(subset(real_df, real_df$TypecadavericDBDDCD == "DBD"), select = -c(TypecadavericDBDDCD))
 
 strafied_Data_DCD <- subset(subset(real_df, real_df$TypecadavericDBDDCD == "DCD"), select = -c(TypecadavericDBDDCD))
+```
+
+# DBD data
+```{r, echo=TRUE}
+#Get the frequency table for DBD
+DBD_Frequency_tab <- data.frame(
+  c = character(),
+  Levels = integer(),
+  MissingObs = integer(),
+  UniqueValues = character()
+)
+factorName["TypecadavericDBDDCD"] <- FALSE
+FactorVariables <- colnames(real_df)[factorName]
 
 
+for (facvar in FactorVariables){
+  #print(facvar)
+  Freq_tab = table(strafied_Data_DBD[[facvar]])
+  print(Freq_tab)
+  categories_Name = names(Freq_tab)
+  #Categories_Freq = table(Freq_tab)
+  temp_df <- data.frame(
+    Variable = facvar,
+    NumLevels = length(unique(strafied_Data_DBD[[facvar]])),
+    factor_Name = paste(categories_Name, collapse = ","),
+    factor_Freq = paste(Freq_tab, collapse = ",")
+  )
+  
+  DBD_Frequency_tab <- rbind(DBD_Frequency_tab, temp_df)
+  
+  temp_df <- data.frame(); rm(Freq_tab, categories_Name)
+}
+
+DBD_Frequency_tab
+
+write.csv(DBD_Frequency_tab, "./Data/DBD_Frequency.csv", row.names = FALSE)
+str(strafied_Data_DBD)
+
+
+#Get the frequency table for DCD
+DCD_Frequency_tab <- data.frame(
+  c = character(),
+  Levels = integer(),
+  MissingObs = integer(),
+  UniqueValues = character()
+)
+
+
+for (facvar in FactorVariables){
+  #print(facvar)
+  Freq_tab = table(strafied_Data_DCD[[facvar]])
+  print(Freq_tab)
+  categories_Name = names(Freq_tab)
+  #Categories_Freq = table(Freq_tab)
+  temp_df <- data.frame(
+    Variable = facvar,
+    NumLevels = length(unique(strafied_Data_DCD[[facvar]])),
+    factor_Name = paste(categories_Name, collapse = ","),
+    factor_Freq = paste(Freq_tab, collapse = ",")
+  )
+  
+  DCD_Frequency_tab <- rbind(DCD_Frequency_tab, temp_df)
+  
+  temp_df <- data.frame(); rm(Freq_tab, categories_Name)
+}
+
+DBD_Frequency_tab
+
+write.csv(DBD_Frequency_tab, "./Data/DCD_Frequency.csv", row.names = FALSE)
+str(strafied_Data_DCD)
+
+save(strafied_Data_DBD, strafied_Data_DCD, file = "./Data/strafied_Data.RData")
+```
+
+```{r, echo=TRUE}
 includingInter <- function(dataframe_) {
   #sum-coded all factor variables
   factor_var <- sapply(dataframe_, is.factor)
@@ -157,7 +232,7 @@ stan_data_bSplines_DBD <- stan_data_Constructer(
       obs_window = obs_window
     )
 
-model_fit_bSplines_DBD <- Bayesian_Survival_model(stan_data = stan_data_bSplines_DBD, withPrediction = FALSE, baseline_assumption = "bSplines", shrinkage = TRUE)
+model_fit_bSplines_DBD <- Bayesian_Survival_model(stan_data = stan_data_bSplines_DBD, withPrediction = FALSE, baseline_modelling = "bSplines", shrinkage = TRUE)
 
 #model diagnotics
 diagnostics_bSplines_DBD <- summary(model_fit_bSplines_DBD)$summary[, c("Rhat", "n_eff")]
@@ -213,7 +288,7 @@ stan_data_bSplines_DCD <- stan_data_Constructer(
       obs_window = obs_window
     )
 
-model_fit_bSplines_DCD <- Bayesian_Survival_model(stan_data = stan_data_bSplines_DCD, withPrediction = FALSE, baseline_assumption = "bSplines")
+model_fit_bSplines_DCD <- Bayesian_Survival_model(stan_data = stan_data_bSplines_DCD, withPrediction = FALSE, baseline_modelling = "bSplines")
 
 #model diagnotics
 diagnostics_bSplines_DCD <- summary(model_fit_bSplines_DCD)$summary[, c("Rhat", "n_eff")]
