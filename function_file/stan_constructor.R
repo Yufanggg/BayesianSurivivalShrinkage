@@ -1,11 +1,23 @@
 
 # assumptions: all data are right censored data with the observed window being [0, obs_window]
-# Construct stan data structure for baseline hazard of exponential, weibull and partial likelihood.
-stan_data_Constructer_noBSpline <- function (training_dataset, testing_dataset = NULL){
+# Construct stan data structure for baseline hazard of exponential and weibull.
+stan_data_Constructer_noBSpline <- function (training_dataset, testing_dataset = NULL, partialLiki = FALSE){
   
   #----------------------------
   # Prepare data for model fitting
   #-----------------------------
+  
+  if(partialLiki){
+    t_event = training_dataset[training_dataset$status == 1, "obstime"]
+    sorted_indices = order(t_event, decreasing = TRUE)
+    
+    t_rcens = training_dataset[training_dataset$status == 0, "obstime"]
+    sorted_indices_rcens = order(t_rcens, decreasing = TRUE)
+    
+  } else {
+    t_event = training_dataset[training_dataset$status == 1, "obstime"]
+    sorted_indices = 1:length(t_event)
+  }
   
   #----- organize the data regarding predictor
   
@@ -25,6 +37,9 @@ stan_data_Constructer_noBSpline <- function (training_dataset, testing_dataset =
   g1 <- g(main_indices_for_int, 1)
   g2 <- g(main_indices_for_int, 2)
   
+  # x_event = X_main[training_dataset$status == 1,]
+  # x_int_event =  X_int[training_dataset$status == 1,]
+  
  
   
   #----------------
@@ -34,18 +49,18 @@ stan_data_Constructer_noBSpline <- function (training_dataset, testing_dataset =
     #----- for model fitting --------
     nevent = nrow(training_dataset[training_dataset$status == 1, ]),
     nrcens = nrow(training_dataset[training_dataset$status == 0, ]),
-    t_event = training_dataset[training_dataset$status == 1, "obstime"],
-    t_rcens = training_dataset[training_dataset$status == 0, "obstime"],
+    t_event = training_dataset[training_dataset$status == 1, "obstime"][sorted_indices],
+    t_rcens = training_dataset[training_dataset$status == 0, "obstime"][sorted_indices_rcens],
     
     # predictor matrices (time-fixed)
     p = p,
     q = q,
     
-    x_event = X_main[training_dataset$status == 1,],
-    x_int_event =  X_int[training_dataset$status == 1,],
+    x_event = X_main[training_dataset$status == 1,][sorted_indices,],
+    x_int_event =  X_int[training_dataset$status == 1,][sorted_indices,],
     
-    x_rcens = X_main[training_dataset$status == 0,],
-    x_int_rcens = X_int[training_dataset$status == 0,],
+    x_rcens = X_main[training_dataset$status == 0,][sorted_indices_rcens,],
+    x_int_rcens = X_int[training_dataset$status == 0,][sorted_indices_rcens,],
     
     # link the interaction effect with the corresponding main effects
     g1 = g1,

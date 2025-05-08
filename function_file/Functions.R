@@ -233,10 +233,11 @@ cross_simulation <- function(whole_dataset, baseline_modelling = "weibull", num_
 
 # Function to construct stan_data for model fitting
 # @para: training_dataset: 
-stan_data_Constructer <- function(training_dataset, withPrediction = FALSE, testing_dataset = NULL, baseline_modelling = "bSplines", obs_window = 5){
+stan_data_Constructer <- function(training_dataset, withPrediction = FALSE, testing_dataset = NULL, baseline_modelling = "bSplines", partialLiki = FALSE, obs_window = 5){
   source("./function_file/stan_constructor.R")
   if (baseline_modelling != "bSplines"){
-    stan_data = stan_data_Constructer_noBSpline(training_dataset = training_dataset, testing_dataset = testing_dataset)
+    stan_data = stan_data_Constructer_noBSpline(training_dataset = training_dataset, testing_dataset = testing_dataset, partialLiki = partialLiki)
+    
   }
   else if (baseline_modelling == "bSplines"){
     stan_data = stan_bSpline_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset,  obs_window = 5)
@@ -344,86 +345,15 @@ Bayesian_Survival_result_Extract <- function(bayesian_model_fit, model_type,
     if (model_type == "exponential") {
       lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
       model_result$baselinePara <- lambda
-      # # Extract posterior samples
-      # posterior_samples <- extract(bayesian_model_fit,
-      #                              pars = "lambda",
-      #                              permuted = TRUE)
-      # 
-      # # Posterior samples for beta
-      # lambda_samples <- posterior_samples$lambda
-      # # Plot the posterior distribution
-      # hist(
-      #   lambda_samples,
-      #   breaks = 30,
-      #   main = "Posterior Distribution of lambda",
-      #   xlab = "Lambda"
-      # )
-    }
-    if (model_type == "weibull") {
+    } else if (model_type == "weibull") {
       lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
       shape <- Output[grep("^shape", rownames(Output)), "50%", drop = FALSE]
       model_result$baselinePara <- c(lambda, shape)
-      
-      # # Extract posterior samples
-      # posterior_samples <- extract(bayesian_model_fit,
-      #                              pars = "lambda",
-      #                              permuted = TRUE)
-      # 
-      # # Posterior samples for beta
-      # lambda_samples <- posterior_samples$lambda
-      # # Plot the posterior distribution
-      # hist(
-      #   lambda_samples,
-      #   breaks = 30,
-      #   main = "Posterior Distribution of lambda",
-      #   xlab = "lambda"
-      # )
-      # 
-      # Extract posterior samples
-      # posterior_samples <- extract(bayesian_model_fit,
-      #                              pars = "shape",
-      #                              permuted = TRUE)
-      # 
-      # # Posterior samples for beta
-      # shape_samples <- posterior_samples$shape
-      # # Plot the posterior distribution
-      # hist(
-      #   shape_samples,
-      #   breaks = 30,
-      #   main = "Posterior Distribution of shape",
-      #   xlab = "shape"
-      # )
-    }
-    if (model_type == "bSplines") {
+    } else if (model_type == "bSplines") {
       coefs <- Output[grep("^coefs", rownames(Output)), "mean", drop = FALSE]
       model_result$baselinePara = coefs
-      
-      # # Extract posterior samples
-      # posterior_samples <- extract(bayesian_model_fit,
-      #                              pars = "coefs",
-      #                              permuted = TRUE)
-      
-      # # Posterior samples for beta
-      # coefs_samples <- posterior_samples$coefs
-      # # Plot the posterior distribution
-      # hist(
-      #   coefs_samples[, 1],
-      #   breaks = 30,
-      #   main = "Posterior Distribution of lambda",
-      #   xlab = "coefs[1]"
-      # )
-      # hist(
-      #   coefs_samples[, 2],
-      #   breaks = 30,
-      #   main = "Posterior Distribution of lambda",
-      #   xlab = "coefs[2]"
-      # )
-      # hist(
-      #   coefs_samples[, 3],
-      #   breaks = 30,
-      #   main = "Posterior Distribution of lambda",
-      #   xlab = "coefs[3]"
-      # )
+    } else {
+      # No actions for 
     }
   }
   
