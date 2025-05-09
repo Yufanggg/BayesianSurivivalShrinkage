@@ -7,36 +7,21 @@
 //    https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started
 //
 
-functions {
-  int find_largest_index(vector t_rcens, real t_event_point) {
-    int max_index = -1;// Initialize to -1 or another indicator for no valid index
-    for (j in 1:num_elements(t_rcens)) {
-      if (t_rcens[j] > t_event_point) {
-        max_index = j; // Update max_index to the current index
-        }
-        }
-        return max_index;
-        }
-        
-}
-
 data {
   // response and time variables
+  int<lower=0> nobs;
   int<lower=0> nevent;
-  int<lower=0> nrcens;
-  vector[nevent] t_event;  // time of events (non-strict decreasing)
-  vector[nrcens] t_rcens;  // time of right censoring (non-strict decreasing)
+  vector[nobs] t_point;  // time of events (non-strict decreasing)
+  int<lower=1> event_indices[nevent];  // indices of events // time of right censoring (non-strict decreasing)
   
   
   // predictor matrices (time-fixed)
   int<lower=0> p; // num main effect
   int<lower=0> q; // num interaction effect
   
-  matrix[nevent,p] x_event; // for rows with events
-  matrix[nevent,q] x_int_event; 
+  matrix[nobs,p] x; // for rows with both events and cencored
+  matrix[nobs,q] x_int; 
   
-  matrix[nrcens,p] x_rcens; // for rows with right censoring
-  matrix[nrcens,q] x_int_rcens; // for rows with right censoring
   
   
   // link the interaction effect with the corresponding main effects
@@ -61,8 +46,8 @@ parameters {
 
 model {
        // pre-allocated variables
-    vector[nevent] eta_event; // for events
-    vector[nrcens] eta_rcens; // for right censored
+    vector[nobs] eta; // for events & right censored
+    
     real log_denom;
 
 
@@ -84,36 +69,37 @@ model {
 
       
     // partical log-likelihood, represented by [target]
-    if (nevent > 0) {
-      eta_event = x_event * Beta + x_int_event * Beta_int;
+    if (nobs > 0) {
+      eta = x * Beta + x_int * Beta_int;
       }
-      
-    // real log_denom = log_sum_exp(eta_rcens);
-    if (nrcens > 0){
-       eta_rcens = x_rcens * Beta + x_int_rcens * Beta_int;
-    }
     
-    for (n in 1:nevent) {
-      if  (nrcens > 0) {
-        // Find indices in t_rcens that are larger than t_event[i]
-        int largest_indices = find_largest_index(t_rcens, t_event[n]);
-        if(largest_indices != -1){
-          log_denom = log_sum_exp(eta_rcens[1:largest_indices]);
-        } else {
-          log_denom = log_sum_exp(0, 0);
+    // Ensure event_indices is declared as int[] in the data block
+    int last_event_index = event_indices[num_elements(event_indices)];  // last event time point
+    if (last_event_index == nobs) {  // if the last time point is the event time point
+      log_denom = 0;
+      } else {  // if the last time point is a censored time point
+        int start_idx = last_event_index;
+        int end_idx = num_elements(eta);
+        vector[end_idx - start_idx + 1] eta_censored_tail = eta[start_idx:end_idx];
+        log_denom = log_sum_exp(eta_censored_tail);  // contribution from censored cases
         }
-      }
-      // log_denom = log_sum_exp(eta_rcens[1:])
-      log_denom = log_sum_exp(log_denom, eta_event[n]);
-      target += eta_event[n] - log_denom;   // log likelihood
-  }
-      
-    
+        
+    for (n in 1:nevent) {
+      if (n != 1 && event_indices[n] != event_indices[n - 1] + 1) {
+        int a = event_indices[n - 1] -1;
+        int b = event_indices[n];
+        log_denom = log_sum_exp(log_denom, log_sum_exp(eta[a:b]));
+        } else {
+          log_denom = log_sum_exp(log_denom, eta[event_indices[n]]);
+          }
+        target += eta[event_indices[n]] - log_denom;  // log-likelihood contribution
+        }
+          
 }
 
 generated quantities{
       // Predicting the survival time on the new/test dataset
-      vector[nnew] eta_pred;
-      eta_pred = x_new * Beta + x_int_new * Beta_int;
+      vector[nnew] eta_new;
+      eta_new = x_new * Beta + x_int_new * Beta_int;
 }
 

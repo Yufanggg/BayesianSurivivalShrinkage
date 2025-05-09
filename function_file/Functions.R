@@ -231,59 +231,6 @@ cross_simulation <- function(whole_dataset, baseline_modelling = "weibull", num_
 
 
 
-# Function to construct stan_data for model fitting
-# @para: training_dataset: 
-stan_data_Constructer <- function(training_dataset, withPrediction = FALSE, testing_dataset = NULL, baseline_modelling = "bSplines", partialLiki = FALSE, obs_window = 5){
-  source("./function_file/stan_constructor.R")
-  if (baseline_modelling != "bSplines"){
-    stan_data = stan_data_Constructer_noBSpline(training_dataset = training_dataset, testing_dataset = testing_dataset, partialLiki = partialLiki)
-    
-  }
-  else if (baseline_modelling == "bSplines"){
-    stan_data = stan_bSpline_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset,  obs_window = 5)
-  }
-  
-  # 
-  # 
-  # if (withPrediction) {
-  #   if (is.null(testing_dataset)) {
-  #     stop("For predictions, the testing_dataset cannot be empty!")
-  #   }
-  #   if (baseline_modelling == "exponential") {
-  #     source("./function_file/exponential_stan_constructorwithPred.R")
-  #     stan_data = stan_exponential_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset)
-  #   }
-  #   
-  #   if (baseline_modelling == "weibull") {
-  #     source("./function_file/weibull_stan_constructorwithPred.R")
-  #     stan_data = stan_weibull_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset)
-  #   }
-  #   
-  #   if (baseline_modelling == "bSplines") {
-  #     source("./function_file/bSpline_stan_constructorwithPred.R")
-  #     stan_data = stan_bSpline_data_Constructer(training_dataset = training_dataset, testing_dataset = testing_dataset,
-  #       obs_window = 5)
-  #   }
-  # }
-  # else{
-  #   if (baseline_modelling == "exponential") {
-  #     source("./function_file/exponential_stan_constructornoPred.R")
-  #     stan_data = stan_exponential_data_Constructer1(training_dataset = training_dataset)
-  #   }
-  #   
-  #   if (baseline_modelling == "weibull") {
-  #     source("./function_file/weibull_stan_constructornoPred.R")
-  #     stan_data = stan_weibull_data_Constructer1(training_dataset = training_dataset)
-  #   }
-  #   
-  #   if (baseline_modelling == "bSplines") {
-  #     source("./function_file/bSpline_stan_constructornoPred.R")
-  #     stan_data = stan_bSpline_data_Constructer1(training_dataset = training_dataset,
-  #                                               obs_window = 5)
-  #   }
-  # }
-  return(stan_data)
-}
 
 # Function to check the Bayesian survival model using various criteria
 # @param: model, a model fitting by the bayesian method.

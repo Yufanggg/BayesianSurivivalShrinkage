@@ -8,8 +8,8 @@ output: pdf_document
 # Step 1: Set up the environment
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+#rm(list = ls())
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 
 
 install_and_load <- function(packages) {
@@ -27,6 +27,7 @@ required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival
 install_and_load(required_packages)
 
 source("./function_file/Functions.R")
+source("./function_file/stan_constructor.R")
 ```
 
 
@@ -56,23 +57,26 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
     testing_dataset = NULL
   }
   
-  stan_data_noBSpline <- stan_data_Constructer(
+  stan_data_PH <- stan_data_Constructer_PH(
     training_dataset = training_dataset,
-    testing_dataset = testing_dataset,
-    baseline_modelling = "noBSplines"
+    testing_dataset = testing_dataset
   )
   
-  stan_data_bSplines <- stan_data_Constructer(
+  stan_data_noBSpline <- stan_data_Constructer_noBSpline(
+    training_dataset = training_dataset,
+    testing_dataset = testing_dataset
+  )
+  
+  stan_data_bSplines <- stan_data_Constructer_BSpline(
     training_dataset = training_dataset,
     testing_dataset = testing_dataset,
-    baseline_modelling = "bSplines",
     obs_window = 5
   )
     
   #fit model
   model_fit_exponential <-  Bayesian_Survival_model(stan_data = stan_data_noBSpline, withPrediction = TRUE, baseline_modelling = "exponential", shrinkage = TRUE)
   model_fit_weibull <- Bayesian_Survival_model(stan_data = stan_data_noBSpline, withPrediction = TRUE, baseline_modelling = "weibull", shrinkage = TRUE)
-  model_fit_PH <- Bayesian_Survival_model(stan_data = stan_data_noBSpline, withPrediction = TRUE, baseline_modelling = "none", shrinkage = TRUE)
+  model_fit_PH <- Bayesian_Survival_model(stan_data = stan_data_PH, withPrediction = TRUE, baseline_modelling = "none", shrinkage = TRUE)
   model_fit_bSplines <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_modelling = "bSplines", shrinkage = TRUE)
   
   #collect diagnostics
@@ -85,7 +89,7 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   #extract the info from the bayesian model fit
   model_result_exponential <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_exponential, model_type = "exponential", criteria = criteria)
   model_result_weibull <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_weibull,  model_type = "weibull", criteria = criteria)
-  model_result_PH <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_PH,  model_type = "weibull", criteria = criteria)
+  model_result_PH <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_PH,  model_type = "PH", criteria = criteria)
   model_result_bSplines <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines, model_type = "bSplines", criteria = criteria)
   
   #---------coefficients for X----------
@@ -94,6 +98,7 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
     output$Beta_est_weibull = model_result_weibull$Beta_bayesian_est[, "mean"]
     
     output$Beta_est_bSplines = model_result_bSplines$Beta_bayesian_est[, "mean"]
+    output$Beta_est_PH = model_result_PH$Beta_bayesian_est[, "mean"]
   }
   
   #----------baseline hazard----------
@@ -129,21 +134,27 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   if ("variableSelection" %in% criteria) {
     output$variableSelection_exponential <-
       model_result_exponential$variableSelection
+    
     output$variableSelection_weibull <-
       model_result_weibull$variableSelection
+    
     output$variableSelection_bSplines <-
       model_result_bSplines$variableSelection
+    
+    output$variableSelection_PH <-
+      model_result_PH$variableSelection
   }
   
   if ("Prediction_SurvivalProb" %in% criteria) {
     
     output$time = testing_dataset$obstime
     output$true_status = testing_dataset$status
-    output$eta_true = as.vector(as.matrix(stan_data_weibull$x_new) %*% output$Beta_true[1:10] + as.matrix(stan_data_weibull$x_int_new) %*% output$Beta_true[11:55])
+    output$eta_true = as.vector(as.matrix(stan_data_noBSpline$x_new) %*% output$Beta_true[1:10] + as.matrix(stan_data_noBSpline$x_int_new) %*% output$Beta_true[11:55])
     
     output$eta_pred_exponential = model_result_exponential$eta_pred
     output$eta_pred_weibulll = model_result_weibull$eta_pred
     output$eta_pred_bSplines = model_result_bSplines$eta_pred
+    output$eta_pred_PH= model_result_PH$eta_pred
     
     output$sp_exponential = model_result_exponential$sp
     output$sp_weibull = model_result_weibull$sp
@@ -152,31 +163,34 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   return(output)
 }
 
-replicate_times = 50
+replicate_times = 2
 simulated_results <- replicate(replicate_times, simulation_bayint_survival(), simplify = "array")
-save.image(file = "./Data/sim_50_para_int.RData")
+#save.image(file = "./Data/sim_50_para_int_PH.RData")
 ```
 
 ```{r, echo=TRUE}
-load(file = "./Data/sim_50_para_int.RData")
+# load(file = "./Data/sim_50_para_int.RData")
 MSEs_exponential = matrix(nrow = replicate_times, ncol = 55)
 MSEs_weibull = matrix(nrow = replicate_times, ncol = 55)
 MSEs_bSplines = matrix(nrow = replicate_times, ncol = 55)
-
+MSEs_PH = matrix(nrow = replicate_times, ncol = 55)
 
 FDR_exponential = rep(NA, replicate_times)
 FDR_weibull = rep(NA, replicate_times)
 FDR_bSplines = rep(NA, replicate_times)
+FDR_PH = rep(NA, replicate_times)
 
 
 CI_index_exponential = rep(NA, replicate_times)
 CI_index_weibull = rep(NA, replicate_times)
 CI_index_bSplines = rep(NA, replicate_times)
+CI_index_PH = rep(NA, replicate_times)
 
 
 cor_exponential = rep(NA, replicate_times)
 cor_weibull = rep(NA, replicate_times)
 cor_bSplines = rep(NA, replicate_times)
+cor_PH = rep(NA, replicate_times)
 
 cor_sp_exponential = rep(NA, replicate_times)
 cor_sp_weibull = rep(NA, replicate_times)
@@ -188,10 +202,12 @@ for (i in 1:replicate_times){
   Beta_est_exponential <- simulated_results[,i]$Beta_est_exponential
   Beta_est_weibull <- simulated_results[,i]$Beta_est_weibull
   Beta_est_bSplines <-  simulated_results[,i]$Beta_est_bSplines
+  Beta_est_PH <-  simulated_results[,i]$Beta_est_PH
   
   MSEs_exponential[i, ] <- (Beta_est_exponential - Beta_true)**2
   MSEs_weibull[i, ] <- (Beta_est_weibull - Beta_true)**2
   MSEs_bSplines[i, ] <- (Beta_est_bSplines - Beta_true)**2
+  MSEs_PH[i, ] <- (Beta_est_PH - Beta_true)**2
   
   
   # FDR
@@ -199,16 +215,19 @@ for (i in 1:replicate_times){
   Selection_exponential <- simulated_results[,i]$variableSelection_exponential 
   Selection_weibull <- simulated_results[,i]$variableSelection_weibull
   Selection_bSplines <- simulated_results[,i]$variableSelection_bSplines
+  Selection_PH <- simulated_results[,i]$variableSelection_PH
   
   FDR_exponential[i] <- sum(Selection_exponential & !variableSelection_reference) / sum(Selection_exponential)
   FDR_weibull[i] <- sum(Selection_weibull & !variableSelection_reference) / sum(Selection_weibull)
   FDR_bSplines[i] <- sum(Selection_bSplines & !variableSelection_reference) / sum(Selection_bSplines)
+  FDR_bSplines[i] <- sum(Selection_PH & !variableSelection_reference) / sum(Selection_PH)
   
   #linear predictor
   eta_true <- simulated_results[,i]$eta_true
   eta_pre_exponential <- simulated_results[, i]$eta_pred_exponential
   eta_pre_weibull <- simulated_results[, i]$eta_pred_weibulll
   eta_pre_bSplines <- simulated_results[, i]$eta_pred_bSplines
+  eta_pre_PH <- simulated_results[, i]$eta_pred_PH
   
   
   
@@ -219,6 +238,7 @@ for (i in 1:replicate_times){
   cor_exponential[i] <- cor(eta_true, eta_pre_exponential)
   cor_weibull[i] <- cor(eta_true, eta_pre_weibull)
   cor_bSplines[i] <- cor(eta_true, eta_pre_bSplines)
+  cor_PH[i] <- cor(eta_true, eta_pre_PH)
   
   # CI 
   time <- simulated_results[,i]$time
@@ -228,20 +248,21 @@ for (i in 1:replicate_times){
   CI_index_exponential[i] <- rcorr.cens(-eta_pre_exponential, Surv(time, true_status))["C Index"] # rcorr.cens
   CI_index_weibull[i] <- rcorr.cens(-eta_pre_weibull, Surv(time, true_status))["C Index"]
   CI_index_bSplines[i] <- rcorr.cens(-eta_pre_bSplines, Surv(time, true_status))["C Index"]
+  CI_index_PH[i] <- rcorr.cens(-eta_pre_PH, Surv(time, true_status))["C Index"]
   
-  cor_sp_exponential[i] <- cor(sp_true, sp_pre_exponential)# rcorr.cens
-  cor_sp_weibull[i] <- cor(sp_true, sp_pre_weibull)#
-  cor_sp_bSplines[i] <- cor(sp_true, sp_pre_weibull)#
+  # cor_sp_exponential[i] <- cor(sp_true, sp_pre_exponential)# rcorr.cens
+  # cor_sp_weibull[i] <- cor(sp_true, sp_pre_weibull)#
+  # cor_sp_bSplines[i] <- cor(sp_true, sp_pre_bSplines)#
 }
 
 mean_MSEs_exponential <- apply(MSEs_exponential, 2, mean)
 mean_MSEs_weibull <- apply(MSEs_weibull, 2, mean)
 mean_MSEs_bSplines <- apply(MSEs_bSplines, 2, mean)
-
+mean_MSEs_PH <- apply(MSEs_PH, 2, mean)
 # visualized result
 fill_vector = (simulated_results[, 1]$Beta_true != 0)
 
-par(mfrow = c(3, 2))
+par(mfrow = c(2, 2))
 plot(mean_MSEs_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.3), main = "MSE for Beta estimation", pch = 16)
 
 # Add background rectangles
@@ -254,24 +275,23 @@ for (i in 1:length(mean_MSEs_exponential)) {
 lines(mean_MSEs_weibull, type = "o", col = "green", pch = 16)
 lines(mean_MSEs_bSplines, type = "o", col = "orange", pch = 16)
 lines(mean_MSEs_exponential, type = "o", col = "blue", pch = 16)
+lines(mean_MSEs_PH, type = "o", col = "grey", pch = 16)
+
 abline(v = 10, col = "red", lty = 2)
 # Add legend
-legend("topright", legend = c("Exponential", "Weibull", "B-Splines"), col = c("blue", "green", "orange"), pch = 16, lty = 1)
+legend("topright", legend = c("Exponential", "Weibull", "B-Splines", "PH"), col = c("blue", "green", "orange", "grey"), pch = 16, lty = 1)
 
 # Create side-by-side boxplots for FDR
-FDR_list = list(FDR_exponential = FDR_exponential, FDR_weibull = FDR_weibull, FDR_bSplines = FDR_bSplines)
-boxplot(FDR_list, names = c("exponential", "weibull", "bSplines"), col = c("blue", "green", "orange"), main = "FDR Boxplots", xlab = "", ylab = "FDR")
+FDR_list = list(FDR_exponential = FDR_exponential, FDR_weibull = FDR_weibull, FDR_bSplines = FDR_bSplines, FDR_PH = FDR_PH)
+boxplot(FDR_list, names = c("exponential", "weibull", "bSplines", "PH"), col = c("blue", "green", "orange", "grey"), main = "FDR Boxplots", xlab = "", ylab = "FDR")
 
 # Create the Brier score
-cor_list = list(exponential = cor_exponential, weibull = cor_weibull, bSplines = cor_bSplines)
-boxplot(cor_list, names = c("exponential", "weibull", "bSplines"), col = c("blue", "green", "orange"), main = "True vs. predicted linear predictor", xlab = "", ylab = "correlation")
-
-cor_sp_list = list(cor_sp_exponential = cor_sp_exponential, cor_sp_weibull = cor_sp_weibull, cor_sp_bSplines = cor_sp_bSplines)
-boxplot(cor_sp_list, names = c("exponential", "weibull", "bSplines"), col = c("blue", "green", "orange"), main = "cor_sp Boxplots", xlab = "", ylab = "cor_sp")
+cor_list = list(exponential = cor_exponential, weibull = cor_weibull, bSplines = cor_bSplines, PH = cor_PH)
+boxplot(cor_list, names = c("exponential", "weibull", "bSplines", "PH"), col = c("blue", "green", "orange", "grey"), main = "True vs. predicted linear predictor", xlab = "", ylab = "correlation")
 
 # Create the CI index
-CI_index_list = list(CI_index_exponential = CI_index_exponential, CI_index_weibull = CI_index_weibull, CI_index_bSplines = CI_index_bSplines)
-boxplot(CI_index_list, names = c("exponential", "weibull", "bSplines"), col = c("blue", "green", "orange"), main = "C index Boxplots", xlab = "", ylab = "C index")
+CI_index_list = list(CI_index_exponential = CI_index_exponential, CI_index_weibull = CI_index_weibull, CI_index_bSplines = CI_index_bSplines, CI_index_PH = CI_index_PH)
+boxplot(CI_index_list, names = c("exponential", "weibull", "bSplines", "PH"), col = c("blue", "green", "orange", "grey"), main = "C index Boxplots", xlab = "", ylab = "C index")
 ```
 
 # Step 3: visualize the estimated basline hazard
