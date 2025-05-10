@@ -8,7 +8,7 @@ output: pdf_document
 # Step 1: Set up the environment
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-#rm(list = ls())
+rm(list = ls())
 setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 
 
@@ -163,9 +163,9 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   return(output)
 }
 
-replicate_times = 2
+replicate_times = 50
 simulated_results <- replicate(replicate_times, simulation_bayint_survival(), simplify = "array")
-#save.image(file = "./Data/sim_50_para_int_PH.RData")
+save.image(file = "./Data/sim_50_para_int_PH.RData")
 ```
 
 ```{r, echo=TRUE}
@@ -220,7 +220,7 @@ for (i in 1:replicate_times){
   FDR_exponential[i] <- sum(Selection_exponential & !variableSelection_reference) / sum(Selection_exponential)
   FDR_weibull[i] <- sum(Selection_weibull & !variableSelection_reference) / sum(Selection_weibull)
   FDR_bSplines[i] <- sum(Selection_bSplines & !variableSelection_reference) / sum(Selection_bSplines)
-  FDR_bSplines[i] <- sum(Selection_PH & !variableSelection_reference) / sum(Selection_PH)
+  FDR_PH[i] <- sum(Selection_PH & !variableSelection_reference) / sum(Selection_PH)
   
   #linear predictor
   eta_true <- simulated_results[,i]$eta_true

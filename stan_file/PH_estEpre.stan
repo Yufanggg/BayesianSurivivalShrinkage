@@ -85,11 +85,17 @@ model {
         }
         
     for (n in 1:nevent) {
+      int a; int b;
+      // print("event_indices:"); print(event_indices[n]);
       if (n != 1 && event_indices[n] != event_indices[n - 1] + 1) {
-        int a = event_indices[n - 1] -1;
-        int b = event_indices[n];
+        a = event_indices[n - 1] + 1;
+        b = event_indices[n];
+        // print("a = "); print(a);
+        // print("b ="); print(b);
+        
         log_denom = log_sum_exp(log_denom, log_sum_exp(eta[a:b]));
         } else {
+          // print("event_indices[n] = "); print(event_indices[n]);
           log_denom = log_sum_exp(log_denom, eta[event_indices[n]]);
           }
         target += eta[event_indices[n]] - log_denom;  // log-likelihood contribution
