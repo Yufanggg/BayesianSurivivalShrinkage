@@ -25,6 +25,7 @@ required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival
 install_and_load(required_packages)
 
 source("./function_file/Functions.R")
+source("./function_file/stan_constructor.R")
 ```
 
 
@@ -45,43 +46,56 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   output$Beta_true = Beta
   
   #constructor data for the model
+  #constructor data for the model
   if (withPrediction) {
     samples <- sample(1:nrow(dataset), 100)
     training_dataset <- dataset[-samples, ]
     testing_dataset <- dataset[samples, ]
-    
-    stan_data_bSplines <- stan_data_Constructer(
-      training_dataset = training_dataset,
-      withPrediction = withPrediction,
-      testing_dataset = testing_dataset,
-      baseline_modelling = "bSplines",
-      obs_window = 5
-    )
-  }  else {
-    
-    stan_data_bSplines <- stan_data_Constructer(
-      training_dataset = dataset,
-      baseline_modelling = "bSplines",
-      obs_window = 5
-    )
+  } else{
+    training_dataset = dataset
+    testing_dataset = NULL
   }
+  stan_data_PH <- stan_data_Constructer_PH(
+    training_dataset = training_dataset,
+    testing_dataset = testing_dataset
+  )
+  
+  
+  stan_data_bSplines <- stan_data_Constructer_BSpline(
+    training_dataset = training_dataset,
+    testing_dataset = testing_dataset,
+    obs_window = 5
+  )
     
   #fit model
   model_fit_bSplines_withShrinkage <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_modelling = "bSplines", shrinkage = TRUE)
   model_fit_bSplines_noShrinkage <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_modelling = "bSplines", shrinkage = FALSE)
   
+  model_fit_PH_withShrinkage <- Bayesian_Survival_model(stan_data = stan_data_PH, baseline_modelling = "none", shrinkage = TRUE)
+  model_fit_PH_noShrinkage <- Bayesian_Survival_model(stan_data = stan_data_PH, baseline_modelling = "none", shrinkage = FALSE)
+  
   #collect diagnostics
   output$diagnostics_bSplines_withShrinkage <- summary(model_fit_bSplines_withShrinkage)$summary[, c("Rhat", "n_eff")]
   output$diagnostics_bSplines_noShrinkage <- summary(model_fit_bSplines_noShrinkage)$summary[, c("Rhat", "n_eff")]
+  
+  output$diagnostics_PH_withShrinkage <- summary(model_fit_PH_withShrinkage)$summary[, c("Rhat", "n_eff")]
+  output$diagnostics_PH_noShrinkage <- summary(model_fit_PH_noShrinkage)$summary[, c("Rhat", "n_eff")]
 
   #extract the info from the bayesian model fit
   model_result_bSplines_withShrinkage <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines_withShrinkage, model_type = "bSplines", criteria = criteria)
   model_result_bSplines_noShrinkage <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines_noShrinkage, model_type = "bSplines", criteria = criteria)
   
+  model_result_PH_withShrinkage <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_PH_withShrinkage, model_type = "none", criteria = criteria)
+  model_result_PH_noShrinkage <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_PH_noShrinkage, model_type = "none", criteria = criteria)
+  
+  
   #---------coefficients for X----------
   if ("DesignCoefficients" %in% criteria){
     output$Beta_est_bSplines_withShrinkage = model_result_bSplines_withShrinkage$Beta_bayesian_est[, "mean"]
     output$Beta_est_bSplines_noShrinkage = model_result_bSplines_noShrinkage$Beta_bayesian_est[, "mean"]
+    
+    output$Beta_est_PH_withShrinkage = model_result_PH_withShrinkage$Beta_bayesian_est[, "mean"]
+    output$Beta_est_PH_noShrinkage = model_result_PH_noShrinkage$Beta_bayesian_est[, "mean"]
   }
   
   #----------baseline hazard----------
@@ -114,6 +128,12 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
     
     output$variableSelection_bSplines_noShrinkage <-
       model_result_bSplines_noShrinkage$variableSelection
+    
+    output$variableSelection_PH_withShrinkage <-
+      model_result_PH_withShrinkage$variableSelection
+    
+    output$variableSelection_PH_noShrinkage <-
+      model_result_PH_noShrinkage$variableSelection
   }
   
   if ("Prediction_SurvivalProb" %in% criteria) {
@@ -127,8 +147,8 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
     output$eta_pred_bSplines_noShrinkage = model_result_bSplines_noShrinkage$eta_pred
 
     
-    output$sp_bSplines_withShrinkage = model_result_bSplines_withShrinkage$sp
-    output$sp_bSplines_noShrinkage = model_result_bSplines_noShrinkage$sp
+    output$eta_pred_PH_withShrinkage = model_result_PH_withShrinkage$eta_pred
+    output$eta_pred_PH_noShrinkage = model_result_PH_noShrinkage$eta_pred
     rm(training_dataset, testing_dataset)
   }
   return(output)
@@ -137,7 +157,7 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
 
 replicate_times = 50
 simulated_results <- replicate(replicate_times, simulation_bayint_survival_shrinkage(), simplify = "array")
-save.image(file = "./Data/sim_50_para_shrinkagenowith.RData")
+save.image(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
 ```
 
 ```{r, echo=TRUE}
@@ -147,13 +167,27 @@ MSEs_bSplines_withShrinkage = matrix(nrow = replicate_times, ncol = 55)
 FDR_bSplines_withShrinkage = rep(NA, replicate_times)
 CI_index_bSplines_withShrinkage = rep(NA, replicate_times)
 cor_eta_bSplines_withShrinkage = rep(NA, replicate_times)
-cor_sp_bSplines_withShrinkage = rep(NA, replicate_times)
+
 
 MSEs_bSplines_noShrinkag = matrix(nrow = replicate_times, ncol = 55)
 FDR_bSplines_noShrinkag = rep(NA, replicate_times)
 CI_index_bSplines_noShrinkag = rep(NA, replicate_times)
 cor_eta_bSplines_noShrinkag = rep(NA, replicate_times)
-cor_sp_bSplines_noShrinkag = rep(NA, replicate_times)
+
+
+
+MSEs_PH_withShrinkage = matrix(nrow = replicate_times, ncol = 55)
+FDR_PH_withShrinkage = rep(NA, replicate_times)
+CI_index_PH_withShrinkage = rep(NA, replicate_times)
+cor_eta_PH_withShrinkage = rep(NA, replicate_times)
+
+
+MSEs_PH_noShrinkag = matrix(nrow = replicate_times, ncol = 55)
+FDR_PH_noShrinkag = rep(NA, replicate_times)
+CI_index_PH_noShrinkag = rep(NA, replicate_times)
+cor_eta_PH_noShrinkag = rep(NA, replicate_times)
+
+
 
 
 for (i in 1:replicate_times){
@@ -166,6 +200,12 @@ for (i in 1:replicate_times){
   Beta_est_bSplines_noShrinkage <-  simulated_results[,i]$Beta_est_bSplines_noShrinkage
   MSEs_bSplines_noShrinkag[i, ] <- (Beta_est_bSplines_noShrinkage - Beta_true)**2
   
+  Beta_est_PH_withShrinkage <-  simulated_results[,i]$Beta_est_PH_withShrinkage
+  MSEs_PH_withShrinkage[i, ] <- (Beta_est_PH_withShrinkage - Beta_true)**2
+  
+  Beta_est_PH_noShrinkage <-  simulated_results[,i]$Beta_est_PH_noShrinkage
+  MSEs_PH_noShrinkag[i, ] <- (Beta_est_PH_noShrinkage - Beta_true)**2
+  
   
   # FDR
   variableSelection_reference <- ifelse(simulated_results[,i]$Beta_true != 0, TRUE, FALSE)
@@ -175,6 +215,12 @@ for (i in 1:replicate_times){
   Selection_bSplines_noShrinkage <- simulated_results[,i]$variableSelection_bSplines_noShrinkage
   FDR_bSplines_noShrinkag[i] <- sum(Selection_bSplines_noShrinkage & !variableSelection_reference) / sum(Selection_bSplines_withShrinkage)
   
+  Selection_PH_withShrinkage <- simulated_results[,i]$variableSelection_PH_withShrinkage
+  FDR_PH_withShrinkage[i] <- sum(Selection_PH_withShrinkage & !variableSelection_reference) / sum(Selection_PH_withShrinkage)
+  
+  Selection_PH_noShrinkage <- simulated_results[,i]$variableSelection_PH_noShrinkage
+  FDR_PH_noShrinkag[i] <- sum(Selection_PH_noShrinkage & !variableSelection_reference) / sum(Selection_bSplines_withShrinkage)
+  
   #linear predictor
   eta_true <- simulated_results[,i]$eta_true
   eta_pre_bSplines_withShrinkage <- simulated_results[,i]$eta_pred_bSplines_withShrinkage
@@ -183,26 +229,32 @@ for (i in 1:replicate_times){
   cor_eta_bSplines_withShrinkage[i] <- cor(eta_true, eta_pre_bSplines_withShrinkage)
   cor_eta_bSplines_noShrinkag[i] <- cor(eta_true, eta_pre_bSplines_noShrinkage)
   
+  eta_pre_PH_withShrinkage <- simulated_results[,i]$eta_pred_PH_withShrinkage
+  eta_pre_PH_noShrinkage <- simulated_results[,i]$eta_pred_PH_noShrinkage
+  
+  cor_eta_PH_withShrinkage[i] <- cor(eta_true, eta_pre_PH_withShrinkage)
+  cor_eta_PH_noShrinkag[i] <- cor(eta_true, eta_pre_PH_noShrinkage)
+  
   # C-index
   time <- simulated_results[,i]$time
   true_status <- simulated_results[,i]$true_status
   sp_true <- exp(-2 * time^10 * exp(eta_true))
-  
-  sp_pre_bSplines_withShrinkage <- simulated_results[,i]$sp_bSplines_withShrinkage
-  sp_pre_bSplines_noShrinkage <- simulated_results[,i]$sp_bSplines_noShrinkage
   
   
   time <- simulated_results[,i]$time
   CI_index_bSplines_withShrinkage[i] <- rcorr.cens(-eta_pre_bSplines_withShrinkage, Surv(time, true_status))[['C Index']]# rcorr.cens
   CI_index_bSplines_noShrinkag[i] <- rcorr.cens(-eta_pre_bSplines_noShrinkage, Surv(time, true_status))[['C Index']]
   
-  cor_sp_bSplines_withShrinkage[i] <- cor(sp_true, sp_pre_bSplines_withShrinkage)
-  cor_sp_bSplines_noShrinkag[i] <- cor(sp_true, sp_pre_bSplines_noShrinkage)
+  CI_index_PH_withShrinkage[i] <- rcorr.cens(-eta_pre_PH_withShrinkage, Surv(time, true_status))[['C Index']]# rcorr.cens
+  CI_index_PH_noShrinkag[i] <- rcorr.cens(-eta_pre_PH_noShrinkage, Surv(time, true_status))[['C Index']]
   
 }
 
 mean_MSEs_bSplines_withShrinkage <- apply(MSEs_bSplines_withShrinkage, 2, mean)
 mean_MSEs_bSplines_noShrinkag <- apply(MSEs_bSplines_noShrinkag, 2, mean)
+
+mean_MSEs_PH_withShrinkage <- apply(MSEs_PH_withShrinkage, 2, mean)
+mean_MSEs_PH_noShrinkag <- apply(MSEs_PH_noShrinkag, 2, mean)
 
 # visualized result
 fill_vector = (simulated_results[, 1]$Beta_true != 0)
@@ -218,23 +270,25 @@ for (i in 1:length(mean_MSEs_bSplines_withShrinkage)) {
 }
 
 lines(mean_MSEs_bSplines_noShrinkag, type = "o", col = "green", pch = 16)
+lines(mean_MSEs_PH_withShrinkage, type = "o", col = "orange", pch = 16)
+lines(mean_MSEs_PH_noShrinkag, type = "o", col = "grey", pch = 16)
 # Add legend
-legend("topright", legend = c("withshrinkage", "noshrinkage"), col = c("blue", "green"), pch = 16, lty = 1)
+legend("topright", legend = c("B_withshrinkage", "B_noshrinkage", "PH_withshrinkage", "PH_noshrinkage"), col = c("blue", "green", "orange", "grey"), pch = 16, lty = 1)
 
 # Create side-by-side boxplots for FDR
-FDR_list = list(FDR_bSplines_withShrinkage = FDR_bSplines_withShrinkage, FDR_bSplines_noShrinkag = FDR_bSplines_noShrinkag)
-boxplot(FDR_list, names = c("withshrinkage", "noshrinkage"), col = c("blue", "green"), main = "FDR Boxplots", xlab = "", ylab = "FDR")
+FDR_list = list(FDR_bSplines_withShrinkage = FDR_bSplines_withShrinkage, FDR_bSplines_noShrinkag = FDR_bSplines_noShrinkag, FDR_PH_withShrinkage = FDR_PH_withShrinkage, FDR_PH_noShrinkag = FDR_PH_noShrinkag)
+boxplot(FDR_list, names = c("B_withshrinkage", "B_noshrinkage", "PH_withshrinkage", "PH_noshrinkage"), col = c("blue", "green", "orange", "grey"), main = "FDR Boxplots", xlab = "", ylab = "FDR")
 
 # Create the Brier score
-cor_eta_list = list(withShrinkage = cor_eta_bSplines_withShrinkage, noShrinkag = cor_eta_bSplines_noShrinkag)
-boxplot(cor_eta_list, names = c("withShrinkage", "noShrinkag"), col = c("blue", "green"), main = "True vs. predicted linear predictor", xlab = "", ylab = "correlation")
+cor_eta_list = list(bSplines_withShrinkage = cor_eta_bSplines_withShrinkage, bSplines_noShrinkag = cor_eta_bSplines_noShrinkag, PH_withShrinkage = cor_eta_PH_withShrinkage, PH_noShrinkag = cor_eta_PH_noShrinkag)
+boxplot(cor_eta_list, names = c("B_withshrinkage", "B_noshrinkage", "PH_withshrinkage", "PH_noshrinkage"), col = c("blue", "green", "orange", "grey"), main = "True vs. predicted linear predictor", xlab = "", ylab = "correlation")
 
 # cor_sp_list = list(withShrinkage = cor_sp_bSplines_withShrinkage, noShrinkag = cor_sp_bSplines_noShrinkag)
 # boxplot(cor_sp_list, names = c("withShrinkage", "noShrinkag"), col = c("blue", "green"), main = "cor_sp Boxplots", xlab = "", ylab = "cor_sp")
 
 # Create the CI index
-CI_index_list = list(CI_index_bSplines_withShrinkage = CI_index_bSplines_withShrinkage, CI_index_bSplines_noShrinkag = CI_index_bSplines_noShrinkag)
-boxplot(CI_index_list, names = c("withshrinkage", "noshrinkage"), col = c("blue", "green"), main = "C index Boxplots", xlab = "", ylab = "CI index")
+CI_index_list = list(CI_index_bSplines_withShrinkage = CI_index_bSplines_withShrinkage, CI_index_bSplines_noShrinkag = CI_index_bSplines_noShrinkag, CI_index_PH_withShrinkage = CI_index_PH_withShrinkage, CI_index_PH_noShrinkag = CI_index_PH_noShrinkag)
+boxplot(CI_index_list, names = c("B_withshrinkage", "B_noshrinkage", "PH_withshrinkage", "PH_noshrinkage"), col = c("blue", "green", "orange", "grey"), main = "C index Boxplots", xlab = "", ylab = "CI index")
 ```
 
 # Step 3: visualize the estimated basline hazard

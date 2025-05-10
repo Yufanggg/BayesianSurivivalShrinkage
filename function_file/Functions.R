@@ -36,7 +36,7 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
                                                 thin = 10,
                                                 chains = 2) {
   if (!shrinkage){
-    message("we only applied the non shrinage code for bSpline baseline hazard.")
+    message("we only applied the non shrinage code for bSpline baseline hazard or PH models.")
   }
   
   
@@ -94,7 +94,12 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
     
     else if (baseline_modelling == "none"){
       message("we used the partical likelihood to estimate the cofficients of covariates")
-      bayesian_model <- stan_model("./stan_file/PH_estEpre.stan")
+      # compile the model
+      if (shrinkage){
+        bayesian_model <- stan_model("./stan_file/PH_estEpre.stan")
+      } else {
+        bayesian_model <- stan_model("./stan_file/PH_estEprenoShrinkage.stan")
+      }
     }
   }
   
