@@ -213,13 +213,13 @@ for (i in 1:replicate_times){
   FDR_bSplines_withShrinkage[i] <- sum(Selection_bSplines_withShrinkage & !variableSelection_reference) / sum(Selection_bSplines_withShrinkage)
   
   Selection_bSplines_noShrinkage <- simulated_results[,i]$variableSelection_bSplines_noShrinkage
-  FDR_bSplines_noShrinkag[i] <- sum(Selection_bSplines_noShrinkage & !variableSelection_reference) / sum(Selection_bSplines_withShrinkage)
+  FDR_bSplines_noShrinkag[i] <- sum(Selection_bSplines_noShrinkage & !variableSelection_reference) / sum(Selection_bSplines_noShrinkage)
   
   Selection_PH_withShrinkage <- simulated_results[,i]$variableSelection_PH_withShrinkage
   FDR_PH_withShrinkage[i] <- sum(Selection_PH_withShrinkage & !variableSelection_reference) / sum(Selection_PH_withShrinkage)
   
   Selection_PH_noShrinkage <- simulated_results[,i]$variableSelection_PH_noShrinkage
-  FDR_PH_noShrinkag[i] <- sum(Selection_PH_noShrinkage & !variableSelection_reference) / sum(Selection_bSplines_withShrinkage)
+  FDR_PH_noShrinkag[i] <- sum(Selection_PH_noShrinkage & !variableSelection_reference) / sum(Selection_PH_noShrinkage)
   
   #linear predictor
   eta_true <- simulated_results[,i]$eta_true
