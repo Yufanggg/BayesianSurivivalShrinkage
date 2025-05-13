@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 install_and_load <- function(packages) {
   for (pkg in packages) {
     if (!require(pkg, character.only = TRUE)) {
@@ -155,13 +155,13 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   }
 
 
-replicate_times = 50
+replicate_times = 2
 simulated_results <- replicate(replicate_times, simulation_bayint_survival_shrinkage(), simplify = "array")
-save.image(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
+#save.image(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
 ```
 
 ```{r, echo=TRUE}
-#load(file = "./Data/sim_50_para_shrinkagenowith.RData")
+load(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
 
 MSEs_bSplines_withShrinkage = matrix(nrow = replicate_times, ncol = 55)
 FDR_bSplines_withShrinkage = rep(NA, replicate_times)
@@ -208,7 +208,7 @@ for (i in 1:replicate_times){
   
   
   # FDR
-  variableSelection_reference <- ifelse(simulated_results[,i]$Beta_true != 0, TRUE, FALSE)
+  true_variables <- simulated_results[, i]$Beta_true != 0
   Selection_bSplines_withShrinkage <- simulated_results[,i]$variableSelection_bSplines_withShrinkage
   FDR_bSplines_withShrinkage[i] <- sum(Selection_bSplines_withShrinkage & !variableSelection_reference) / sum(Selection_bSplines_withShrinkage)
   
@@ -247,7 +247,6 @@ for (i in 1:replicate_times){
   
   CI_index_PH_withShrinkage[i] <- rcorr.cens(-eta_pre_PH_withShrinkage, Surv(time, true_status))[['C Index']]# rcorr.cens
   CI_index_PH_noShrinkag[i] <- rcorr.cens(-eta_pre_PH_noShrinkage, Surv(time, true_status))[['C Index']]
-  
 }
 
 mean_MSEs_bSplines_withShrinkage <- apply(MSEs_bSplines_withShrinkage, 2, mean)
@@ -275,40 +274,185 @@ lines(mean_MSEs_PH_noShrinkag, type = "o", col = "grey", pch = 16)
 # Add legend
 legend("topright", legend = c("B_withshrinkage", "B_noshrinkage", "PH_withshrinkage", "PH_noshrinkage"), col = c("blue", "green", "orange", "grey"), pch = 16, lty = 1)
 
-# Create side-by-side boxplots for FDR
-FDR_list = list(FDR_bSplines_withShrinkage = FDR_bSplines_withShrinkage, FDR_bSplines_noShrinkag = FDR_bSplines_noShrinkag, FDR_PH_withShrinkage = FDR_PH_withShrinkage, FDR_PH_noShrinkag = FDR_PH_noShrinkag)
-boxplot(FDR_list, names = c("B_withshrinkage", "B_noshrinkage", "PH_withshrinkage", "PH_noshrinkage"), col = c("blue", "green", "orange", "grey"), main = "FDR Boxplots", xlab = "", ylab = "FDR")
+# Create the list of FDR values
+FDR_list <- list(
+  FDR_bSplines_withShrinkage = FDR_bSplines_withShrinkage,
+  FDR_bSplines_noShrinkag = FDR_bSplines_noShrinkag,
+  FDR_PH_withShrinkage = FDR_PH_withShrinkage,
+  FDR_PH_noShrinkag = FDR_PH_noShrinkag
+)
 
-# Create the Brier score
+# Plot the boxplot without default x-axis labels
+boxplot(FDR_list,
+        col = c("blue", "green", "orange", "grey"),
+        xaxt = "n",  # Disable default x-axis labels
+        main = "FDR Boxplots",
+        xlab = "", ylab = "FDR")
+
+# Define custom x-axis labels
+labels <- c("B_withshrinkage", "B_noshrinkage", "PH_withshrinkage", "PH_noshrinkage")
+
+# Add custom x-axis ticks without labels
+axis(side = 1, at = 1:4, labels = FALSE)
+
+# Add tilted labels at 45 degrees
+text(x = 1:4,
+     y = par("usr")[3] - 0.01,  # Adjust vertical position below x-axis
+     labels = labels,
+     srt = 45,       # Rotate text 45 degrees
+     adj = 1,        # Right-align the text
+     xpd = TRUE,     # Allow drawing outside plot region
+     cex = 0.8)      # Set text size
+
+
+# Create the correlation plot
 cor_eta_list = list(bSplines_withShrinkage = cor_eta_bSplines_withShrinkage, bSplines_noShrinkag = cor_eta_bSplines_noShrinkag, PH_withShrinkage = cor_eta_PH_withShrinkage, PH_noShrinkag = cor_eta_PH_noShrinkag)
-boxplot(cor_eta_list, names = c("B_withshrinkage", "B_noshrinkage", "PH_withshrinkage", "PH_noshrinkage"), col = c("blue", "green", "orange", "grey"), main = "True vs. predicted linear predictor", xlab = "", ylab = "correlation")
+boxplot(cor_eta_list,
+        col = c("blue", "green", "orange", "grey"),
+        xaxt = "n",  # Disable default x-axis labels
+        main = "True vs. predicted linear predictor",
+        xlab = "", ylab = "correlation")
 
-# cor_sp_list = list(withShrinkage = cor_sp_bSplines_withShrinkage, noShrinkag = cor_sp_bSplines_noShrinkag)
-# boxplot(cor_sp_list, names = c("withShrinkage", "noShrinkag"), col = c("blue", "green"), main = "cor_sp Boxplots", xlab = "", ylab = "cor_sp")
+# Define custom labels
+labels <- c("B_withshrinkage", "B_noshrinkage", "PH_withshrinkage", "PH_noshrinkage")
+
+# Add x-axis ticks without labels
+axis(side = 1, at = 1:4, labels = FALSE)
+
+# Add tilted labels at 45 degrees
+text(x = 1:4,
+     y = par("usr")[3] - 0.02,  # Slightly below the x-axis
+     labels = labels,
+     srt = 45,        # Rotate text 45 degrees
+     adj = 1,         # Right-align the text
+     xpd = TRUE,      # Allow drawing outside the plot region
+     cex = 0.8)       # Scale text size
+
+
 
 # Create the CI index
 CI_index_list = list(CI_index_bSplines_withShrinkage = CI_index_bSplines_withShrinkage, CI_index_bSplines_noShrinkag = CI_index_bSplines_noShrinkag, CI_index_PH_withShrinkage = CI_index_PH_withShrinkage, CI_index_PH_noShrinkag = CI_index_PH_noShrinkag)
-boxplot(CI_index_list, names = c("B_withshrinkage", "B_noshrinkage", "PH_withshrinkage", "PH_noshrinkage"), col = c("blue", "green", "orange", "grey"), main = "C index Boxplots", xlab = "", ylab = "CI index")
+boxplot(CI_index_list,
+        col = c("blue", "green", "orange", "grey"),
+        xaxt = "n",  # Disable default x-axis labels
+        main = "C index Boxplots",
+        xlab = "", ylab = "CI index")
+
+# Define custom labels
+labels <- c("B_withshrinkage", "B_noshrinkage", "PH_withshrinkage", "PH_noshrinkage")
+
+# Add x-axis ticks without labels
+axis(side = 1, at = 1:4, labels = FALSE)
+
+# Add tilted labels at 45 degrees
+text(x = 1:4,
+     y = par("usr")[3] - 0.01,  # Slightly below the x-axis (adjust if needed)
+     labels = labels,
+     srt = 45,        # Rotate text 45 degrees
+     adj = 1,         # Right-align the text
+     xpd = TRUE,      # Allow drawing outside the plot region
+     cex = 0.8)       # Scale text size
 ```
 
-# Step 3: visualize the estimated basline hazard
+# Step 3: Furture check bias-variance
 ```{r, echo=TRUE}
-for (i in 1:replicate_times) {
-  baseline_true <- simulated_results[, i]$baseline_true 
-  baseline_bSplines_withShrinkage <- simulated_results[, i]$baseline_bSplines_withShrinkage
-  baseline_bSplines_noShrinkage <- simulated_results[, i]$baseline_bSplines_noShrinkage
+load(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
+
+# Ground-truth info
+Beta_true = rep(NA, 55)
+LinearPred_true = matrix(nrow = replicate_times, ncol = 100)
+
+# Output of bSplines with vs. no shrinkage for betas
+Beta_bSpline_noShrinkage = matrix(nrow = replicate_times, ncol = 55)
+Beta_bSpline_withShrinkage =  matrix(nrow = replicate_times, ncol = 55)
+
+LinearPred_bSpline_noShrinkage = matrix(nrow = replicate_times, ncol = 100)
+LinearPred_bSpline_withShrinkage = matrix(nrow = replicate_times, ncol = 100)
+
+#Output of partical likelihood with vs. no shrinkage for betas
+Beta_PH_noShrinkage = matrix(nrow = replicate_times, ncol = 55)
+Beta_PH_withShrinkage =  matrix(nrow = replicate_times, ncol = 55)
+
+LinearPred_PH_noShrinkage = matrix(nrow = replicate_times, ncol = 100)
+LinearPred_PH_withShrinkage = matrix(nrow = replicate_times, ncol = 100)
+
+
+
+# FDR
+variableSelection_reference = rep(NA, 55)
+Selection_bSplines_withShrinkage = matrix(nrow = replicate_times, ncol = 55)
+Selection_bSplines_noShrinkage = matrix(nrow = replicate_times, ncol = 55)
+
+Selection_PH_withShrinkage = matrix(nrow = replicate_times, ncol = 55)
+Selection_PH_noShrinkage = matrix(nrow = replicate_times, ncol = 55)
+
+
+
+for (i in 1:replicate_times){
+  # Ground-truth info 
+  Beta_true <- simulated_results[,i]$Beta_true
   
-  plot(baseline_true, col = "red", type = "l", pch = 16, lty = 1, lwd = 2)
-  lines(baseline_bSplines_withShrinkage, col = "green", type = "l", pch = 16, lty = 1, lwd = 2)
-  lines(baseline_bSplines_noShrinkage, col = "blue", pch = 16, lty = 1, lwd = 2)
-  # Add legend
-  legend(
-    "topleft",
-    legend = c("True", "bSplines_withShrinkage", "bSplines_noShrinkage"),
-    col = c("red", "blue", "green"),
-    pch = 16,
-    lty = 1
-  )
+  Beta_bSpline_withShrinkage[i, ] <-  simulated_results[,i]$Beta_est_bSplines_withShrinkage
+  Beta_bSpline_noShrinkage[i, ] <-  simulated_results[,i]$Beta_est_bSplines_noShrinkage
+  
+  
+  Beta_PH_withShrinkage[i,] <-  simulated_results[,i]$Beta_est_PH_withShrinkage
+  Beta_PH_noShrinkage[i, ] <-  simulated_results[,i]$Beta_est_PH_noShrinkage
+  
+  
+  # Linear predictor
+  LinearPred_true[i, ] <- simulated_results[,i]$eta_true
+  LinearPred_bSpline_withShrinkage[i, ] <- simulated_results[,i]$eta_pred_bSplines_withShrinkage
+  LinearPred_bSpline_noShrinkage[i, ] <- simulated_results[,i]$eta_pred_bSplines_noShrinkage
+  
+  LinearPred_PH_withShrinkage[i, ] <- simulated_results[,i]$eta_pred_PH_withShrinkage
+  LinearPred_PH_noShrinkage[i, ] <- simulated_results[,i]$eta_pred_PH_noShrinkage
+  
+  
+  # FDR
+  variableSelection_reference <- ifelse(simulated_results[,i]$Beta_true != 0, TRUE, FALSE)
+  
+  Selection_bSplines_withShrinkage[i, ] <- simulated_results[,i]$variableSelection_bSplines_withShrinkage
+  Selection_bSplines_noShrinkage[i, ] <- simulated_results[,i]$variableSelection_bSplines_noShrinkage
+
+  Selection_PH_withShrinkage[i, ] <- simulated_results[,i]$variableSelection_PH_withShrinkage
+  Selection_PH_noShrinkage[i, ] <- simulated_results[,i]$variableSelection_PH_noShrinkage
 }
+
+
+par(mfrow = c(2, 2))
+Bias_bSpline_withShrinkage <- apply(Beta_bSpline_withShrinkage, 2, mean) - Beta_true
+Bias_bSpline_noShrinkage <- apply(Beta_bSpline_noShrinkage, 2, mean) - Beta_true
+plot(Bias_bSpline_noShrinkage, Bias_bSpline_withShrinkage,
+     xlab = "Bias (No Shrinkage)", ylab = "Bias (With Shrinkage)",
+     main = "Bias Comparison: No Shrinkage vs With Shrinkage")
+abline(0, 1, col = "red", lty = 2)  # y = x line
+
+
+var_bSpline_withShrinkage <- apply(Beta_bSpline_withShrinkage - apply(Beta_bSpline_withShrinkage, 2, mean), 2, function(x){mean(x^2)})
+Var_bSpline_noShrinkage <- apply(Beta_bSpline_noShrinkage - apply(Beta_bSpline_noShrinkage, 2, mean), 2, function(x){mean(x^2)})
+plot(Var_bSpline_noShrinkage, var_bSpline_withShrinkage,
+     xlab = "Variance (No Shrinkage)", ylab = "Variance (With Shrinkage)",
+     main = "Variance Comparison: No Shrinkage vs With Shrinkage")
+abline(0, 1, col = "red", lty = 2)  # y = x line
+
+# visualized result
+fill_vector = (simulated_results[, 1]$Beta_true != 0)
+
+plot(apply(Selection_bSplines_withShrinkage, 2, mean), type = "o", col = "blue", xlab = "estimated Betas", ylab = "FDR", ylim = c(0, 1), main = "FDR for Beta estimation", pch = 16)
+
+# Add background rectangles
+for (i in 1:length(variableSelection_reference)) {
+  if (fill_vector[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+
+lines(apply(Selection_bSplines_withShrinkage, 2, mean), type = "o", col = "blue", pch = 16)
+lines(apply(Selection_bSplines_noShrinkage, 2, mean), type = "o", col = "green", pch = 16)
+lines(apply(Selection_PH_withShrinkage, 2, mean), type = "o", col = "orange", pch = 16)
+lines(apply(Selection_PH_noShrinkage, 2, mean), type = "o", col = "grey", pch = 16)
+# Add legend
+legend("topright", legend = c("B_withshrinkage", "B_noshrinkage", "PH_withshrinkage", "PH_noshrinkage"), col = c("blue", "green", "orange", "grey"), pch = 16, lty = 1)
 ```
 

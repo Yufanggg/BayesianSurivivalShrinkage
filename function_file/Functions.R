@@ -87,6 +87,7 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
       if (shrinkage){
         bayesian_model <- stan_model("./stan_file/bSpline_estEpre.stan")
       } else {
+        message("No shrinkaged bSplines modelling!")
         bayesian_model <- stan_model("./stan_file/bSpline_estEprenoShrinkage.stan")
       }
       
@@ -98,6 +99,7 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
       if (shrinkage){
         bayesian_model <- stan_model("./stan_file/PH_estEpre.stan")
       } else {
+        message("No shrinkaged partical likelihood modelling!")
         bayesian_model <- stan_model("./stan_file/PH_estEprenoShrinkage.stan")
       }
     }
