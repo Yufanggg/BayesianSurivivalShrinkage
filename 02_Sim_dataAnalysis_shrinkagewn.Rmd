@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 install_and_load <- function(packages) {
   for (pkg in packages) {
     if (!require(pkg, character.only = TRUE)) {
@@ -155,9 +155,9 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   }
 
 
-replicate_times = 2
+replicate_times = 50
 simulated_results <- replicate(replicate_times, simulation_bayint_survival_shrinkage(), simplify = "array")
-#save.image(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
+save.image(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
 ```
 
 ```{r, echo=TRUE}
@@ -208,7 +208,7 @@ for (i in 1:replicate_times){
   
   
   # FDR
-  true_variables <- simulated_results[, i]$Beta_true != 0
+  variableSelection_reference <- simulated_results[, i]$Beta_true != 0
   Selection_bSplines_withShrinkage <- simulated_results[,i]$variableSelection_bSplines_withShrinkage
   FDR_bSplines_withShrinkage[i] <- sum(Selection_bSplines_withShrinkage & !variableSelection_reference) / sum(Selection_bSplines_withShrinkage)
   
@@ -356,7 +356,7 @@ text(x = 1:4,
 
 # Step 3: Furture check bias-variance
 ```{r, echo=TRUE}
-load(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
+#load(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
 
 # Ground-truth info
 Beta_true = rep(NA, 55)

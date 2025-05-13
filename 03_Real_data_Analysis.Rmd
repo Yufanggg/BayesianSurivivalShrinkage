@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 
 install_and_load <- function(packages) {
@@ -56,7 +56,9 @@ factorName["status"] <- FALSE
 
 print(colnames(real_df)[factorName])
 
-
+real_df <- real_df[, !(names(real_df) %in% "InitialOnmachineindicator")]
+real_df$Donorcauseofdeath_group <- ifelse(real_df$Donorcauseofdeath_group == "Cardiac", 1, 0)
+real_df$InitialPrimaryDiseaseET_regroup <- ifelse(real_df$InitialPrimaryDiseaseET_regroup == "Diabetes Mellitus", 1, 0)
 
 strafied_Data_DBD <- subset(subset(real_df, real_df$TypecadavericDBDDCD == "DBD"), select = -c(TypecadavericDBDDCD))
 
