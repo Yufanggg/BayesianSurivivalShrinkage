@@ -20,7 +20,7 @@ install_and_load <- function(packages) {
 }
 
 # List of required packages
-required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret")
+required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret", "rbenchmark")
 # Install and/or load packages
 install_and_load(required_packages)
 
@@ -456,3 +456,38 @@ lines(apply(Selection_PH_noShrinkage, 2, mean), type = "o", col = "grey", pch = 
 legend("topright", legend = c("B_withshrinkage", "B_noshrinkage", "PH_withshrinkage", "PH_noshrinkage"), col = c("blue", "green", "orange", "grey"), pch = 16, lty = 1)
 ```
 
+# Tracking time
+```{r, echo=TRUE}
+set.seed(123)
+n_samples <- 300
+n_features <- 10 
+simulated_data <- DataGenerator(n_samples = n_samples, n_features = 10)
+samples <- sample(1:nrow(dataset), 100)
+training_dataset <- dataset[-samples, ]
+testing_dataset <- dataset[samples, ]
+
+stan_data_PH <- stan_data_Constructer_PH(
+    training_dataset = training_dataset,
+    testing_dataset = testing_dataset)
+
+stan_data_bSplines <- stan_data_Constructer_BSpline(
+    training_dataset = training_dataset,
+    testing_dataset = testing_dataset,
+    obs_window = 5
+  )
+
+t_eval = benchmark(
+  "bSpline_shrinkage" = {
+     model_fit_withShrinkage <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_modelling = "bSplines", shrinkage = TRUE)
+  },
+  
+  "PH_shrinkage" = {
+     model_fit_withShrinkage <- Bayesian_Survival_model(stan_data = stan_data_PH, baseline_modelling = "none", shrinkage = TRUE)
+  },
+  
+  replications = 50
+)
+t_eval
+
+save(t.eval, file = "./Data/t_eval.RData")
+```
