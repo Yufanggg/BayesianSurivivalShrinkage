@@ -14,7 +14,7 @@ data {
   vector[nobs] t_points;  // observed time points (non-strict decreasing)
   vector[nobs] event_flag;  // whether or not an event happened at the conresponding time point
   
-  int<lower=0> last_event_time; // # time point where the last event occurs
+  real last_event_time; // # time point where the last event occurs
   int event_indices[nevent]; # the row ID where events happened
   
   
