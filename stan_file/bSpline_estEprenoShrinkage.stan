@@ -135,17 +135,19 @@ model {
   
   //Prior
   coefs ~ normal(0, 100);
-  tau2int ~ uniform(0.01,1);
-  for (k in 1:p){
-    gam2[k] ~ inv_gamma(0.5, 1);
-    tau2[k] ~ inv_gamma(0.5, 1/gam2[k]);
-    }
+  // tau2int ~ uniform(0.01,1);
+  // for (k in 1:p){
+  //   gam2[k] ~ inv_gamma(0.5, 1);
+  //   tau2[k] ~ inv_gamma(0.5, 1/gam2[k]);
+  //   }
     
   for (i in 1:p){
-    Beta[i] ~ normal(0, sqrt(tau2[i]));
+    Beta[i] ~ normal(0, 100);
+    // Beta[i] ~ normal(0, sqrt(tau2[i]));
     }
   for (i in 1:q){
-    Beta_int[i] ~ normal(0, sqrt(tau2int));
+    Beta_int[i] ~ normal(0, 100);
+    // Beta_int[i] ~ normal(0, sqrt(tau2int));
     }
   
   

@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 install_and_load <- function(packages) {
   for (pkg in packages) {
     if (!require(pkg, character.only = TRUE)) {
@@ -155,38 +155,39 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   }
 
 
-replicate_times = 50
+replicate_times = 2
 simulated_results <- replicate(replicate_times, simulation_bayint_survival_shrinkage(), simplify = "array")
-save.image(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
+#save.image(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
 ```
 
 ```{r, echo=TRUE}
-load(file = "./Data/sim_10_para_shrinkagenowith_PH.RData")
+#load(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
 
 MSEs_bSplines_withShrinkage = matrix(nrow = replicate_times, ncol = 55)
 FDR_bSplines_withShrinkage = rep(NA, replicate_times)
 CI_index_bSplines_withShrinkage = rep(NA, replicate_times)
 cor_eta_bSplines_withShrinkage = rep(NA, replicate_times)
-
+NumSelect_bSplines_withShrinkage = rep(NA, replicate_times)
 
 MSEs_bSplines_noShrinkag = matrix(nrow = replicate_times, ncol = 55)
 FDR_bSplines_noShrinkag = rep(NA, replicate_times)
 CI_index_bSplines_noShrinkag = rep(NA, replicate_times)
 cor_eta_bSplines_noShrinkag = rep(NA, replicate_times)
-
+NumSelect_bSplines_noShrinkag = rep(NA, replicate_times)
 
 
 MSEs_PH_withShrinkage = matrix(nrow = replicate_times, ncol = 55)
 FDR_PH_withShrinkage = rep(NA, replicate_times)
 CI_index_PH_withShrinkage = rep(NA, replicate_times)
 cor_eta_PH_withShrinkage = rep(NA, replicate_times)
+NumSelect_PH_withShrinkage = rep(NA, replicate_times)
 
 
 MSEs_PH_noShrinkag = matrix(nrow = replicate_times, ncol = 55)
 FDR_PH_noShrinkag = rep(NA, replicate_times)
 CI_index_PH_noShrinkag = rep(NA, replicate_times)
 cor_eta_PH_noShrinkag = rep(NA, replicate_times)
-
+NumSelect_PH_noShrinkage = rep(NA, replicate_times)
 
 
 
@@ -220,6 +221,14 @@ for (i in 1:replicate_times){
   
   Selection_PH_noShrinkage <- simulated_results[,i]$variableSelection_PH_noShrinkage
   FDR_PH_noShrinkag[i] <- sum(Selection_PH_noShrinkage & !variableSelection_reference) / sum(Selection_PH_noShrinkage)
+  
+  # Number of selected
+  NumvariableSelection = sum(variableSelection_reference)
+  NumSelect_bSplines_withShrinkage[i] = sum(Selection_bSplines_withShrinkage)
+  NumSelect_bSplines_noShrinkag[i] = sum(Selection_bSplines_noShrinkage)
+  
+  NumSelect_PH_withShrinkage[i] = sum(Selection_PH_withShrinkage)
+  NumSelect_PH_noShrinkage[i] =  sum(Selection_PH_noShrinkage)
   
   #linear predictor
   eta_true <- simulated_results[,i]$eta_true

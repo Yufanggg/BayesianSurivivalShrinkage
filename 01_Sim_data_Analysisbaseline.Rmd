@@ -196,6 +196,11 @@ cor_sp_exponential = rep(NA, replicate_times)
 cor_sp_weibull = rep(NA, replicate_times)
 cor_sp_bSplines = rep(NA, replicate_times)
 
+Num_Selected_exponential = rep(NA, replicate_times)
+Num_Selected_weibull = rep(NA, replicate_times)
+Num_Selected_bSplines = rep(NA, replicate_times)
+Num_Selected_PH = rep(NA, replicate_times)
+
 for (i in 1:replicate_times){
   # beta MSE
   Beta_true <- simulated_results[,i]$Beta_true
@@ -221,6 +226,12 @@ for (i in 1:replicate_times){
   FDR_weibull[i] <- sum(Selection_weibull & !variableSelection_reference) / sum(Selection_weibull)
   FDR_bSplines[i] <- sum(Selection_bSplines & !variableSelection_reference) / sum(Selection_bSplines)
   FDR_PH[i] <- sum(Selection_PH & !variableSelection_reference) / sum(Selection_PH)
+  
+  # Number of selected variables 
+  Num_Selected_exponential[i] = sum(Selection_exponential)
+  Num_Selected_weibull[i] = sum(Selection_weibull)
+  Num_Selected_bSplines[i] = sum(Selection_bSplines)
+  Num_Selected_PH[i] = sum(Selection_PH)
   
   #linear predictor
   eta_true <- simulated_results[,i]$eta_true
@@ -250,9 +261,6 @@ for (i in 1:replicate_times){
   CI_index_bSplines[i] <- rcorr.cens(-eta_pre_bSplines, Surv(time, true_status))["C Index"]
   CI_index_PH[i] <- rcorr.cens(-eta_pre_PH, Surv(time, true_status))["C Index"]
   
-  # cor_sp_exponential[i] <- cor(sp_true, sp_pre_exponential)# rcorr.cens
-  # cor_sp_weibull[i] <- cor(sp_true, sp_pre_weibull)#
-  # cor_sp_bSplines[i] <- cor(sp_true, sp_pre_bSplines)#
 }
 
 mean_MSEs_exponential <- apply(MSEs_exponential, 2, mean)
