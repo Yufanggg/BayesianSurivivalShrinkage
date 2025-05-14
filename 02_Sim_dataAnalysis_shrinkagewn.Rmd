@@ -161,7 +161,7 @@ save.image(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
 ```
 
 ```{r, echo=TRUE}
-load(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
+load(file = "./Data/sim_10_para_shrinkagenowith_PH.RData")
 
 MSEs_bSplines_withShrinkage = matrix(nrow = replicate_times, ncol = 55)
 FDR_bSplines_withShrinkage = rep(NA, replicate_times)
