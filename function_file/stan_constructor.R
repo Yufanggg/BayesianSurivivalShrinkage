@@ -6,11 +6,11 @@ stan_data_Constructer_PH <- function (training_dataset, testing_dataset = NULL){
   # Prepare data for model fitting
   #-----------------------------
   #----- organize the data regarding predictor
-  t_points = training_dataset[, "obstime"]
-  sorted_indices = order(t_points, decreasing = TRUE)
+  sorted_indices = order(training_dataset$obstime, decreasing = TRUE)
+  Sorted_training_dataset = training_dataset[sorted_indices,]
 
   
-  design__matrix = training_dataset[,!(names(training_dataset) %in% c("id", "obstime", "status"))]
+  design__matrix = training_dataset[,!(names(Sorted_training_dataset) %in% c("id", "obstime", "status"))]
   
   column_names = colnames(design__matrix)
   main_names =  column_names[!grepl(":", column_names)] #whether or not having intercept needs to be verified
@@ -26,9 +26,6 @@ stan_data_Constructer_PH <- function (training_dataset, testing_dataset = NULL){
   g1 <- g(main_indices_for_int, 1)
   g2 <- g(main_indices_for_int, 2)
   
-  # x_event = X_main[training_dataset$status == 1,]
-  # x_int_event =  X_int[training_dataset$status == 1,]
-  
   
   
   #----------------
@@ -36,12 +33,14 @@ stan_data_Constructer_PH <- function (training_dataset, testing_dataset = NULL){
   #----------------
   stan_data = list(
     #----- for model fitting --------
-    nobs = nrow(training_dataset),
-    nevent = nrow(training_dataset[training_dataset$status == 1, ]),
+    nobs = nrow(Sorted_training_dataset),
+    nevent = nrow(Sorted_training_dataset[Sorted_training_dataset$status == 1, ]),
     
-    t_point = training_dataset[, "obstime"][sorted_indices],
-    event_indices = which(training_dataset$status == 1),
-
+    t_points = Sorted_training_dataset[, "obstime"],
+    event_flag = (Sorted_training_dataset$status == 1), # whether or not an event is observed
+    
+    last_event_time = max(Sorted_training_dataset[Sorted_training_dataset$status == 1, "obstime"]), # time point where the last event occurs
+    event_indices = which(Sorted_training_dataset$status == 1), # the row ID where events happened
     
     # predictor matrices (time-fixed)
     p = p,
