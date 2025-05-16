@@ -230,13 +230,13 @@ for (i in 1:replicate_times){
   Variance_exponential_[i, ] = simulated_results[,i]$Beta_est_exponential - Beta_true
   Variance_weibull_[i, ] = simulated_results[,i]$Beta_est_weibull - Beta_true
   Variance_bSplines_[i, ] = simulated_results[,i]$Beta_est_bSplines - Beta_true
-  Variance_PH_ = simulated_results[,i]$Beta_est_PH - Beta_true
+  Variance_PH_[i, ] = simulated_results[,i]$Beta_est_PH - Beta_true
   
   # MSE
-  MSEs_exponential_[i, ] <- (Beta_est_exponential - Beta_true)**2
-  MSEs_weibull_[i, ] <- (Beta_est_weibull - Beta_true)**2
-  MSEs_bSplines_[i, ] <- (Beta_est_bSplines - Beta_true)**2
-  MSEs_PH_[i, ] <- (Beta_est_PH - Beta_true)**2
+  MSEs_exponential_[i, ] <- (simulated_results[,i]$Beta_est_exponential - Beta_true)**2
+  MSEs_weibull_[i, ] <- (simulated_results[,i]$Beta_est_weibull - Beta_true)**2
+  MSEs_bSplines_[i, ] <- (simulated_results[,i]$Beta_est_bSplines - Beta_true - Beta_true)**2
+  MSEs_PH_[i, ] <- (simulated_results[,i]$Beta_est_PH - Beta_true - Beta_true)**2
   
   # FDR (Type I error)
   variableSelection_reference <- ifelse(simulated_results[,i]$Beta_true != 0, TRUE, FALSE)
@@ -277,8 +277,7 @@ for (i in 1:replicate_times){
   CI_index_weibull[i] <- rcorr.cens(-eta_pre_weibull, Surv(time, true_status))["C Index"]
   CI_index_bSplines[i] <- rcorr.cens(-eta_pre_bSplines, Surv(time, true_status))["C Index"]
   CI_index_PH[i] <- rcorr.cens(-eta_pre_PH, Surv(time, true_status))["C Index"]
-  
-}
+  }
 
 # Bias
 Bias_exponential = apply(Beta_est_exponential, 2, mean) - Beta_true
@@ -302,10 +301,10 @@ MSEs_PH <- apply(MSEs_PH_, 2, mean)
 # visualized result
 fill_vector = (Beta_true != 0)
 
-par(mfrow = c(3, 3))
+par(mfrow = c(3, 2))
 
 # Subfigure 1: Bias
-plot(Bias_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Bias", ylim = c(0, 0.3), main = "Bias for Beta estimation", pch = 16)
+plot(Bias_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Bias", main = "Bias for Beta estimation", pch = 16)
 
 # Add background rectangles
 for (i in 1:length(Beta_true)) {
@@ -314,17 +313,16 @@ for (i in 1:length(Beta_true)) {
   }
 }
 
-
+lines(Bias_exponential, type = "o", col = "blue", pch = 16)
 lines(Bias_weibull, type = "o", col = "green", pch = 16)
 lines(Bias_bSplines, type = "o", col = "orange", pch = 16)
-lines(Bias_exponential, type = "o", col = "blue", pch = 16)
-lines(Bias_PH, type = "o", col = "grey", pch = 16)
+lines(Bias_PH, type = "o", col = "purple", pch = 16)
 
 abline(v = 10, col = "red", lty = 2)
-legend("topright", legend = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "grey"), pch = 16, lty = 1) # Add legend
+legend("topright", legend = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
 
 # Subfigure 2: Variance
-plot(Variance_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Variance", ylim = c(0, 0.3), main = "Variance for Beta estimation", pch = 16)
+plot(Variance_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Variance", main = "Variance for Beta estimation", pch = 16, ylim = c(0, 0.3))
 
 # Add background rectangles
 for (i in 1:length(Beta_true)) {
@@ -333,50 +331,49 @@ for (i in 1:length(Beta_true)) {
   }
 }
 
+lines(Variance_exponential, type = "o", col = "blue", pch = 16)
 lines(Variance_weibull, type = "o", col = "green", pch = 16)
 lines(Variance_bSplines, type = "o", col = "orange", pch = 16)
-lines(Variance_exponential, type = "o", col = "blue", pch = 16)
-lines(Variance_PH, type = "o", col = "grey", pch = 16)
-
-abline(v = 10, col = "red", lty = 2)
-abline(h = 0, col = "red", lty = 2)
-legend("topright", legend = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "grey"), pch = 16, lty = 1)# Add legend
+lines(Variance_PH, type = "o", col = "purple", pch = 16)
+legend("topright", legend = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1)# Add legend
 
 
-# Subfigure 3: MSE
-plot(MSEs_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.3), main = "MSE for Beta estimation", pch = 16)
-
-# Add background rectangles
-for (i in 1:length(Beta_true)) {
-  if (fill_vector[i]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
-  }
-}
-
-lines(MSEs_weibull, type = "o", col = "green", pch = 16)
-lines(MSEs_bSplines, type = "o", col = "orange", pch = 16)
-lines(MSEs_exponential, type = "o", col = "blue", pch = 16)
-lines(MSEs_PH, type = "o", col = "grey", pch = 16)
-
-abline(v = 10, col = "red", lty = 2)
-legend("topright", legend = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "grey"), pch = 16, lty = 1) # Add legend
+# # Subfigure 3: MSE
+# plot(MSEs_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.3), main = "MSE for Beta estimation", pch = 16)
+# 
+# # Add background rectangles
+# for (i in 1:length(Beta_true)) {
+#   if (fill_vector[i]) {
+#     rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+#   }
+# }
+# 
+# lines(MSEs_weibull, type = "o", col = "green", pch = 16)
+# lines(MSEs_bSplines, type = "o", col = "orange", pch = 16)
+# lines(MSEs_exponential, type = "o", col = "blue", pch = 16)
+# lines(MSEs_PH, type = "o", col = "purple", pch = 16)
+# 
+# abline(v = 10, col = "red", lty = 2)
+# legend("topright", legend = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
 
 # Subfigure 4 Type I error
 # Create side-by-side boxplots for FDR
 FDR_list = list(FDR_exponential = FDR_exponential, FDR_weibull = FDR_weibull, FDR_bSplines = FDR_bSplines, FDR_PH = FDR_PH)
-boxplot(FDR_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "grey"), main = "FDR Boxplots", xlab = "", ylab = "FDR")
+boxplot(FDR_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), main = "FDR Boxplots", xlab = "", ylab = "FDR", ylim = c(0, 1))
+abline(h = 0.05, col = "red", lty = 2)
 
 # Subfigure 5 Type II error
-Num_Selected_list = list(Exponential = Num_Selected_exponential, Weibull = Num_Selected_weibull, BSplines = Num_Selected_bSplines, ParticalLiklihood = Num_Selected_PH)
-boxplot(Num_Selected_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "grey"), main = "FDR Boxplots", xlab = "", ylab = "FDR")
+Num_Selected_list = list(Exponential = Num_Selected_exponential/sum(Beta_true != 0), Weibull = Num_Selected_weibull/sum(Beta_true != 0), BSplines = Num_Selected_bSplines/sum(Beta_true != 0), ParticalLiklihood = Num_Selected_PH/sum(Beta_true != 0))
+boxplot(Num_Selected_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), main = "Selected variables Boxplots", xlab = "", ylab = "Selected variables", ylim = c(0, 1))
 
 # Subfigure 6 Correlation for linear predictors
 cor_list = list(exponential = cor_exponential, weibull = cor_weibull, bSplines = cor_bSplines, PH = cor_PH)
-boxplot(cor_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "grey"), main = "True vs. predicted linear predictor", xlab = "", ylab = "correlation")
+boxplot(cor_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), main = "True vs. predicted linear predictor", xlab = "", ylab = "correlation", ylim = c(0, 1))
 
 # # Subfigure 7 C index
 CI_index_list = list(CI_index_exponential = CI_index_exponential, CI_index_weibull = CI_index_weibull, CI_index_bSplines = CI_index_bSplines, CI_index_PH = CI_index_PH)
-boxplot(CI_index_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "grey"), main = "C index Boxplots", xlab = "", ylab = "C index")
+boxplot(CI_index_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), main = "C index Boxplots", xlab = "", ylab = "C index", ylim = c(0, 1))
+abline(h = 0.5, col = "red", lty = 2)
 ```
 
 # Step 3: visualize the estimated basline hazard
