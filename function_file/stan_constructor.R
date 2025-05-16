@@ -34,8 +34,6 @@ stan_data_Constructer_PH <- function (training_dataset, testing_dataset = NULL){
   stan_data = list(
     #----- for model fitting --------
     nobs = nrow(Sorted_training_dataset),
-    nevent = nrow(Sorted_training_dataset[Sorted_training_dataset$status == 1, ]),
-    
     t_points = Sorted_training_dataset[, "obstime"],
     event_flag = (Sorted_training_dataset$status == 1), # whether or not an event is observed
     

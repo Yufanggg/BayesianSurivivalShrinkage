@@ -46,6 +46,8 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   dataset <- simulated_data$dataset
   Beta <- simulated_data$Beta
   output$Beta_true = Beta
+  output$NumTied = length(dataset$obstime) - length(unique(dataset$obstime))
+  print(output$NumTied)
   
   #constructor data for the model
   if (withPrediction) {
@@ -165,7 +167,7 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
 
 replicate_times = 50
 simulated_results <- replicate(replicate_times, simulation_bayint_survival(), simplify = "array")
-save.image(file = "./Data/sim_50_para_int_PH.RData")
+save.image(file = "./Data/sim_50_para_int_PH_tiedTimes.RData")
 ```
 
 ```{r, echo=TRUE}

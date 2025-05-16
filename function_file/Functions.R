@@ -190,7 +190,7 @@ DataGenerator <- function(n_samples = 210, n_features = 10) {
     mutate(
       censtime = runif(n_samples, 0.5, 5),
       status = as.numeric(eventtime <= censtime),
-      obstime = pmin(eventtime, censtime)
+      obstime = pmin(round(eventtime, 4), censtime)
     ) 
   survival_data <- survival_data[, c("status", "obstime")]
   
