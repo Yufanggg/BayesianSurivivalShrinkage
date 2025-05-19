@@ -44,6 +44,8 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   dataset <- simulated_data$dataset
   Beta <- simulated_data$Beta
   output$Beta_true = Beta
+  output$NumTied = length(dataset$obstime) - length(unique(dataset$obstime))
+  print(output$NumTied)
   
   #constructor data for the model
   #constructor data for the model
@@ -70,7 +72,7 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   #fit model
   model_fit_bSplines_withShrinkage <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_modelling = "bSplines", shrinkage = TRUE)
   model_fit_bSplines_noShrinkage <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_modelling = "bSplines", shrinkage = FALSE)
-  
+
   model_fit_PH_withShrinkage <- Bayesian_Survival_model(stan_data = stan_data_PH, baseline_modelling = "none", shrinkage = TRUE)
   model_fit_PH_noShrinkage <- Bayesian_Survival_model(stan_data = stan_data_PH, baseline_modelling = "none", shrinkage = FALSE)
   
@@ -157,7 +159,7 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
 
 replicate_times = 50
 simulated_results <- replicate(replicate_times, simulation_bayint_survival_shrinkage(), simplify = "array")
-save.image(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
+save.image(file = "./Data/sim_50_para_shrinkagenowith_PH_tiedTimes.RData")
 ```
 
 ```{r, echo=TRUE}
