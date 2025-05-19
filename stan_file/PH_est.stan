@@ -12,8 +12,8 @@ data {
   int<lower=0> nobs; // number of observations, including events, and censored
   
   int<lower=0> unique_nevent;
-  vector[unique_nevent] first_indices_events;
-  vector[unique_nevent] last_indices_events;
+  int first_indices_events[unique_nevent];
+  int last_indices_events[unique_nevent];
 
   
   // predictor matrices (time-fixed)
@@ -43,6 +43,8 @@ parameters {
 model {
        // pre-allocated variables
     vector[nobs] eta; // for events & right censored
+    real log_denom_lhs;
+    real numerator;
 
 
     // prior
@@ -73,30 +75,40 @@ model {
     // - nevent is the number of events
     // - t_points is also sorted
     for (j in 1:unique_nevent) {
-      int start = first_indices_events[j],
-      int end = last_indices_events[j],
-      int len = end - starte + 1;
+      int start = first_indices_events[j];
+      int end = last_indices_events[j];
+      int len = end - start + 1;
       real log_len = log(len);
       if (len == 1){
-        real numerator = eta[start];
+        numerator = eta[start];
       } else {
-        real numerator = sum(eta[start:end]);
+        numerator = sum(eta[start:end]);
       }
       
       if (j == 1){ // initalized
         if (start != 1){
-          real log_denom_lhs = log_sum_exp(eta[1:start-1], eta[start:end]);
+          log_denom_lhs = log_sum_exp(eta[1:end]);
         } else {
-          real log_denom_lhs = log_sum_exp(eta[start:end]);
+          // if (len == 1){
+          //   real log_denom_lhs = eta[start];
+          // } else {
+            log_denom_lhs = log_sum_exp(eta[start:end]);
+/*          }*/
         }
       } else {
-        log_denom_lhs = log_sum_exp(log_denom_lhs, log_sum_exp(eta[start:end]));
+        int last_end = last_indices_events[j-1];
+        log_denom_lhs = log_sum_exp(log_denom_lhs, log_sum_exp(eta[last_end-1:end]));
       }
       
       vector[len] diff;
       for (ell in 1:len){
-        diff[ell] = log_diff_exp(log_denom_lhs, log_sum_exp(eta[start:end]) - log_len + log(ell -1 ))
+        if (ell == 1){
+          diff[ell] = log_denom_lhs;// or some other appropriate value
+        } else {
+          diff[ell] = log_diff_exp(log_denom_lhs, log_sum_exp(eta[start:end]) - log_len + log(ell -1 ));
+        }
       }
       
-      target += numerator  - sum(diff);
+      target += numerator - sum(diff);
+      }
 }
