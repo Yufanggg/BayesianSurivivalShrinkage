@@ -10,13 +10,11 @@
 data {
   // response and time variables
   int<lower=0> nobs; // number of observations, including events, and censored
-  int<lower=0> nevent; // number of events
   vector[nobs] t_points;  // observed time points (non-strict decreasing)
   vector[nobs] event_flag;  // whether or not an event happened at the conresponding time point
   
-  int<lower=0> last_event_time; // # time point where the last event occurs
-  int event_indices[nevent]; # the row ID where events happened
-  
+  int<lower=0> unique_nevent; // # number of events
+  vector[unique_nevent] unique_event_times;
   
   // predictor matrices (time-fixed)
   int<lower=0> p; // num main effect
@@ -64,39 +62,32 @@ model {
     for (i in 1:q){
       Beta_int[i] ~ normal(0, sqrt(sqrt(tau2[g1[i]]*tau2[g2[i]])*tau2int));
       }
-
       
-    // partical log-likelihood, represented by [target]
-    if (nobs > 0) {
-      eta = x * Beta + x_int * Beta_int;
-      }
+      // Partial log-likelihood contribution
+      if (nobs > 0) {
+        eta = x * Beta + x_int * Beta_int;
+        }
+
     
     // Assumes: 
     // - event_indices is sorted
     // - eta is the linear predictor vector
     // - nevent is the number of events
-
-
-    for (n in 1:nevent) {
-      int current_idx = event_indices[n];
-      if (n == 1){
-        if (current_idx == 1){
-          log_denom = eta[current_idx];  // First event
-        } else {
-          log_denom = log_sum_exp(eta[1:current_idx]); 
+    // - t_points is also sorted
+    
+    for (j in 1:unique_nevent) {
+      unique_event_time = unique_event_times[j]
+      real log_num; real log_denom;
+      for (t in 1:nobs){
+        if(t_points[t] == unique_event_time && event_flag[i] == 1){
+          log_num = log_sum_exp(log_num, eta[i]);
         }
-      } else {
-         int prev_idx = event_indices[n - 1];
-         if (current_idx != prev_idx + 1) {
-          int a = prev_idx + 1;
-          int b = current_idx;
-          log_denom = log_sum_exp(log_denom, log_sum_exp(eta[a:b]));
-        } else {
-            log_denom = log_sum_exp(log_denom, eta[current_idx]);
-        }
+        if (t_points[i] >= unique_event_time) {
+          log_denom = log_sum_exp(log_denom, eta[i]);
       }
-      // Add log-likelihood contribution
-      target += eta[current_idx] - log_denom;
     }
+    target += log_num - log_denom
+      
 }
+
 

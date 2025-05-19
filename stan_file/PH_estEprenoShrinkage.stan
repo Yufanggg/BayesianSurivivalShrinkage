@@ -6,16 +6,40 @@
 //    http://mc-stan.org/users/interfaces/rstan.html
 //    https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started
 //
+functions {
+  int num_unique_starts(vector t) { //The first calculates how many different survival times occur in the data.
+    if (size(t) == 0) return 0;
+    int us = 1;
+    for (n in 2:size(t)) {
+      if (t[n] != t[n - 1]) us += 1;
+    }
+    return us;
+  }
+  
+  array[] int unique_starts(vector t, int J) { // compute the value J to send into the function that computes the position in the array of failure times where each new failure time starts, plus an end point that goes one past the target
+    array[J + 1] int starts;
+    if (J == 0) return starts;
+    starts[1] = 1;
+    int pos = 2;
+    for (n in 2:size(t)) {
+      if (t[n] != t[n - 1]) {
+    starts[pos] = n;
+    pos += 1;
+      }
+    }
+    starts[J + 1] = size(t) + 1;
+    return starts;
+  }
+}
+
 
 data {
   // response and time variables
   int<lower=0> nobs; // number of observations, including events, and censored
-  int<lower=0> nevent; // number of events
   vector[nobs] t_points;  // observed time points (non-strict decreasing)
   vector[nobs] event_flag;  // whether or not an event happened at the conresponding time point
   
   real last_event_time; // # time point where the last event occurs
-  int event_indices[nevent]; # the row ID where events happened
   
   
   // predictor matrices (time-fixed)
@@ -40,6 +64,11 @@ data {
   
 }
 
+transformed data {
+  int<lower=0> J = num_unique_starts(t_points); // number of unique survival time
+  array[J + 1] int<lower=0> starts = unique_starts(t_points, J);
+}
+
 parameters {
   vector[p] Beta; // coefficients for design matrix;
   vector[q] Beta_int;
@@ -57,7 +86,6 @@ model {
 
 
     // prior
-    tau2int ~ uniform(0.01,1);
     for (i in 1:p){
       Beta[i] ~ normal(0, 100);
       }
@@ -65,40 +93,40 @@ model {
     for (i in 1:q){
       Beta_int[i] ~ normal(0, 100);
       }
-
       
-    // partical log-likelihood, represented by [target]
+      // Partial log-likelihood contribution
     if (nobs > 0) {
-      eta = x * Beta + x_int * Beta_int;
-      }
+        eta = x * Beta + x_int * Beta_int;
+        }
+
     
     // Assumes: 
     // - event_indices is sorted
     // - eta is the linear predictor vector
     // - nevent is the number of events
-
-
-    for (n in 1:nevent) {
-      int current_idx = event_indices[n];
-      if (n == 1){
-        if (current_idx == 1){
-          log_denom = eta[current_idx];  // First event
+    // - t_points is also sorted
+    
+    for (j in 1:J) {
+      int start = starts[j];
+      int end = starts[j + 1] - 1;
+      int len = end - start + 1;
+      real log_len = log(len);
+      
+      if (j == 1){ // first unqiue time point, initializ the log_denom
+        if (len == 1){
+          log_denom = eta[start]; // single event
         } else {
-          log_denom = log_sum_exp(eta[1:current_idx]); 
+          log_denom = log_sum_exp(eta[start:end]); // multiple events at first time point
         }
       } else {
-         int prev_idx = event_indices[n - 1];
-         if (current_idx != prev_idx + 1) {
-          int a = prev_idx + 1;
-          int b = current_idx;
-          log_denom = log_sum_exp(log_denom, log_sum_exp(eta[a:b]));
-        } else {
-            log_denom = log_sum_exp(log_denom, eta[current_idx]);
+        log_denom = log_sum_exp(append_row(rep_vector(log_denom, 1), eta[start:end]));
         }
-      }
       // Add log-likelihood contribution
-      target += eta[current_idx] - log_denom;
-    }
+      if (event_flag[j] == 1){
+        target += log_sum_exp(eta[start:end]) - log_denom;
+      }
+    } 
+      
 }
 
 generated quantities{
