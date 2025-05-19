@@ -169,7 +169,7 @@ stan_data_PH_DBD <- stan_data_Constructer_PH(
       testing_dataset = NULL
     )
 
-model_fit_bSpline_DBD <- Bayesian_Survival_model(stan_data = stan_data_bSpline_DBD, baseline_modelling = "bSplines", withPrediction = FALSE, shrinkage = TRUE)
+#model_fit_bSpline_DBD <- Bayesian_Survival_model(stan_data = stan_data_bSpline_DBD, baseline_modelling = "bSplines", withPrediction = FALSE, shrinkage = TRUE)
 
 model_fit_PH_DBD <- Bayesian_Survival_model(stan_data = stan_data_PH_DBD, baseline_modelling = "none", withPrediction = FALSE, shrinkage = TRUE)
 
@@ -197,7 +197,7 @@ save.image(file = "./Data/03_results_DBD_2.RData")
 
 ### STEP 3: visualize the results for DBD
 ```{r, echo=TRUE}
-load(file = "./Data/03_results_DBD.RData")
+load(file = "./Data/03_results_DBD_2.RData")
 results_DBD_df <- data.frame(variableName = colnames(strafied_Data_DBD_int)[!(colnames(strafied_Data_DBD_int) %in% c("id", "status", "obstime"))],
                              beta_int = mean_beta_DBD, 
                              variableSelection = variableSelection_DBD[,1])
@@ -225,27 +225,44 @@ ggplot(results_DBD_df, aes(x = variableName, y = beta_int, color = variableSelec
 ## STEP 1: estimate the Betas for DCD
 ```{r, echo=TRUE}
 obs_window = 3415 #max(df_using$time_tx_date_max2)
-# only for estimating the Betas
+
+
 strafied_Data_DCD_int <- includingInter(strafied_Data_DCD)
-stan_data_bSplines_DCD <- stan_data_Constructer(
+
+stan_data_bSpline_DCD <- stan_data_Constructer_BSpline(
       training_dataset = strafied_Data_DCD_int,
-      baseline_modelling = "bSplines",
-      obs_window = obs_window
+      testing_dataset = NULL,
+      obs_window = 3415
     )
 
-model_fit_bSplines_DCD <- Bayesian_Survival_model(stan_data = stan_data_bSplines_DCD, withPrediction = FALSE, baseline_modelling = "bSplines")
+stan_data_PH_DCD <- stan_data_Constructer_PH(
+      training_dataset = strafied_Data_DCD_int,
+      testing_dataset = NULL
+    )
+
+model_fit_bSpline_DCD <- Bayesian_Survival_model(stan_data = stan_data_bSpline_DCD, baseline_modelling = "bSplines", withPrediction = FALSE, shrinkage = TRUE)
+
+model_fit_PH_DCD <- Bayesian_Survival_model(stan_data = stan_data_PH_DCD, baseline_modelling = "none", withPrediction = FALSE, shrinkage = TRUE)
 
 #model diagnotics
-diagnostics_bSplines_DCD <- summary(model_fit_bSplines_DCD)$summary[, c("Rhat", "n_eff")]
+diagnostics_bSpline_DCD <- summary(model_fit_bSpline_DCD)$summary[, c("Rhat", "n_eff")]
+
+diagnostics_PH_DCD <- summary(model_fit_PH_DCD)$summary[, c("Rhat", "n_eff")]
+print(diagnostics_bSpline_DCD)
+print(diagnostics_PH_DCD)
 
 #extract the info from the bayesian model fit
-model_result_bSplines_DCD <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSplines_DCD, model_type = "bSplines", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
+model_result_bSpline_DCD <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSpline_DCD, model_type = "none", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
 
+model_result_PH_DCD <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_PH_DCD, model_type = "none", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
 
-mean_beta_DCD = model_result_bSplines_DCD$Beta_bayesian_est[, "mean"]
-variableSelect_DCD = model_result_bSplines_DCD$variableSelection
+mean_beta_DCD = model_result_bSpline_DCD$Beta_bayesian_est[, "mean"]
+variableSelection_DCD = model_result_bSpline_DCD$variableSelection
 
-cross_val_metric_DCD <- cross_validation(whole_dataset = strafied_Data_DCD_int, baseline_modelling = "bSplines")
+mean_beta_DCD_PH = model_result_PH_DCD$Beta_bayesian_est[, "mean"]
+variableSelection_DCD_PH = model_result_PH_DCD$variableSelection
+
+#cross_val_metric_DBD <- cross_validation(whole_dataset = strafied_Data_DBD_int, baseline_modelling = "bSplines", num_folds = 5, obs_window = 3415)
 save.image(file = "./Data/03_results_DCD_2.RData")
 ```
 

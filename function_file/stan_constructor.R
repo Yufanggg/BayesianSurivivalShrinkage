@@ -8,7 +8,7 @@ stan_data_Constructer_PH <- function (training_dataset, testing_dataset = NULL){
   #----- organize the data regarding predictor
   sorted_indices = order(training_dataset$obstime, decreasing = TRUE)
   Sorted_training_dataset = training_dataset[sorted_indices,]
-
+  t_points = Sorted_training_dataset[, "obstime"]
   
   design__matrix = training_dataset[,!(names(Sorted_training_dataset) %in% c("id", "obstime", "status"))]
   
@@ -28,26 +28,24 @@ stan_data_Constructer_PH <- function (training_dataset, testing_dataset = NULL){
   
   
   
+  event_values <- t_points[which(Sorted_training_dataset$status == 1)]
+  unique_event_times <- unique(event_values)
+  
   #----------------
   # Construct data
   #----------------
   stan_data = list(
     #----- for model fitting --------
     nobs = nrow(Sorted_training_dataset),
-    t_points = Sorted_training_dataset[, "obstime"],
-    event_flag = (Sorted_training_dataset$status == 1), # whether or not an event is observed
-    
-    last_event_time = max(Sorted_training_dataset[Sorted_training_dataset$status == 1, "obstime"]), # time point where the last event occurs
-    event_indices = which(Sorted_training_dataset$status == 1), # the row ID where events happened
-    
-    # predictor matrices (time-fixed)
+    t_points = t_points,
+    status = Sorted_training_dataset$status,
+    unique_nevent = length(unique_event_times),
+    unique_event_times = unique_event_times,
     p = p,
     q = q,
     
     x = X_main[sorted_indices,],
     x_int =  X_int[sorted_indices,],
-    
-
     
     # link the interaction effect with the corresponding main effects
     g1 = g1,

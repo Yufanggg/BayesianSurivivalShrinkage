@@ -11,10 +11,11 @@ data {
   // response and time variables
   int<lower=0> nobs; // number of observations, including events, and censored
   vector[nobs] t_points;  // observed time points (non-strict decreasing)
-  vector[nobs] event_flag;  // whether or not an event happened at the conresponding time point
+  vector[nobs] status;  // whether or not an event happened at the conresponding time point
   
-  int<lower=0> unique_nevent; // # number of events
+  int<lower=0> unique_nevent;
   vector[unique_nevent] unique_event_times;
+
   
   // predictor matrices (time-fixed)
   int<lower=0> p; // num main effect
@@ -43,8 +44,6 @@ parameters {
 model {
        // pre-allocated variables
     vector[nobs] eta; // for events & right censored
-    
-    real log_denom;
 
 
     // prior
@@ -74,20 +73,27 @@ model {
     // - eta is the linear predictor vector
     // - nevent is the number of events
     // - t_points is also sorted
-    
     for (j in 1:unique_nevent) {
-      unique_event_time = unique_event_times[j]
-      real log_num; real log_denom;
+      real unique_event_time = unique_event_times[j];
+      real tie_sum = 0;
+      real risk_sum = 0;
+      real log_denom = 0;
+      int d = 0;
+      
       for (t in 1:nobs){
-        if(t_points[t] == unique_event_time && event_flag[i] == 1){
-          log_num = log_sum_exp(log_num, eta[i]);
+        if (status[t] == 1 && t_points[t] == unique_event_time){
+          tie_sum += exp(eta[t]);
+          d += 1;
         }
-        if (t_points[i] >= unique_event_time) {
-          log_denom = log_sum_exp(log_denom, eta[i]);
+        if (t_points[t] >= unique_event_time) {
+          risk_sum += exp(eta[t]);
       }
     }
-    target += log_num - log_denom
-      
+    
+    for (l in 0:(d - 1)) {
+      log_denom += log(risk_sum- (l * tie_sum / d));
+    }
+
+    target += log(tie_sum) - log_denom;
+    }
 }
-
-
