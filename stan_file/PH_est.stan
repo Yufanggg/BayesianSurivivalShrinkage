@@ -10,11 +10,10 @@
 data {
   // response and time variables
   int<lower=0> nobs; // number of observations, including events, and censored
-  vector[nobs] t_points;  // observed time points (non-strict decreasing)
-  vector[nobs] status;  // whether or not an event happened at the conresponding time point
   
   int<lower=0> unique_nevent;
-  vector[unique_nevent] unique_event_times;
+  vector[unique_nevent] first_indices_events;
+  vector[unique_nevent] last_indices_events;
 
   
   // predictor matrices (time-fixed)
@@ -74,26 +73,30 @@ model {
     // - nevent is the number of events
     // - t_points is also sorted
     for (j in 1:unique_nevent) {
-      real unique_event_time = unique_event_times[j];
-      real tie_sum = 0;
-      real risk_sum = 0;
-      real log_denom = 0;
-      int d = 0;
-      
-      for (t in 1:nobs){
-        if (status[t] == 1 && t_points[t] == unique_event_time){
-          tie_sum += exp(eta[t]);
-          d += 1;
-        }
-        if (t_points[t] >= unique_event_time) {
-          risk_sum += exp(eta[t]);
+      int start = first_indices_events[j],
+      int end = last_indices_events[j],
+      int len = end - starte + 1;
+      real log_len = log(len);
+      if (len == 1){
+        real numerator = eta[start];
+      } else {
+        real numerator = sum(eta[start:end]);
       }
-    }
-    
-    for (l in 0:(d - 1)) {
-      log_denom += log(risk_sum- (l * tie_sum / d));
-    }
-
-    target += log(tie_sum) - log_denom;
-    }
+      
+      if (j == 1){ // initalized
+        if (start != 1){
+          real log_denom_lhs = log_sum_exp(eta[1:start-1], eta[start:end]);
+        } else {
+          real log_denom_lhs = log_sum_exp(eta[start:end]);
+        }
+      } else {
+        log_denom_lhs = log_sum_exp(log_denom_lhs, log_sum_exp(eta[start:end]));
+      }
+      
+      vector[len] diff;
+      for (ell in 1:len){
+        diff[ell] = log_diff_exp(log_denom_lhs, log_sum_exp(eta[start:end]) - log_len + log(ell -1 ))
+      }
+      
+      target += numerator  - sum(diff);
 }
