@@ -89,15 +89,11 @@ model {
         if (start != 1){
           log_denom_lhs = log_sum_exp(eta[1:end]);
         } else {
-          // if (len == 1){
-          //   real log_denom_lhs = eta[start];
-          // } else {
             log_denom_lhs = log_sum_exp(eta[start:end]);
-/*          }*/
         }
       } else {
         int last_end = last_indices_events[j-1];
-        log_denom_lhs = log_sum_exp(log_denom_lhs, log_sum_exp(eta[last_end-1:end]));
+        log_denom_lhs = log_sum_exp(log_denom_lhs, log_sum_exp(eta[last_end+1:end]));
       }
       
       vector[len] diff;

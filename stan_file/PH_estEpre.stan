@@ -6,41 +6,15 @@
 //    http://mc-stan.org/users/interfaces/rstan.html
 //    https://github.com/stan-dev/rstan/wiki/RStan-Getting-Started
 //
-functions {
-  int num_unique_starts(vector t) { //The first calculates how many different survival times occur in the data.
-    if (size(t) == 0) return 0;
-    int us = 1;
-    for (n in 2:size(t)) {
-      if (t[n] != t[n - 1]) us += 1;
-    }
-    return us;
-  }
-  
-  array[] int unique_starts(vector t, int J) { // compute the value J to send into the function that computes the position in the array of failure times where each new failure time starts, plus an end point that goes one past the target
-    array[J + 1] int starts;
-    if (J == 0) return starts;
-    starts[1] = 1;
-    int pos = 2;
-    for (n in 2:size(t)) {
-      if (t[n] != t[n - 1]) {
-    starts[pos] = n;
-    pos += 1;
-      }
-    }
-    starts[J + 1] = size(t) + 1;
-    return starts;
-  }
-}
-
 
 data {
   // response and time variables
   int<lower=0> nobs; // number of observations, including events, and censored
-  vector[nobs] t_points;  // observed time points (non-strict decreasing)
-  vector[nobs] event_flag;  // whether or not an event happened at the conresponding time point
   
-  real last_event_time; // # time point where the last event occurs
-  
+  int<lower=0> unique_nevent;
+  int first_indices_events[unique_nevent];
+  int last_indices_events[unique_nevent];
+
   
   // predictor matrices (time-fixed)
   int<lower=0> p; // num main effect
@@ -55,18 +29,11 @@ data {
   int g1[q];
   int g2[q];
   
-  
   // for prediction
   int<lower=0> nnew;
   vector[nnew] t_new;
   matrix[nnew,p] x_new; // for rows with events
   matrix[nnew,q] x_int_new;
-  
-}
-
-transformed data {
-  int<lower=0> J = num_unique_starts(t_points); // number of unique survival time
-  array[J + 1] int<lower=0> starts = unique_starts(t_points, J);
 }
 
 parameters {
@@ -81,8 +48,8 @@ parameters {
 model {
        // pre-allocated variables
     vector[nobs] eta; // for events & right censored
-    
-    real log_denom;
+    real log_denom_lhs;
+    real numerator;
 
 
     // prior
@@ -112,33 +79,43 @@ model {
     // - eta is the linear predictor vector
     // - nevent is the number of events
     // - t_points is also sorted
-    
-    for (j in 1:J) {
-      int start = starts[j];
-      int end = starts[j + 1] - 1;
+    for (j in 1:unique_nevent) {
+      int start = first_indices_events[j];
+      int end = last_indices_events[j];
       int len = end - start + 1;
       real log_len = log(len);
+      if (len == 1){
+        numerator = eta[start];
+      } else {
+        numerator = sum(eta[start:end]);
+      }
       
-      if (j == 1){ // first unqiue time point, initializ the log_denom
-        if (len == 1){
-          log_denom = eta[start]; // single event
+      if (j == 1){ // initalized
+        if (start != 1){
+          log_denom_lhs = log_sum_exp(eta[1:end]);
         } else {
-          log_denom = log_sum_exp(eta[start:end]); // multiple events at first time point
+            log_denom_lhs = log_sum_exp(eta[start:end]);
         }
       } else {
-        log_denom = log_sum_exp(append_row(rep_vector(log_denom, 1), eta[start:end]));
-        }
-      // Add log-likelihood contribution
-      if (event_flag[j] == 1){
-        target += log_sum_exp(eta[start:end]) - log_denom;
+        int last_end = last_indices_events[j-1];
+        log_denom_lhs = log_sum_exp(log_denom_lhs, log_sum_exp(eta[last_end+1:end]));
       }
-    } 
       
+      vector[len] diff;
+      for (ell in 1:len){
+        if (ell == 1){
+          diff[ell] = log_denom_lhs;// or some other appropriate value
+        } else {
+          diff[ell] = log_diff_exp(log_denom_lhs, log_sum_exp(eta[start:end]) - log_len + log(ell -1 ));
+        }
+      }
+      
+      target += numerator - sum(diff);
+      }
 }
 
 generated quantities{
-      // Predicting the survival time on the new/test dataset
-      vector[nnew] eta_new;
-      eta_new = x_new * Beta + x_int_new * Beta_int;
+  // Predicting the survival time on the new/test dataset
+  vector[nnew] eta_new;
+  eta_new = x_new * Beta + x_int_new * Beta_int;
 }
-

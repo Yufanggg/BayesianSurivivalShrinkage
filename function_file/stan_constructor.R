@@ -6,11 +6,10 @@ stan_data_Constructer_PH <- function (training_dataset, testing_dataset = NULL){
   # Prepare data for model fitting
   #-----------------------------
   #----- organize the data regarding predictor
-  sorted_indices = order(training_dataset$obstime, decreasing = TRUE)
-  Sorted_training_dataset = training_dataset[sorted_indices,]
+  Sorted_training_dataset <- training_dataset[order(-training_dataset$obstime, -training_dataset$status), ] # observed time points (non-strict decreasing)
   t_points = Sorted_training_dataset[, "obstime"]
   
-  design__matrix = training_dataset[,!(names(Sorted_training_dataset) %in% c("id", "obstime", "status"))]
+  design__matrix = Sorted_training_dataset[,!(names(Sorted_training_dataset) %in% c("id", "obstime", "status"))]
   
   column_names = colnames(design__matrix)
   main_names =  column_names[!grepl(":", column_names)] #whether or not having intercept needs to be verified
@@ -26,10 +25,24 @@ stan_data_Constructer_PH <- function (training_dataset, testing_dataset = NULL){
   g1 <- g(main_indices_for_int, 1)
   g2 <- g(main_indices_for_int, 2)
   
+
   
-  
-  event_values <- t_points[which(Sorted_training_dataset$status == 1)]
+  event_flag <- Sorted_training_dataset$status == 1
+  event_values <- t_points[event_flag]
   unique_event_times <- unique(event_values)
+  
+  # Find the first index in t_points for each unique event time where event_flag is TRUE
+  first_indices_events <- sapply(unique_event_times, function(time) {
+    which(t_points == time & event_flag)[1]
+  })
+  
+  
+  # Find the last index in t_points for each unique event time where event_flag is TRUE
+  last_indices_events <- sapply(unique_event_times, function(time) {
+    tail(which(t_points == time & event_flag), 1)
+  })
+  
+  
   
   #----------------
   # Construct data
@@ -37,15 +50,14 @@ stan_data_Constructer_PH <- function (training_dataset, testing_dataset = NULL){
   stan_data = list(
     #----- for model fitting --------
     nobs = nrow(Sorted_training_dataset),
-    t_points = t_points,
-    status = Sorted_training_dataset$status,
+    first_indices_events = first_indices_events,
+    last_indices_events = last_indices_events,
     unique_nevent = length(unique_event_times),
-    unique_event_times = unique_event_times,
     p = p,
     q = q,
     
-    x = X_main[sorted_indices,],
-    x_int =  X_int[sorted_indices,],
+    x = X_main,
+    x_int =  X_int,
     
     # link the interaction effect with the corresponding main effects
     g1 = g1,
