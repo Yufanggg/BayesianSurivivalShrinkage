@@ -124,8 +124,10 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
 
 
 # Generate a simulate dateset
-DataGenerator <- function(n_samples = 210, n_features = 10) {
+DataGenerator <- function(n_samples, n_features) {
   sim_data <- list()
+  
+  print(n_features)
   
   # generate design matrix in the formate of dataframe
   # Generate covariance matrix
@@ -186,13 +188,13 @@ DataGenerator <- function(n_samples = 210, n_features = 10) {
     maxt = 5  # Maximum follow-up time
   )
   
-  survival_data <- survival_data |>
-    mutate(
-      censtime = runif(n_samples, 0.5, 5),
-      status = as.numeric(eventtime <= censtime),
-      obstime = pmin(round(eventtime, 4), censtime)
-    ) 
-  survival_data <- survival_data[, c("status", "obstime")]
+  # survival_data <- survival_data |>
+  #   mutate(
+  #     censtime = runif(n_samples, 0.5, 5),
+  #     status = as.numeric(eventtime <= censtime),
+  #     obstime = pmin(round(eventtime, 4), censtime)
+  #   )
+  # survival_data <- survival_data[, c("status", "obstime")]
   
   dataset <- cbind(survival_data, design_matrix)
   sim_data$dataset <- dataset

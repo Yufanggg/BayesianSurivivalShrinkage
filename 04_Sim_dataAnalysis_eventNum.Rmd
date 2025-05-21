@@ -1,0 +1,538 @@
+---
+title: "04_Sim_dataAnalysis_eventNum"
+author: "Yufang Wang"
+date: "2025-03-18"
+output: pdf_document
+---
+
+# Step 1: Set up the environment
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+install_and_load <- function(packages) {
+  for (pkg in packages) {
+    if (!require(pkg, character.only = TRUE)) {
+      install.packages(pkg, dependencies = TRUE)
+    }
+    library(pkg, character.only = TRUE) }
+  
+}
+
+# List of required packages
+required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret", "rbenchmark")
+# Install and/or load packages
+install_and_load(required_packages)
+
+source("./function_file/Functions.R")
+source("./function_file/stan_constructor.R")
+```
+
+
+# Step 2: Generate simulated data
+```{r, echo=TRUE}
+set.seed(123)
+n_samples <- 3000
+n_features <- 10 
+
+simulation_bayint_survival <- function(
+  criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"),
+  withPrediction = FALSE,
+  event_props = c(0.1, 0.3, 0.5, 0.7),
+  n_samples = 3000,
+  n_features = 10
+) {
+  output <- list()
+  
+  # Generate data
+  simulated_data <- DataGenerator(n_samples = n_samples, n_features = n_features)
+  dataset <- simulated_data$dataset
+  Beta <- simulated_data$Beta
+  output$Beta_true <- Beta
+  
+  for (event_prop in event_props) {
+    
+    # Apply censoring to achieve desired event proportion
+    n_events <- round(event_prop * n_samples)
+    event_ids <- sample(dataset$id, size = n_events)
+    dataset$status <- ifelse(dataset$id %in% event_ids, 1, 0)
+    
+    # Adjust observed times for censored individuals
+    dataset$obstime <- ifelse(dataset$status == 0,
+                               runif(sum(dataset$status == 0), 0, dataset$eventtime),
+                               dataset$eventtime)
+    
+    output[[paste0("NumTied_", event_prop)]] <- length(dataset$obstime) - length(unique(dataset$obstime))
+    print(output[[paste0("NumTied_", event_prop)]])
+    
+    # Split data if prediction is required
+    if (withPrediction) {
+      samples <- sample(1:nrow(dataset), 100)
+      training_dataset <- dataset[-samples, ]
+      testing_dataset <- dataset[samples, ]
+    } else {
+      training_dataset <- dataset
+      testing_dataset <- NULL
+    }
+    
+    # Construct data for models
+    stan_data_PH <- stan_data_Constructer_PH(training_dataset, testing_dataset)
+    stan_data_bSplines <- stan_data_Constructer_BSpline(training_dataset, testing_dataset, obs_window = 5)
+    
+    # Fit Bayesian models
+    model_fit_bSplines <- Bayesian_Survival_model(stan_data_bSplines, baseline_modelling = "bSplines", shrinkage = TRUE, withPrediction = withPrediction)
+    model_fit_PH <- Bayesian_Survival_model(stan_data_PH, baseline_modelling = "none", shrinkage = TRUE, withPrediction = withPrediction)
+    
+    # Diagnostics
+    output[[paste0("diagnostics_bSplines_", event_prop)]] <- summary(model_fit_bSplines)$summary[, c("Rhat", "n_eff")]
+    output[[paste0("diagnostics_PH_", event_prop)]] <- summary(model_fit_PH)$summary[, c("Rhat", "n_eff")]
+    
+    # Extract results
+    result_bSplines <- Bayesian_Survival_result_Extract(model_fit_bSplines, "bSplines", criteria)
+    result_PH <- Bayesian_Survival_result_Extract(model_fit_PH, "none", criteria)
+    
+    if ("DesignCoefficients" %in% criteria) {
+      output[[paste0("Beta_bSplines_", event_prop)]] <- result_bSplines$Beta_bayesian_est[, "mean"]
+      output[[paste0("Beta_PH_", event_prop)]] <- result_PH$Beta_bayesian_est[, "mean"]
+    }
+    
+    if ("baseline" %in% criteria) {
+      time_vec <- sort(training_dataset[training_dataset$status == 1, ]$obstime)
+      output[[paste0("time_vec_", event_prop)]] <- time_vec
+      output[[paste0("baseline_true_", event_prop)]] <- 10 * 2 * (time_vec ^ (10 - 1))
+      output[[paste0("baseline_bSplines_", event_prop)]] <- exp(as.matrix(stan_data_bSplines$basis) %*% result_bSplines$baselinePara[, "mean"])
+    }
+    
+    if ("variableSelection" %in% criteria) {
+      output[[paste0("varSel_bSplines_", event_prop)]] <- result_bSplines$variableSelection
+      output[[paste0("varSel_PH_", event_prop)]] <- result_PH$variableSelection
+    }
+    
+    if ("Prediction_SurvivalProb" %in% criteria && withPrediction) {
+      output[[paste0("time_", event_prop)]] <- testing_dataset$obstime
+      output[[paste0("true_status_", event_prop)]] <- testing_dataset$status
+      output[[paste0("eta_true_", event_prop)]] <- as.vector(
+        as.matrix(stan_data_bSplines$x_new) %*% Beta[1:10] +
+        as.matrix(stan_data_bSplines$x_int_new) %*% Beta[11:55]
+      )
+      output[[paste0("eta_pred_bSplines_", event_prop)]] <- result_bSplines$eta_pred
+      output[[paste0("eta_pred_PH_", event_prop)]] <- result_PH$eta_pred
+    }
+  }
+  
+  return(output)
+}
+
+replicate_times = 20
+simulated_results <- replicate(replicate_times, simulation_bayint_survival(n_samples = 3000, n_features = 10 ), simplify = "array")
+save.image(file = "./Data/sim_50_para_event_prop_3000.RData")
+```
+
+
+```{r, echo=TRUE}
+load(file = "./Data/sim_50_para_event_prop_3000.RData")
+Beta_true = rep(NA, 55)
+NumTied_0.1 = rep(NA, replicate_times)
+NumTied_0.3 = rep(NA, replicate_times)
+NumTied_0.5 = rep(NA, replicate_times)
+NumTied_0.7 = rep(NA, replicate_times)
+  
+diagnostics_bSplines_0.1 = matrix(160, replicate_times)
+diagnostics_bSplines_0.3 = matrix(160, replicate_times)
+diagnostics_bSplines_0.5 = matrix(160, replicate_times)
+diagnostics_bSplines_0.7 = matrix(160, replicate_times)
+  
+diagnostics_PH_0.1 = matrix(154, replicate_times)
+Beta_bSplines_0.1 = matrix(55, replicate_times)
+Beta_PH_0.1 = matrix(55, replicate_times)
+time_vec_0.1 = matrix(50, replicate_times)
+baseline_true_0.1 = matrix(50, replicate_times)
+baseline_bSplines_0.1 = matrix(50, replicate_times)
+varSel_bSplines_0.1 = matrix(55, replicate_times)
+varSel_PH_0.1 = matrix(55, replicate_times)
+
+
+
+diagnostics_PH_0.3 =
+Beta_bSplines_0.3 = 
+Beta_PH_0.3 = 
+time_vec_0.3 = 
+baseline_true_0.3 = 
+baseline_bSplines_0.3 = 
+varSel_bSplines_0.3 = 
+varSel_PH_0.3 = 
+  
+
+
+diagnostics_PH_0.5 = 
+Beta_bSplines_0.5 = 
+Beta_PH_0.5 = 
+time_vec_0.5 = 
+baseline_true_0.5 = 
+baseline_bSplines_0.5 = 
+varSel_bSplines_0.5 = 
+varSel_PH_0.5 = 
+
+
+diagnostics_PH_0.7 = 
+Beta_bSplines_0.7 = 
+Beta_PH_0.7 = 
+time_vec_0.7 = 
+baseline_true_0.7 = 
+baseline_bSplines_0.7 = 
+varSel_bSplines_0.7 = 
+varSel_PH_0.7 =  
+
+
+Beta_est_bSplines_withShrinkag <- matrix(nrow = replicate_times, ncol = 55)
+Beta_est_bSplines_noShrinkag <- matrix(nrow = replicate_times, ncol = 55)
+Beta_est_PH_withShrinkage <- matrix(nrow = replicate_times, ncol = 55)
+Beta_est_PH_noShrinkag <- matrix(nrow = replicate_times, ncol = 55)
+
+
+# Bias  
+Bias_bSplines_withShrinkag = rep(NA, ncol = 55)
+Bias_bSplines_noShrinkag = rep(NA, ncol = 55)
+Bias_PH_withShrinkage = rep(NA, ncol = 55)
+Bias_PH_noShrinkag = rep(NA, ncol = 55)
+
+# Variance
+Variance_bSplines_withShrinkag_ = matrix(nrow = replicate_times, ncol = 55)
+Variance_bSplines_noShrinkag_ = matrix(nrow = replicate_times, ncol = 55)
+Variance_PH_withShrinkage_ = matrix(nrow = replicate_times, ncol = 55)
+Variance_PH_noShrinkag_ = matrix(nrow = replicate_times, ncol = 55)
+
+# MSE
+MSEs_bSplines_withShrinkag_ = matrix(nrow = replicate_times, ncol = 55)
+MSEs_bSplines_noShrinkag_ = matrix(nrow = replicate_times, ncol = 55)
+MSEs_PH_withShrinkage_ = matrix(nrow = replicate_times, ncol = 55)
+MSEs_PH_noShrinkag_ = matrix(nrow = replicate_times, ncol = 55)
+
+# Type I error
+FDR_bSplines_withShrinkag = rep(NA, replicate_times)
+FDR_bSplines_noShrinkag = rep(NA, replicate_times)
+FDR_PH_withShrinkage = rep(NA, replicate_times)
+FDR_PH_noShrinkag = rep(NA, replicate_times)
+
+# Type II error
+Num_Selected_bSplines_withShrinkag = rep(NA, replicate_times)
+Num_Selected_bSplines_noShrinkag = rep(NA, replicate_times)
+Num_Selected_PH_withShrinkage = rep(NA, replicate_times)
+Num_Selected_PH_noShrinkag = rep(NA, replicate_times)
+
+# correlation, i.e., Prediction at the linear predictor level
+cor_bSplines_withShrinkag = rep(NA, replicate_times)
+cor_bSplines_noShrinkag = rep(NA, replicate_times)
+cor_PH_withShrinkage = rep(NA, replicate_times)
+cor_PH_noShrinkag = rep(NA, replicate_times)
+
+#C INDEX, i.e., prediction at the C index level
+C_index_bSplines_withShrinkag = rep(NA, replicate_times)
+C_index_bSplines_noShrinkag = rep(NA, replicate_times)
+C_index_PH_withShrinkage = rep(NA, replicate_times)
+C_index_PH_noShrinkag = rep(NA, replicate_times)
+
+
+for (i in 1:replicate_times){
+  # Beta
+  Beta_true <- simulated_results[,i]$Beta_true
+  Beta_est_bSplines_withShrinkag[i, ] <- simulated_results[,i]$Beta_est_bSplines_withShrinkage 
+  Beta_est_bSplines_noShrinkag[i, ] <- simulated_results[,i]$Beta_est_bSplines_noShrinkage
+  Beta_est_PH_withShrinkage[i, ] <- simulated_results[,i]$Beta_est_PH_withShrinkage
+  Beta_est_PH_noShrinkag[i, ] <-  simulated_results[,i]$Beta_est_PH_noShrinkage
+  
+  # Variance
+  Variance_bSplines_withShrinkag_[i, ] = simulated_results[,i]$Beta_est_bSplines_withShrinkage - Beta_true
+  Variance_bSplines_noShrinkag_[i, ] = simulated_results[,i]$Beta_est_bSplines_noShrinkage - Beta_true
+  Variance_PH_withShrinkage_[i, ] = simulated_results[,i]$Beta_est_PH_withShrinkage - Beta_true
+  Variance_PH_noShrinkag_[i, ] = simulated_results[,i]$Beta_est_PH_noShrinkage - Beta_true
+  
+  # MSE
+  MSEs_bSplines_withShrinkag_[i, ] <- (simulated_results[,i]$Beta_est_bSplines_withShrinkage - Beta_true)**2
+  MSEs_bSplines_noShrinkag_[i, ] <- (simulated_results[,i]$Beta_est_bSplines_noShrinkage - Beta_true)**2
+  MSEs_PH_withShrinkage_[i, ] <- (simulated_results[,i]$Beta_est_PH_withShrinkage - Beta_true)**2
+  MSEs_PH_noShrinkag_[i, ] <- (simulated_results[,i]$Beta_est_PH_noShrinkage - Beta_true)**2
+  
+  # FDR (Type I error)
+  variableSelection_reference <- ifelse(simulated_results[,i]$Beta_true != 0, TRUE, FALSE)
+  
+  # FDR
+  variableSelection_reference <- simulated_results[, i]$Beta_true != 0
+  
+  Selection_bSplines_withShrinkage <- simulated_results[,i]$variableSelection_bSplines_withShrinkage
+  Selection_bSplines_noShrinkage <- simulated_results[,i]$variableSelection_bSplines_noShrinkage
+  Selection_PH_withShrinkage <- simulated_results[,i]$variableSelection_PH_withShrinkage
+  Selection_PH_noShrinkage <- simulated_results[,i]$variableSelection_PH_noShrinkage
+  
+
+  FDR_bSplines_withShrinkag[i] <- sum(Selection_bSplines_withShrinkage & !variableSelection_reference) / sum(Selection_bSplines_withShrinkage)
+  FDR_bSplines_noShrinkag[i] <- sum(Selection_bSplines_noShrinkage & !variableSelection_reference) / sum(Selection_bSplines_noShrinkage)
+  FDR_PH_withShrinkage[i] <- sum(Selection_PH_withShrinkage & !variableSelection_reference) / sum(Selection_PH_withShrinkage)
+  FDR_PH_noShrinkag[i] <- sum(Selection_PH_noShrinkage & !variableSelection_reference) / sum(Selection_PH_noShrinkage)
+  
+  # Number of selected variables (Type II error)
+  Num_Selected_bSplines_withShrinkag[i] = sum(Selection_bSplines_withShrinkage)
+  Num_Selected_bSplines_noShrinkag[i] = sum(Selection_bSplines_noShrinkage)
+  Num_Selected_PH_withShrinkage[i] = sum(Selection_PH_withShrinkage)
+  Num_Selected_PH_noShrinkag[i] = sum(Selection_PH_noShrinkage)
+
+  
+  #linear predictor
+  eta_true <- simulated_results[,i]$eta_true
+  eta_pre_bSplines_withShrinkage <- simulated_results[, i]$eta_pred_bSplines_withShrinkage
+  eta_pre_bSplines_noShrinkage <- simulated_results[, i]$eta_pred_bSplines_noShrinkage
+  eta_pre_PH_withShrinkage <- simulated_results[, i]$eta_pred_PH_withShrinkage
+  eta_pre_PH_noShrinkage <- simulated_results[, i]$eta_pred_PH_noShrinkage
+  
+  cor_bSplines_withShrinkag[i] <- cor(eta_true, eta_pre_bSplines_withShrinkage)
+  cor_bSplines_noShrinkag[i] <- cor(eta_true, eta_pre_bSplines_noShrinkage)
+  cor_PH_withShrinkage[i] <- cor(eta_true, eta_pre_PH_withShrinkage)
+  cor_PH_noShrinkag[i] <- cor(eta_true, eta_pre_PH_noShrinkage)
+  
+  # CI 
+  time <- simulated_results[,i]$time
+  true_status <- simulated_results[,i]$true_status
+  sp_true <- exp(-2 * time^10 * exp(eta_true))
+  
+  C_index_bSplines_withShrinkag[i] <- rcorr.cens(-eta_pre_bSplines_withShrinkage, Surv(time, true_status))["C Index"] # rcorr.cens
+  C_index_bSplines_noShrinkag[i] <- rcorr.cens(-eta_pre_bSplines_noShrinkage, Surv(time, true_status))["C Index"]
+  C_index_PH_withShrinkage[i] <- rcorr.cens(-eta_pre_PH_withShrinkage, Surv(time, true_status))["C Index"]
+  C_index_PH_noShrinkag[i] <- rcorr.cens(-eta_pre_PH_noShrinkage, Surv(time, true_status))["C Index"]
+  
+}
+
+# Bias
+Bias_bSplines_withShrinkag = apply(Beta_est_bSplines_withShrinkag, 2, mean) - Beta_true
+Bias_bSplines_noShrinkag = apply(Beta_est_bSplines_noShrinkag, 2, mean) - Beta_true
+Bias_PH_withShrinkage = apply(Beta_est_PH_withShrinkage, 2, mean) - Beta_true
+Bias_PH_noShrinkag = apply(Beta_est_PH_noShrinkag, 2, mean) - Beta_true
+
+# Variance 
+Variance_bSplines_withShrinkag = apply(Variance_bSplines_withShrinkag_, 2, var)
+Variance_bSplines_noShrinkag = apply(Variance_bSplines_noShrinkag_, 2, var)
+Variance_PH_withShrinkage = apply(Variance_PH_withShrinkage_, 2, var)
+Variance_PH_noShrinkag = apply(Variance_PH_noShrinkag_, 2, var)
+
+# MSE
+MSEs_bSplines_withShrinkag <- apply(MSEs_bSplines_withShrinkag_, 2, mean)
+MSEs_bSplines_noShrinkag <- apply(MSEs_bSplines_noShrinkag_, 2, mean)
+MSEs_PH_withShrinkage <- apply(MSEs_PH_withShrinkage_, 2, mean)
+MSEs_PH_noShrinkag <- apply(MSEs_PH_noShrinkag_, 2, mean)
+
+# visualized result
+fill_vector = (Beta_true != 0)
+
+par(mfrow = c(3, 2))
+
+# Subfigure 1: Bias
+plot(Bias_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Bias", main = "Bias for Beta estimation", pch = 16)
+
+# Add background rectangles
+for (i in 1:length(Beta_true)) {
+  if (fill_vector[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+
+
+lines(Bias_bSplines_noShrinkag, type = "o", col = "green", pch = 16)
+lines(Bias_PH_withShrinkage, type = "o", col = "orange", pch = 16)
+lines(Bias_bSplines_withShrinkag, type = "o", col = "blue", pch = 16)
+lines(Bias_PH_noShrinkag, type = "o", col = "purple", pch = 16)
+
+abline(v = 10, col = "red", lty = 2)
+legend("topright", legend = c("bSplines_withShrinkag", "bSplines_noShrinkag", "PL_withShrinkage", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
+
+# Subfigure 2: Variance
+plot(Variance_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Variance", ylim = c(0, 0.3), main = "Variance for Beta estimation", pch = 16)
+
+# Add background rectangles
+for (i in 1:length(Beta_true)) {
+  if (fill_vector[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+
+lines(Variance_bSplines_noShrinkag, type = "o", col = "green", pch = 16)
+lines(Variance_PH_withShrinkage, type = "o", col = "orange", pch = 16)
+lines(Variance_bSplines_withShrinkag, type = "o", col = "blue", pch = 16)
+lines(Variance_PH_noShrinkag, type = "o", col = "purple", pch = 16)
+
+abline(v = 10, col = "red", lty = 2)
+abline(h = 0, col = "red", lty = 2)
+legend("topright", legend = c("bSplines_withShrinkag", "bSplines_noShrinkag", "PL_withShrinkage", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
+
+# # Subfigure 3: MSE
+# plot(MSEs_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.3), main = "MSE for Beta estimation", pch = 16)
+# 
+# # Add background rectangles
+# for (i in 1:length(Beta_true)) {
+#   if (fill_vector[i]) {
+#     rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+#   }
+# }
+# 
+# lines(MSEs_bSplines_noShrinkag, type = "o", col = "green", pch = 16)
+# lines(MSEs_PH_withShrinkage, type = "o", col = "orange", pch = 16)
+# lines(MSEs_bSplines_withShrinkag, type = "o", col = "blue", pch = 16)
+# lines(MSEs_PH_noShrinkag, type = "o", col = "purple", pch = 16)
+# 
+# abline(v = 10, col = "red", lty = 2)
+# legend("topright", legend = c("bSplines_withShrinkag", "bSplines_noShrinkag", "PL_withShrinkage", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
+
+
+# Subfigure 4 Type I error
+# Create side-by-side boxplots for FDR
+FDR_list = list(bSplines_withShrinkag = FDR_bSplines_withShrinkag, bSplines_noShrinkag = FDR_bSplines_noShrinkag, PL_withShrinkage = FDR_PH_withShrinkage, PL_noShrinkag = FDR_PH_noShrinkag)
+boxplot(FDR_list, names = c("bSplines_withShrinkag", "bSplines_noShrinkag", "PL_withShrinkage", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), main = "FDR Boxplots", xlab = "", ylab = "FDR")
+
+# Subfigure 5 Type II error
+Num_Selected_list = list(bSplines_withShrinkag = Num_Selected_bSplines_withShrinkag/sum(Beta_true != 0), bSplines_noShrinkag = Num_Selected_bSplines_noShrinkag/sum(Beta_true != 0), PL_withShrinkage = Num_Selected_PH_withShrinkage/sum(Beta_true != 0), PL_noShrinkag = Num_Selected_PH_noShrinkag/sum(Beta_true != 0))
+boxplot(Num_Selected_list, names = c("bSplines_withShrinkag", "bSplines_noShrinkag", "PL_withShrinkage", "PL_noShrinkag"), col = c("blue", "green", "orange", "grey"), main = "Proportional of Selected variables", xlab = "", ylab = "Prop of Selected variables")
+
+# Subfigure 6 Correlation for linear predictors
+cor_list = list(bSplines_withShrinkag = cor_bSplines_withShrinkag, bSplines_noShrinkag = cor_bSplines_noShrinkag, PL_withShrinkage = cor_PH_withShrinkage, PL_noShrinkag = cor_PH_noShrinkag)
+boxplot(cor_list, names = c("bSplines_withShrinkag", "bSplines_noShrinkag", "PL_withShrinkage", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), main = "True vs. predicted linear predictor", xlab = "", ylab = "correlation")
+
+# # Subfigure 7 C index
+C_index_list = list(bSplines_withShrinkag = C_index_bSplines_withShrinkag, bSplines_noShrinkag = C_index_bSplines_noShrinkag, PL_withShrinkage = C_index_PH_withShrinkage, PL_noShrinkag = C_index_PH_noShrinkag)
+boxplot(C_index_list, names = c("bSplines_withShrinkag", "bSplines_noShrinkag", "PL_withShrinkage", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), main = "C index Boxplots", xlab = "", ylab = "C index")
+```
+
+# Step 3: Furture check bias-variance
+```{r, echo=TRUE}
+#load(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
+
+# Ground-truth info
+Beta_true = rep(NA, 55)
+LinearPred_true = matrix(nrow = replicate_times, ncol = 100)
+
+# Output of bSplines with vs. no shrinkage for betas
+Beta_bSpline_noShrinkage = matrix(nrow = replicate_times, ncol = 55)
+Beta_bSpline_withShrinkage =  matrix(nrow = replicate_times, ncol = 55)
+
+LinearPred_bSpline_noShrinkage = matrix(nrow = replicate_times, ncol = 100)
+LinearPred_bSpline_withShrinkage = matrix(nrow = replicate_times, ncol = 100)
+
+#Output of partical likelihood with vs. no shrinkage for betas
+Beta_PH_noShrinkage = matrix(nrow = replicate_times, ncol = 55)
+Beta_PH_withShrinkage =  matrix(nrow = replicate_times, ncol = 55)
+
+LinearPred_PH_noShrinkage = matrix(nrow = replicate_times, ncol = 100)
+LinearPred_PH_withShrinkage = matrix(nrow = replicate_times, ncol = 100)
+
+
+
+# FDR
+variableSelection_reference = rep(NA, 55)
+Selection_bSplines_withShrinkage = matrix(nrow = replicate_times, ncol = 55)
+Selection_bSplines_noShrinkage = matrix(nrow = replicate_times, ncol = 55)
+
+Selection_PH_withShrinkage = matrix(nrow = replicate_times, ncol = 55)
+Selection_PH_noShrinkage = matrix(nrow = replicate_times, ncol = 55)
+
+
+
+for (i in 1:replicate_times){
+  # Ground-truth info 
+  Beta_true <- simulated_results[,i]$Beta_true
+  
+  Beta_bSpline_withShrinkage[i, ] <-  simulated_results[,i]$Beta_est_bSplines_withShrinkage
+  Beta_bSpline_noShrinkage[i, ] <-  simulated_results[,i]$Beta_est_bSplines_noShrinkage
+  
+  
+  Beta_PH_withShrinkage[i,] <-  simulated_results[,i]$Beta_est_PH_withShrinkage
+  Beta_PH_noShrinkage[i, ] <-  simulated_results[,i]$Beta_est_PH_noShrinkage
+  
+  
+  # Linear predictor
+  LinearPred_true[i, ] <- simulated_results[,i]$eta_true
+  LinearPred_bSpline_withShrinkage[i, ] <- simulated_results[,i]$eta_pred_bSplines_withShrinkage
+  LinearPred_bSpline_noShrinkage[i, ] <- simulated_results[,i]$eta_pred_bSplines_noShrinkage
+  
+  LinearPred_PH_withShrinkage[i, ] <- simulated_results[,i]$eta_pred_PH_withShrinkage
+  LinearPred_PH_noShrinkage[i, ] <- simulated_results[,i]$eta_pred_PH_noShrinkage
+  
+  
+  # FDR
+  variableSelection_reference <- ifelse(simulated_results[,i]$Beta_true != 0, TRUE, FALSE)
+  
+  Selection_bSplines_withShrinkage[i, ] <- simulated_results[,i]$variableSelection_bSplines_withShrinkage
+  Selection_bSplines_noShrinkage[i, ] <- simulated_results[,i]$variableSelection_bSplines_noShrinkage
+
+  Selection_PH_withShrinkage[i, ] <- simulated_results[,i]$variableSelection_PH_withShrinkage
+  Selection_PH_noShrinkage[i, ] <- simulated_results[,i]$variableSelection_PH_noShrinkage
+}
+
+
+par(mfrow = c(2, 2))
+Bias_bSpline_withShrinkage <- apply(Beta_bSpline_withShrinkage, 2, mean) - Beta_true
+Bias_bSpline_noShrinkage <- apply(Beta_bSpline_noShrinkage, 2, mean) - Beta_true
+plot(Bias_bSpline_noShrinkage, Bias_bSpline_withShrinkage,
+     xlab = "Bias (No Shrinkage)", ylab = "Bias (With Shrinkage)",
+     main = "Bias Comparison: No Shrinkage vs With Shrinkage")
+abline(0, 1, col = "red", lty = 2)  # y = x line
+
+
+var_bSpline_withShrinkage <- apply(Beta_bSpline_withShrinkage - apply(Beta_bSpline_withShrinkage, 2, mean), 2, function(x){mean(x^2)})
+Var_bSpline_noShrinkage <- apply(Beta_bSpline_noShrinkage - apply(Beta_bSpline_noShrinkage, 2, mean), 2, function(x){mean(x^2)})
+plot(Var_bSpline_noShrinkage, var_bSpline_withShrinkage,
+     xlab = "Variance (No Shrinkage)", ylab = "Variance (With Shrinkage)",
+     main = "Variance Comparison: No Shrinkage vs With Shrinkage")
+abline(0, 1, col = "red", lty = 2)  # y = x line
+
+# visualized result
+fill_vector = (simulated_results[, 1]$Beta_true != 0)
+
+plot(apply(Selection_bSplines_withShrinkage, 2, mean), type = "o", col = "blue", xlab = "estimated Betas", ylab = "FDR", ylim = c(0, 1), main = "FDR for Beta estimation", pch = 16)
+
+# Add background rectangles
+for (i in 1:length(variableSelection_reference)) {
+  if (fill_vector[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+
+lines(apply(Selection_bSplines_withShrinkage, 2, mean), type = "o", col = "blue", pch = 16)
+lines(apply(Selection_bSplines_noShrinkage, 2, mean), type = "o", col = "green", pch = 16)
+lines(apply(Selection_PH_withShrinkage, 2, mean), type = "o", col = "orange", pch = 16)
+lines(apply(Selection_PH_noShrinkage, 2, mean), type = "o", col = "grey", pch = 16)
+# Add legend
+legend("topright", legend = c("B_withshrinkage", "B_noshrinkage", "PH_withshrinkage", "PH_noshrinkage"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1)
+```
+
+# Tracking time
+```{r, echo=TRUE}
+set.seed(123)
+n_samples <- 300
+n_features <- 10 
+simulated_data <- DataGenerator(n_samples = n_samples, n_features = 10)
+samples <- sample(1:nrow(dataset), 100)
+training_dataset <- dataset[-samples, ]
+testing_dataset <- dataset[samples, ]
+
+stan_data_PH <- stan_data_Constructer_PH(
+    training_dataset = training_dataset,
+    testing_dataset = testing_dataset)
+
+stan_data_bSplines <- stan_data_Constructer_BSpline(
+    training_dataset = training_dataset,
+    testing_dataset = testing_dataset,
+    obs_window = 5
+  )
+
+t_eval = benchmark(
+  "bSpline_shrinkage" = {
+     model_fit_withShrinkage <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_modelling = "bSplines", shrinkage = TRUE)
+  },
+  
+  "PH_shrinkage" = {
+     model_fit_withShrinkage <- Bayesian_Survival_model(stan_data = stan_data_PH, baseline_modelling = "none", shrinkage = TRUE)
+  },
+  
+  replications = 50
+)
+t_eval
+
+save(t.eval, file = "./Data/t_eval.RData")
+```
