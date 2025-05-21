@@ -38,11 +38,11 @@ n_samples <- 300
 n_features <- 10 
 
 # function for one simulation
-simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE){
+simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE, n_samples = n_samples, n_features = n_features){
   
   output = list()
   
-  simulated_data <- DataGenerator(n_samples = n_samples, n_features = 10)
+  simulated_data <- DataGenerator(n_samples = n_samples, n_features = n_features)
   dataset <- simulated_data$dataset
   Beta <- simulated_data$Beta
   output$Beta_true = Beta
@@ -166,7 +166,7 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
 }
 
 replicate_times = 50
-simulated_results <- replicate(replicate_times, simulation_bayint_survival(), simplify = "array")
+simulated_results <- replicate(replicate_times, simulation_bayint_survival(n_samples = n_samples, n_features = n_features), simplify = "array")
 save.image(file = "./Data/sim_50_para_int_PH_tiedTimes.RData")
 ```
 

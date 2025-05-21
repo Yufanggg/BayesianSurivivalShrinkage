@@ -32,15 +32,13 @@ source("./function_file/stan_constructor.R")
 # Step 2: Generate simulated data
 ```{r, echo=TRUE}
 set.seed(123)
-n_samples <- 300
-n_features <- 10 
 
 # function for one simulation
-simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE){
+simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE, n_samples = 300, n_features = 10){
   
   output = list()
   
-  simulated_data <- DataGenerator(n_samples = n_samples, n_features = 10)
+  simulated_data <- DataGenerator(n_samples = n_samples, n_features = n_features)
   dataset <- simulated_data$dataset
   Beta <- simulated_data$Beta
   output$Beta_true = Beta
@@ -158,7 +156,7 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
 
 
 replicate_times = 50
-simulated_results <- replicate(replicate_times, simulation_bayint_survival_shrinkage(), simplify = "array")
+simulated_results <- replicate(replicate_times, simulation_bayint_survival_shrinkage(n_samples = 300, n_features = 10 ), simplify = "array")
 save.image(file = "./Data/sim_50_para_shrinkagenowith_PH_tiedTimes.RData")
 ```
 
