@@ -727,7 +727,7 @@ handle_basehaz_surv <- function(times,
   nvars  <- ncol(basis)  # number of aux parameters, basis terms
   
   
-  nlist(
+  rstan::nlist(
     nvars, 
     iknots, 
     bknots,

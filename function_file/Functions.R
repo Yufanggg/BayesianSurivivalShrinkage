@@ -45,25 +45,25 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
       # compile the model
       message("We assume that the baseline hazard function is exponentially distributed.")
       bayesian_model <-
-        stan_model("./stan_file/exponential_est.stan")
+        rstan::stan_model("./stan_file/exponential_est.stan")
     }
     
     else if (baseline_modelling == "weibull") {
       # compile the model
       message("We assume that the baseline hazard function is weibully distributed.")
-      bayesian_model <- stan_model("./stan_file/weibull_est.stan")
+      bayesian_model <- rstan::stan_model("./stan_file/weibull_est.stan")
     }
     
     else if (baseline_modelling == "bSplines") {
       message("We utilized B-splines to estimate the log baseline hazard function.")
       
       # compile the model
-      bayesian_model <- stan_model("./stan_file/bSpline_est.stan")
+      bayesian_model <- rstan::stan_model("./stan_file/bSpline_est.stan")
     }
     
     else if (baseline_modelling == "none"){
       message("we used the partical likelihood to estimate the cofficients of covariates")
-      bayesian_model <- stan_model("./stan_file/PH_est.stan")
+      bayesian_model <- rstan::stan_model("./stan_file/PH_est.stan")
     }
     
   } else {
@@ -71,13 +71,13 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
       # compile the model
       message("We assume that the baseline hazard function is exponentially distributed.")
       bayesian_model <-
-        stan_model("./stan_file/exponential_estEpre.stan")
+        rstan::stan_model("./stan_file/exponential_estEpre.stan")
     }
     
     else if (baseline_modelling == "weibull") {
       # compile the model
       message("We assume that the baseline hazard function is weibully distributed.")
-      bayesian_model <- stan_model("./stan_file/weibull_estEpre.stan")
+      bayesian_model <- rstan::stan_model("./stan_file/weibull_estEpre.stan")
     }
     
     else if (baseline_modelling == "bSplines") {
@@ -85,10 +85,10 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
       
       # compile the model
       if (shrinkage){
-        bayesian_model <- stan_model("./stan_file/bSpline_estEpre.stan")
+        bayesian_model <- rstan::stan_model("./stan_file/bSpline_estEpre.stan")
       } else {
         message("No shrinkaged bSplines modelling!")
-        bayesian_model <- stan_model("./stan_file/bSpline_estEprenoShrinkage.stan")
+        bayesian_model <- rstan::stan_model("./stan_file/bSpline_estEprenoShrinkage.stan")
       }
       
     }
@@ -97,10 +97,10 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
       message("we used the partical likelihood to estimate the cofficients of covariates")
       # compile the model
       if (shrinkage){
-        bayesian_model <- stan_model("./stan_file/PH_estEpre.stan")
+        bayesian_model <- rstan::stan_model("./stan_file/PH_estEpre.stan")
       } else {
         message("No shrinkaged partical likelihood modelling!")
-        bayesian_model <- stan_model("./stan_file/PH_estEprenoShrinkage.stan")
+        bayesian_model <- rstan::stan_model("./stan_file/PH_estEprenoShrinkage.stan")
       }
     }
   }
@@ -108,7 +108,7 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
     
     # Model fitting
     bayesian_model_fit <- suppressWarnings(
-      sampling(
+      rstan::sampling(
         bayesian_model,
         data = stan_data,
         iter = niter,
@@ -134,7 +134,7 @@ DataGenerator <- function(n_samples, n_features) {
   Sigma <- matrix(0.3, nrow = n_features, ncol = n_features)
   diag(Sigma) <- 1
   
-  design_matrix <- mvrnorm(n_samples, mu = rep(0, n_features), Sigma = Sigma)
+  design_matrix <- MASS::mvrnorm(n_samples, mu = rep(0, n_features), Sigma = Sigma)
   design_matrix <- as.data.frame(design_matrix)
   names(design_matrix) <- paste0("Var", 1:n_features)
   
@@ -176,7 +176,7 @@ DataGenerator <- function(n_samples, n_features) {
   
   
   # Generate simulated survival data
-  survival_data <- simsurv(
+  survival_data <- simsurv::simsurv(
     dist = "weibull",
     lambdas = 2,
     # scale
