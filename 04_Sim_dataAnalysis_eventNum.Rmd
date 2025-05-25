@@ -149,12 +149,12 @@ simulated_results = replicate(replicate_times, simulation_bayint_survival())
 # 
 # simulated_results
 
-save.image(file = "./Data/sim_20_para_event_prop_200.RData")
+save.image(file = "./Data/sim_50_para_event_prop_200.RData")
 ```
 
 
 ```{r, echo=TRUE}
-#load(file = "./Data/sim_5_para_event_prop_1000.RData")
+load(file = "./Data/sim_50_para_event_prop_200.RData")
 Beta_true = rep(NA, 55)
 NumTied_0.1 = rep(NA, replicate_times)
 NumTied_0.4 = rep(NA, replicate_times)
@@ -278,12 +278,12 @@ for (i in 1:replicate_times){
   Selection_PH_0.9 <- simulated_results[,i]$varSel_PH_0.9
   
 
-  FDR_bSplines_0.1[i] <- sum(Selection_bSplines_0.1 & !variableSelection_reference) / sum(Selection_bSplines_withShrinkage)
-  FDR_bSplines_0.4[i] <- sum(Selection_bSplines_0.4 & !variableSelection_reference) / sum(Selection_bSplines_noShrinkage)
-  FDR_bSplines_0.9[i] <- sum(Selection_bSplines_0.9 & !variableSelection_reference) / sum(Selection_PH_withShrinkage)
-  FDR_PH_0.1[i] <- sum(Selection_PH_0.1 & !variableSelection_reference) / sum(Selection_PH_noShrinkage)
-  FDR_PH_0.4[i] <- sum(Selection_PH_0.4 & !variableSelection_reference) / sum(Selection_PH_noShrinkage)
-  FDR_PH_0.9[i] <- sum(Selection_PH_0.9 & !variableSelection_reference) / sum(Selection_PH_noShrinkage)
+  FDR_bSplines_0.1[i] <- sum(Selection_bSplines_0.1 & !variableSelection_reference) / sum(Selection_bSplines_0.1)
+  FDR_bSplines_0.4[i] <- sum(Selection_bSplines_0.4 & !variableSelection_reference) / sum(Selection_bSplines_0.4)
+  FDR_bSplines_0.9[i] <- sum(Selection_bSplines_0.9 & !variableSelection_reference) / sum(Selection_bSplines_0.9)
+  FDR_PH_0.1[i] <- sum(Selection_PH_0.1 & !variableSelection_reference) / sum(Selection_PH_0.1)
+  FDR_PH_0.4[i] <- sum(Selection_PH_0.4 & !variableSelection_reference) / sum(Selection_PH_0.4)
+  FDR_PH_0.9[i] <- sum(Selection_PH_0.9 & !variableSelection_reference) / sum(Selection_PH_0.9)
   
   
   # Number of selected variables (Type II error)
@@ -346,7 +346,7 @@ lines(Bias_PH_0.9, type = "o", col = "#a2d9ce", pch = 16)
 
 
 abline(v = 10, col = "red", lty = 2)
-legend("topright", legend = c("bSplines_0.1", "bSplines_noShrinkag", "PL_withShrinkage", "PL_noShrinkag"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), pch = 16, lty = 1) # Add legend
+legend("topright", legend = c("bSplines_0.1", "bSplines_0.4", "bSplines_0.9", "PH_0.1", "PH_0.4", "PH_0.9"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), pch = 16, lty = 1) # Add legend
 
 # Subfigure 2: Variance
 plot(Variance_bSplines_0.1, type = "o", col = "#641e16", xlab = "estimated Betas", ylab = "Variance", ylim = c(0, 0.3), main = "Variance for Beta estimation", pch = 16)
