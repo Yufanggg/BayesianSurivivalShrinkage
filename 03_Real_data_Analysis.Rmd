@@ -169,7 +169,7 @@ stan_data_PH_DBD <- stan_data_Constructer_PH(
       testing_dataset = NULL
     )
 
-#model_fit_bSpline_DBD <- Bayesian_Survival_model(stan_data = stan_data_bSpline_DBD, baseline_modelling = "bSplines", withPrediction = FALSE, shrinkage = TRUE)
+model_fit_bSpline_DBD <- Bayesian_Survival_model(stan_data = stan_data_bSpline_DBD, baseline_modelling = "bSplines", withPrediction = FALSE, shrinkage = TRUE)
 
 model_fit_PH_DBD <- Bayesian_Survival_model(stan_data = stan_data_PH_DBD, baseline_modelling = "none", withPrediction = FALSE, shrinkage = TRUE)
 
