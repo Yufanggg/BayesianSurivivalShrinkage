@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 source("./function_file/stan_constructor.R")
 
@@ -31,7 +31,7 @@ install_and_load(required_packages)
 
 # Step 2: Organize the real-world data
 ```{r, echo=TRUE}
-real_df <- readRDS("./Data/imputed_NOTR_DGF_2.rds")
+real_df <- readRDS("./Data/imputed_NOTR_DGF.rds")
 sum(!complete.cases(real_df))
 mean(real_df$status == "graftloss")
 mean(real_df$status == "alive")
@@ -192,12 +192,12 @@ mean_beta_DBD_PH = model_result_PH_DBD$Beta_bayesian_est[, "mean"]
 variableSelection_DBD_PH = model_result_PH_DBD$variableSelection
 
 #cross_val_metric_DBD <- cross_validation(whole_dataset = strafied_Data_DBD_int, baseline_modelling = "bSplines", num_folds = 5, obs_window = 3415)
-save.image(file = "./Data/03_results_DBD_2.RData")
+save.image(file = "./Data/03_results_DBD.RData")
 ```
 
 ### STEP 3: visualize the results for DBD
 ```{r, echo=TRUE}
-load(file = "./Data/03_results_DBD_2.RData")
+load(file = "./Data/03_results_DBD.RData")
 results_DBD_df <- data.frame(variableName = colnames(strafied_Data_DBD_int)[!(colnames(strafied_Data_DBD_int) %in% c("id", "status", "obstime"))],
                              beta_int = mean_beta_DBD, 
                              variableSelection = variableSelection_DBD[,1])
@@ -225,9 +225,8 @@ ggplot(results_DBD_df, aes(x = variableName, y = beta_int, color = variableSelec
 ## STEP 1: estimate the Betas for DCD
 ```{r, echo=TRUE}
 obs_window = 3415 #max(df_using$time_tx_date_max2)
-
-
 strafied_Data_DCD_int <- includingInter(strafied_Data_DCD)
+
 
 stan_data_bSpline_DCD <- stan_data_Constructer_BSpline(
       training_dataset = strafied_Data_DCD_int,
@@ -246,7 +245,6 @@ model_fit_PH_DCD <- Bayesian_Survival_model(stan_data = stan_data_PH_DCD, baseli
 
 #model diagnotics
 diagnostics_bSpline_DCD <- summary(model_fit_bSpline_DCD)$summary[, c("Rhat", "n_eff")]
-
 diagnostics_PH_DCD <- summary(model_fit_PH_DCD)$summary[, c("Rhat", "n_eff")]
 print(diagnostics_bSpline_DCD)
 print(diagnostics_PH_DCD)
@@ -263,7 +261,7 @@ mean_beta_DCD_PH = model_result_PH_DCD$Beta_bayesian_est[, "mean"]
 variableSelection_DCD_PH = model_result_PH_DCD$variableSelection
 
 #cross_val_metric_DBD <- cross_validation(whole_dataset = strafied_Data_DBD_int, baseline_modelling = "bSplines", num_folds = 5, obs_window = 3415)
-save.image(file = "./Data/03_results_DCD_2.RData")
+save.image(file = "./Data/03_results_DCD.RData")
 ```
 
 
