@@ -35,23 +35,23 @@ source("./function_file/stan_constructor.R")
 simulation_bayint_survival <- function(
   criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"),
   withPrediction = FALSE,
-  event_props = c(0.1, 0.4, 0.9),
-  n_samples = 200,
+  event_prop = 0.1,
+  n_samples = c(200, 600, 1000),
   n_features = 10
 ) {
   output <- list()
   
-  # Generate data
-  simulated_data <- DataGenerator(n_samples = n_samples, n_features = n_features)
-  dataset <- simulated_data$dataset
-  Beta <- simulated_data$Beta
-  output$Beta_true <- Beta
-  
-  for (event_prop in event_props) {
-    print(event_prop)
+  for (n_sample in n_samples) {
+    print(n_sample)
+    # Generate data
+    simulated_data <-
+      DataGenerator(n_samples = n_sample, n_features = n_features)
+    dataset <- simulated_data$dataset
+    Beta <- simulated_data$Beta
+    output$Beta_true <- Beta
 
     # Apply censoring to achieve desired event proportion
-    n_events <- round(event_prop * n_samples)
+    n_events <- round(event_prop * n_sample)
     event_ids <- sample(dataset$id, size = n_events)
     dataset$status <- ifelse(dataset$id %in% event_ids, 1, 0)
 
@@ -119,7 +119,7 @@ simulation_bayint_survival <- function(
   }
   return(output)
 }
-replicate_times = 20
+replicate_times = 50
 
 simulated_results = replicate(replicate_times, simulation_bayint_survival())
 
@@ -149,12 +149,12 @@ simulated_results = replicate(replicate_times, simulation_bayint_survival())
 # 
 # simulated_results
 
-save.image(file = "./Data/sim_50_para_event_prop_200.RData")
+save.image(file = "./Data/sim_50_para_nsamples.RData")
 ```
 
 
 ```{r, echo=TRUE}
-load(file = "./Data/sim_50_para_event_prop_200.RData")
+load(file = "./Data/sim_50_para_nsamples.RData")
 Beta_true = rep(NA, 55)
 NumTied_0.1 = rep(NA, replicate_times)
 NumTied_0.4 = rep(NA, replicate_times)
