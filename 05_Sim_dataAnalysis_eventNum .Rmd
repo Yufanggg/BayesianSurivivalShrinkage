@@ -119,7 +119,7 @@ simulation_bayint_survival <- function(
   }
   return(output)
 }
-replicate_times = 2
+replicate_times = 50
 
 simulated_results = replicate(replicate_times, simulation_bayint_survival())
 
