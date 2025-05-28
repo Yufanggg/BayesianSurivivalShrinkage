@@ -1,0 +1,386 @@
+---
+title: "04_Sim_dataAnalysis_eventNum"
+author: "Yufang Wang"
+date: "2025-03-18"
+output: pdf_document
+---
+
+# Step 1: Set up the environment
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+install_and_load <- function(packages) {
+  for (pkg in packages) {
+    if (!require(pkg, character.only = TRUE)) {
+      install.packages(pkg, dependencies = TRUE)
+    }
+    library(pkg, character.only = TRUE) }
+  
+}
+
+# List of required packages
+required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret")
+# Install and/or load packages
+install_and_load(required_packages)
+
+
+source("./function_file/Functions.R")
+source("./function_file/stan_constructor.R")
+```
+
+
+# Step 2: Generate simulated data
+```{r, echo=TRUE}
+simulation_bayint_survival <- function(
+  criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"),
+  withPrediction = FALSE,
+  event_prop = 0.1,
+  n_samples = c(200, 600, 1000),
+  n_features = 10
+) {
+  output <- list()
+  
+  for (n_sample in n_samples) {
+    print(n_sample)
+    # Generate data
+    simulated_data <-
+      DataGenerator(n_samples = n_sample, n_features = n_features)
+    dataset <- simulated_data$dataset
+    Beta <- simulated_data$Beta
+    output$Beta_true <- Beta
+
+    # Apply censoring to achieve desired event proportion
+    n_events <- round(event_prop * n_sample)
+    event_ids <- sample(dataset$id, size = n_events)
+    dataset$status <- ifelse(dataset$id %in% event_ids, 1, 0)
+
+    # Adjust observed times for censored individuals
+    dataset$obstime <- ifelse(dataset$status == 0,
+                               runif(sum(dataset$status == 0), 0, dataset$eventtime),
+                               dataset$eventtime)
+    dataset_ <- dataset[, !(names(dataset) %in% c("eventtime"))]
+
+    output[[paste0("NumTied_", event_prop)]] <- length(dataset$obstime) - length(unique(dataset$obstime))
+
+    # Split data if prediction is required
+    if (withPrediction) {
+      samples <- sample(1:nrow(dataset_), 100)
+      training_dataset <- dataset_[-samples, ]
+      testing_dataset <- dataset_[samples, ]
+    } else {
+      training_dataset <- dataset_
+      testing_dataset <- NULL
+    }
+
+    # Construct data for models
+    stan_data_PH <- stan_data_Constructer_PH(training_dataset, testing_dataset)
+    stan_data_bSplines <- stan_data_Constructer_BSpline(training_dataset, testing_dataset, obs_window = 5)
+
+    # Fit Bayesian models
+    model_fit_bSplines <- Bayesian_Survival_model(stan_data_bSplines, baseline_modelling = "bSplines", shrinkage = TRUE, withPrediction = withPrediction)
+    model_fit_PH <- Bayesian_Survival_model(stan_data_PH, baseline_modelling = "none", shrinkage = TRUE, withPrediction = withPrediction)
+
+    # Diagnostics
+    output[[paste0("diagnostics_bSplines_", n_sample)]] <- summary(model_fit_bSplines)$summary[, c("Rhat", "n_eff")]
+    output[[paste0("diagnostics_PH_", n_sample)]] <- summary(model_fit_PH)$summary[, c("Rhat", "n_eff")]
+
+    # Extract results
+    result_bSplines <- Bayesian_Survival_result_Extract(model_fit_bSplines, "bSplines", criteria)
+    result_PH <- Bayesian_Survival_result_Extract(model_fit_PH, "none", criteria)
+
+    if ("DesignCoefficients" %in% criteria) {
+      output[[paste0("Beta_bSplines_", n_sample)]] <- result_bSplines$Beta_bayesian_est[, "mean"]
+      output[[paste0("Beta_PH_", n_sample)]] <- result_PH$Beta_bayesian_est[, "mean"]
+    }
+
+    if ("baseline" %in% criteria) {
+      time_vec <- sort(training_dataset[training_dataset$status == 1, ]$obstime)
+      output[[paste0("time_vec_", n_sample)]] <- time_vec
+      output[[paste0("baseline_true_", n_sample)]] <- 10 * 2 * (time_vec ^ (10 - 1))
+      output[[paste0("baseline_bSplines_", n_sample)]] <- exp(as.matrix(stan_data_bSplines$basis) %*% result_bSplines$baselinePara[, "mean"])
+    }
+
+    if ("variableSelection" %in% criteria) {
+      output[[paste0("varSel_bSplines_", n_sample)]] <- result_bSplines$variableSelection
+      output[[paste0("varSel_PH_", n_sample)]] <- result_PH$variableSelection
+    }
+
+    if ("Prediction_SurvivalProb" %in% criteria && withPrediction) {
+      output[[paste0("time_", n_sample)]] <- testing_dataset$obstime
+      output[[paste0("true_status_", n_sample)]] <- testing_dataset$status
+      output[[paste0("eta_true_", n_sample)]] <- as.vector(
+        as.matrix(stan_data_bSplines$x_new) %*% Beta[1:10] +
+        as.matrix(stan_data_bSplines$x_int_new) %*% Beta[11:55]
+      )
+      output[[paste0("eta_pred_bSplines_", n_sample)]] <- result_bSplines$eta_pred
+      output[[paste0("eta_pred_PH_", n_sample)]] <- result_PH$eta_pred
+    }
+  }
+  return(output)
+}
+replicate_times = 2
+
+simulated_results = replicate(replicate_times, simulation_bayint_survival())
+
+save.image(file = "./Data/sim_50_para_nsamples.RData")
+```
+
+
+```{r, echo=TRUE}
+load(file = "./Data/sim_50_para_nsamples.RData")
+Beta_true = rep(NA, 55)
+NumTied_200 = rep(NA, replicate_times)
+NumTied_600 = rep(NA, replicate_times)
+NumTied_1000 = rep(NA, replicate_times)
+
+diagnostics_bSplines_200 = matrix(160, replicate_times)
+diagnostics_bSplines_600 = matrix(160, replicate_times)
+diagnostics_bSplines_1000 = matrix(160, replicate_times)
+
+diagnostics_PH_200 = matrix(154, replicate_times)
+diagnostics_PH_600 = matrix(154, replicate_times)
+diagnostics_PH_1000 = matrix(154, replicate_times)
+
+
+Beta_est_bSplines_200 = matrix(nrow = replicate_times, ncol = 55)
+Beta_est_bSplines_600 = matrix(nrow = replicate_times, ncol = 55)
+Beta_est_bSplines_1000 = matrix(nrow = replicate_times, ncol = 55)
+
+Beta_est_PH_200 = matrix(nrow = replicate_times, ncol = 55)
+Beta_est_PH_600 = matrix(nrow = replicate_times, ncol = 55)
+Beta_est_PH_1000 = matrix(nrow = replicate_times, ncol = 55)
+
+
+time_vec_200 = matrix(50, replicate_times)
+time_vec_600 = matrix(50, replicate_times)
+time_vec_1000 = matrix(50, replicate_times)
+
+baseline_true_200 = matrix(50, replicate_times)
+baseline_true_600 = matrix(50, replicate_times)
+baseline_true_1000 = matrix(50, replicate_times)
+
+baseline_bSplines_200 = matrix(50, replicate_times)
+baseline_bSplines_600 = matrix(50, replicate_times)
+baseline_bSplines_1000 = matrix(50, replicate_times)
+
+
+varSel_bSplines_200 =  matrix(nrow = replicate_times, ncol = 55)
+varSel_bSplines_600 =  matrix(nrow = replicate_times, ncol = 55)
+varSel_bSplines_1000 =  matrix(nrow = replicate_times, ncol = 55)
+varSel_PH_200 = matrix(nrow = replicate_times, ncol = 55)
+varSel_PH_600 =  matrix(nrow = replicate_times, ncol = 55)
+varSel_PH_1000 =  matrix(nrow = replicate_times, ncol = 55)
+
+# Bias  
+Bias_bSplines_200 = rep(NA, ncol = 55)
+Bias_bSplines_600 = rep(NA, ncol = 55)
+Bias_bSplines_1000 = rep(NA, ncol = 55)
+Bias_PH_200 = rep(NA, ncol = 55)
+Bias_PH_600 = rep(NA, ncol = 55)
+Bias_PH_1000 = rep(NA, ncol = 55)
+
+# Variance
+Variance_bSplines_200_ = matrix(nrow = replicate_times, ncol = 55)
+Variance_bSplines_600_ = matrix(nrow = replicate_times, ncol = 55)
+Variance_bSplines_1000_ = matrix(nrow = replicate_times, ncol = 55)
+Variance_PH_200_ = matrix(nrow = replicate_times, ncol = 55)
+Variance_PH_600_ = matrix(nrow = replicate_times, ncol = 55)
+Variance_PH_1000_ = matrix(nrow = replicate_times, ncol = 55)
+
+# MSE
+MSEs_bSplines_200_ = matrix(nrow = replicate_times, ncol = 55)
+MSEs_bSplines_600_ = matrix(nrow = replicate_times, ncol = 55)
+MSEs_bSplines_1000_ = matrix(nrow = replicate_times, ncol = 55)
+MSEs_PH_200_ = matrix(nrow = replicate_times, ncol = 55)
+MSEs_PH_600_ = matrix(nrow = replicate_times, ncol = 55)
+MSEs_PH_1000_ = matrix(nrow = replicate_times, ncol = 55)
+
+# Type I error
+FDR_bSplines_200 = rep(NA, replicate_times)
+FDR_bSplines_600 = rep(NA, replicate_times)
+FDR_bSplines_1000 = rep(NA, replicate_times)
+FDR_PH_200 = rep(NA, replicate_times)
+FDR_PH_600 = rep(NA, replicate_times)
+FDR_PH_1000 = rep(NA, replicate_times)
+
+# Type II error
+Num_Selected_bSplines_200 = rep(NA, replicate_times)
+Num_Selected_bSplines_600 = rep(NA, replicate_times)
+Num_Selected_bSplines_1000 = rep(NA, replicate_times)
+Num_Selected_PH_200 = rep(NA, replicate_times)
+Num_Selected_PH_600 = rep(NA, replicate_times)
+Num_Selected_PH_1000 = rep(NA, replicate_times)
+
+
+for (i in 1:replicate_times){
+  # Beta
+  Beta_true <- simulated_results[,i]$Beta_true
+  Beta_est_bSplines_200[i, ] <- simulated_results[,i]$Beta_bSplines_200
+  Beta_est_bSplines_600[i, ] <- simulated_results[,i]$Beta_bSplines_600
+  Beta_est_bSplines_1000[i, ] <- simulated_results[,i]$Beta_bSplines_1000
+  
+  Beta_est_PH_200[i, ] <-  simulated_results[,i]$Beta_PH_200
+  Beta_est_PH_600[i, ] <-  simulated_results[,i]$Beta_PH_600
+  Beta_est_PH_1000[i, ] <-  simulated_results[,i]$Beta_PH_1000
+  
+  # Variance
+  Variance_bSplines_200_[i, ] = simulated_results[,i]$Beta_bSplines_200 - Beta_true
+  Variance_bSplines_600_[i, ] = simulated_results[,i]$Beta_bSplines_600 - Beta_true
+  Variance_bSplines_1000_[i, ] = simulated_results[,i]$Beta_bSplines_1000 - Beta_true
+  Variance_PH_200_[i, ] = simulated_results[,i]$Beta_PH_200 - Beta_true
+  Variance_PH_600_[i, ] = simulated_results[,i]$Beta_PH_600 - Beta_true
+  Variance_PH_1000_[i, ] = simulated_results[,i]$Beta_PH_1000 - Beta_true
+  
+  # MSE
+  MSEs_bSplines_200_[i, ] <- (simulated_results[,i]$Beta_bSplines_200 - Beta_true)**2
+  MSEs_bSplines_600_[i, ] <- (simulated_results[,i]$Beta_bSplines_600 - Beta_true)**2
+  MSEs_bSplines_1000_[i, ] <- (simulated_results[,i]$Beta_bSplines_1000 - Beta_true)**2
+  MSEs_PH_200_[i, ] <- (simulated_results[,i]$Beta_PH_200 - Beta_true)**2
+  MSEs_PH_600_[i, ] <- (simulated_results[,i]$Beta_PH_600 - Beta_true)**2
+  MSEs_PH_1000_[i, ] <- (simulated_results[,i]$Beta_PH_1000 - Beta_true)**2
+  
+  # FDR (Type I error)
+  variableSelection_reference <- simulated_results[, i]$Beta_true != 0
+  
+  Selection_bSplines_200 <- simulated_results[,i]$varSel_bSplines_200
+  Selection_bSplines_600 <- simulated_results[,i]$varSel_bSplines_600
+  Selection_bSplines_1000 <- simulated_results[,i]$varSel_bSplines_1000
+
+  Selection_PH_200 <- simulated_results[,i]$varSel_PH_200
+  Selection_PH_600 <- simulated_results[,i]$varSel_PH_600
+  Selection_PH_1000 <- simulated_results[,i]$varSel_PH_1000
+  
+
+  FDR_bSplines_200[i] <- sum(Selection_bSplines_200 & !variableSelection_reference) / sum(Selection_bSplines_200)
+  FDR_bSplines_600[i] <- sum(Selection_bSplines_600 & !variableSelection_reference) / sum(Selection_bSplines_600)
+  FDR_bSplines_1000[i] <- sum(Selection_bSplines_1000 & !variableSelection_reference) / sum(Selection_bSplines_1000)
+  FDR_PH_200[i] <- sum(Selection_PH_200 & !variableSelection_reference) / sum(Selection_PH_200)
+  FDR_PH_600[i] <- sum(Selection_PH_600 & !variableSelection_reference) / sum(Selection_PH_600)
+  FDR_PH_1000[i] <- sum(Selection_PH_1000 & !variableSelection_reference) / sum(Selection_PH_1000)
+  
+  
+  # Number of selected variables (Type II error)
+  Num_Selected_bSplines_200[i] = sum(Selection_bSplines_200)
+  Num_Selected_bSplines_600[i] = sum(Selection_bSplines_600)
+  Num_Selected_bSplines_1000[i] = sum(Selection_bSplines_1000)
+  Num_Selected_PH_200[i] = sum(Selection_PH_200)
+  Num_Selected_PH_600[i] = sum(Selection_PH_600)
+  Num_Selected_PH_1000[i] = sum(Selection_PH_1000)
+}
+
+# Bias
+Bias_bSplines_200 = apply(Beta_est_bSplines_200, 2, mean) - Beta_true
+Bias_bSplines_600 = apply(Beta_est_bSplines_600, 2, mean) - Beta_true
+Bias_bSplines_1000 = apply(Beta_est_bSplines_1000, 2, mean) - Beta_true
+
+Bias_PH_200 = apply(Beta_est_PH_200, 2, mean) - Beta_true
+Bias_PH_600 = apply(Beta_est_PH_600, 2, mean) - Beta_true
+Bias_PH_1000 = apply(Beta_est_PH_1000, 2, mean) - Beta_true
+
+# Variance 
+Variance_bSplines_200 = apply(Variance_bSplines_200_, 2, var)
+Variance_bSplines_600 = apply(Variance_bSplines_600_, 2, var)
+Variance_bSplines_1000 = apply(Variance_bSplines_1000_, 2, var)
+Variance_PH_200 = apply(Variance_PH_200_, 2, var)
+Variance_PH_600 = apply(Variance_PH_600_, 2, var)
+Variance_PH_1000 = apply(Variance_PH_1000_, 2, var)
+
+
+# MSE
+MSEs_bSplines_200 <- apply(MSEs_bSplines_200_, 2, mean)
+MSEs_bSplines_600 <- apply(MSEs_bSplines_600_, 2, mean)
+MSEs_bSplines_1000 <- apply(MSEs_bSplines_1000_, 2, mean)
+MSEs_PH_200 <- apply(MSEs_PH_200_, 2, mean)
+MSEs_PH_600 <- apply(MSEs_PH_600_, 2, mean)
+MSEs_PH_1000 <- apply(MSEs_PH_1000_, 2, mean)
+
+# visualized result
+fill_vector = (Beta_true != 0)
+
+par(mfrow = c(3, 2))
+
+# Subfigure 1: Bias
+plot(Bias_bSplines_200, type = "o", col = "#641e16", xlab = "estimated Betas", ylab = "Bias", main = "Bias for Beta estimation", pch = 16)
+
+# Add background rectangles
+for (i in 1:length(Beta_true)) {
+  if (fill_vector[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+
+
+lines(Bias_bSplines_600, type = "o", col = "#c0392b", pch = 16)
+lines(Bias_bSplines_1000, type = "o", col = "#f2d7d5", pch = 16)
+lines(Bias_bSplines_200, type = "o", col = "#8e1204", pch = 16)
+lines(Bias_PH_200, type = "o", col = "#145a32", pch = 16)
+lines(Bias_PH_600, type = "o", col = "#229954", pch = 16)
+lines(Bias_PH_1000, type = "o", col = "#a2d9ce", pch = 16)
+
+
+abline(v = 10, col = "red", lty = 2)
+legend("topright", legend = c("bSplines_200", "bSplines_600", "bSplines_1000", "PH_200", "PH_600", "PH_1000"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), pch = 16, lty = 1) # Add legend
+
+# Subfigure 2: Variance
+plot(Variance_bSplines_200, type = "o", col = "#641e16", xlab = "estimated Betas", ylab = "Variance", ylim = c(0, 0.3), main = "Variance for Beta estimation", pch = 16)
+
+# Add background rectangles
+for (i in 1:length(Beta_true)) {
+  if (fill_vector[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "#d5d8dc", border = NA)
+  }
+}
+
+lines(Variance_bSplines_600, type = "o", col = "#c0392b", pch = 16)
+lines(Variance_bSplines_1000, type = "o", col = "#f2d7d5", pch = 16)
+lines(Variance_bSplines_200, type = "o", col = "#641e16", pch = 16)
+lines(Variance_PH_200, type = "o", col = "#145a32", pch = 16)
+lines(Variance_PH_600, type = "o", col = "#229954", pch = 16)
+lines(Variance_PH_1000, type = "o", col = "#a2d9ce", pch = 16)
+
+abline(v = 10, col = "red", lty = 2)
+abline(h = 0, col = "red", lty = 2)
+
+legend("topright", legend = c("bSplines_200", "bSplines_600", "bSplines_1000", "PH_200", "PH_600", "PH_1000"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), pch = 16, lty = 1) # Add legend
+
+# Subfigure 3: MSE
+MSEs_bSplines_200 <- apply(MSEs_bSplines_200_, 2, mean)
+MSEs_bSplines_600 <- apply(MSEs_bSplines_600_, 2, mean)
+MSEs_bSplines_1000 <- apply(MSEs_bSplines_1000_, 2, mean)
+MSEs_PH_200 <- apply(MSEs_PH_200_, 2, mean)
+MSEs_PH_600 <- apply(MSEs_PH_600_, 2, mean)
+MSEs_PH_1000 <- apply(MSEs_PH_1000_, 2, mean)
+
+plot(MSEs_bSplines_200, type = "o", col = "#641e16", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.3), main = "MSE for Beta estimation", pch = 16)
+
+# Add background rectangles
+for (i in 1:length(Beta_true)) {
+  if (fill_vector[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "#d5d8dc", border = NA)
+  }
+}
+
+lines(MSEs_bSplines_600, type = "o", col = "#c0392b", pch = 16)
+lines(MSEs_bSplines_1000, type = "o", col = "#f2d7d5", pch = 16)
+lines(MSEs_bSplines_200, type = "o", col = "#641e16", pch = 16)
+lines(MSEs_PH_200, type = "o", col = "#145a32", pch = 16)
+lines(MSEs_PH_600, type = "o", col = "#229954", pch = 16)
+lines(MSEs_PH_1000, type = "o", col = "#a2d9ce", pch = 16)
+
+abline(v = 10, col = "red", lty = 2)
+legend("topright", legend = c("bSplines_200", "bSplines_600", "bSplines_1000", "PH_200", "PH_600", "PH_1000"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), pch = 16, lty = 1) # Add legend
+
+
+# Subfigure 4 Type I error
+
+FDR_list = list(bSplines_200 = FDR_bSplines_200, bSplines_600 = FDR_bSplines_600, bSplines_1000 = FDR_bSplines_1000, PH_200 = FDR_PH_200, PH_600 = FDR_PH_600, PH_1000 = FDR_PH_1000)
+boxplot(FDR_list, names = c("bSplines_200", "bSplines_600", "bSplines_1000", "PH_200", "PH_600", "PH_1000"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), main = "FDR Boxplots", xlab = "", ylab = "FDR")
+
+# Subfigure 5 Type II error
+# Create side-by-side boxplots for FDR
+Num_Selected_list = list(bSplines_200 = Num_Selected_bSplines_200/sum(Beta_true != 0), bSplines_600 = Num_Selected_bSplines_600/sum(Beta_true != 0), bSplines_1000 = Num_Selected_bSplines_1000/sum(Beta_true != 0), 
+                         PH_200 = Num_Selected_PH_200/sum(Beta_true != 0), PH_600 = Num_Selected_PH_600/sum(Beta_true != 0), PH_1000 = Num_Selected_PH_1000/sum(Beta_true != 0))
+boxplot(Num_Selected_list, names = c("bSplines_200", "bSplines_600", "bSplines_1000", "PH_200", "PH_600", "PH_1000"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), main = "Proportional of Selected variables", xlab = "", ylab = "Prop of Selected variables")
+```
+
