@@ -220,7 +220,6 @@ ggplot(results_DBD_df, aes(x = variableName, y = beta_int, color = variableSelec
 ```
 
 ## STEP 2: prediction 
-
 # Section 2: Data analysis for DCD
 ## STEP 1: estimate the Betas for DCD
 ```{r, echo=TRUE}
