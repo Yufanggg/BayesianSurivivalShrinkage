@@ -9,7 +9,7 @@ output: pdf_document
 ```{r, echo = FALSE, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("G:/MasterThesis/Code/"")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 source("./function_file/stan_constructor.R")
 
@@ -27,22 +27,7 @@ required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival
 # Install and/or load packages
 install_and_load(required_packages)
 ```
-Make sure the existence of interaction effects
-```{r, echo=TRUE}
-cross_validated_likelihood <- function(D, ){
-  likelihood_beta_hat_min_ls <- rep(NA, nrow(D))
-  # SD <- D[order(-D$obstime, -D$status), ] # observed time points (non-strict decreasing), first sort with obstime, then status
-  # t_points = D[, "obstime"]
-  likelihood_beta <- 
-  for (i in 1:nrow(D)){
-    likelihood_beta_hat_min_l <- 
-    likelihood_beta_hat_min_ls[i] <- likelihood_beta - likelihood_beta_hat_min_l
-  }
-  
-  cvl = mean(likelihood_beta_hat_min_ls)
-  return(cvl)
-}
-```
+
 
 For DBD
 ```{r, echo=TRUE}
