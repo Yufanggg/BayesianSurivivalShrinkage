@@ -102,7 +102,7 @@ stan_data_Constructer_PH <- function (training_dataset, testing_dataset = NULL){
 
 # assumptions: all data are right censored data with the observed window being [0, obs_window]
 # Construct stan data structure for baseline hazard of exponential and weibull.
-stan_data_Constructer_noBSpline <- function (training_dataset, testing_dataset = NULL){
+stan_data_Constructer_noBSpline <- function (training_dataset, testing_dataset = NULL, log_lik_saving = TRUE) {
   
   #----------------------------
   # Prepare data for model fitting
@@ -155,7 +155,22 @@ stan_data_Constructer_noBSpline <- function (training_dataset, testing_dataset =
     g2 = g2
   )
   
+  #----------------------------
+  # Prepare data for log_lik
+  #-----------------------------
   
+  if (log_lik_saving == TRUE){
+    #----- for generate log_lik
+    stan_data = c(stan_data, list(
+      #--- for log_lik ----
+      N = nrow(training_dataset),
+      status = training_dataset$status,
+      t = training_dataset$obstime,
+      X = X_main,
+      X_int = X_int)
+      )
+    
+  }
   
   #----------------------------
   # Prepare data for prediction
@@ -195,7 +210,7 @@ stan_data_Constructer_noBSpline <- function (training_dataset, testing_dataset =
 #'   Options are 15 (the default), 11 or 7.
 
 # assumptions: all data are right censored data with the observed window being [0, obs_window]
-stan_data_Constructer_BSpline <- function (training_dataset, testing_dataset, obs_window, qnodes = 15){
+stan_data_Constructer_BSpline <- function (training_dataset, testing_dataset, obs_window, qnodes = 15, log_lik_saving = FALSE){
   
   #----------------------------
   # Prepare data for model fitting
@@ -344,68 +359,118 @@ stan_data_Constructer_BSpline <- function (training_dataset, testing_dataset, ob
     g1 = g1,
     g2 = g2
   )
+  
+  #----------------------------
+  # Prepare data for saving log_lik
+  #-----------------------------
+  if (log_lik_saving == TRUE){
+    #=====TO BE ADDRESSED =====
+    # number of quadrature points
+    qevent <- length(qwts_event)
+    qrcens <- length(qwts_rcens)
     
+    
+    #----- basis terms for baseline hazard
+    
+    basis_epts_event <- make_basis(t_event,    basehaz)
+    basis_qpts_event <- make_basis(qpts_event, basehaz)
+    basis_qpts_rcens <- make_basis(qpts_rcens, basehaz)
+    
+    
+    #----- model frames for generating predictor matrices
+    
+    id_event <- which(training_dataset$status == 1)
+    id_rcens <-  which(training_dataset$status == 0)
+    
+    # combined model frame, with quadrature  
+    X_main_cpts_unorder <- rbind(X_main,
+                         rep_rows(X_main, times = qnodes),
+                         rep_rows(X_main, times = qnodes))
+    X_int_cpts__unorder <- rbind(X_int,
+                        rep_rows(X_int, times = qnodes),
+                        rep_rows(X_int, times = qnodes))
+    
+    
+    
+    # time-fixed predictor matrices, with quadrature
+    x_epts_event <- X_main_cpts[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
+    x_qpts_event <- X_main_cpts[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
+    x_qpts_rcens <- X_main_cpts[idx_cpts[3,1]:idx_cpts[3,2], , drop = FALSE]
+    
+    x_int_epts_event <- X_int_cpts[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
+    x_int_qpts_event <- X_int_cpts[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
+    x_int_qpts_rcens <- X_int_cpts[idx_cpts[3,1]:idx_cpts[3,2], , drop = FALSE]
+    
+    stan_data = c(stan_data, list(
+      Nobs = nrow(training_dataset),
+      x_epts_all = x_epts_all,
+      x_int_epts_all = x_int_epts_all,
+      x_qpts_all = x_qpts_all,
+      x_int_qpts_all = x_int_qpts_all
+    ))
+  }
+  
   
   #----------------------------
   # Prepare data for prediction
   #-----------------------------
-
+  
   if(! is.null(testing_dataset)){
     nnew <- nrow(testing_dataset)
     t_new <- testing_dataset$obstime
     design__matrix_2 = testing_dataset[,!(names(testing_dataset) %in% c("id", "obstime", "status"))]
-
+    
     column_names = colnames(design__matrix_2)
     main_names =  column_names[!grepl(":", column_names) &
                                  column_names != "(Intercept)"] #whether or not having intercept needs to be verified
     X_new_main = design__matrix_2[, main_names]
-
+    
     int_names =  column_names[grepl(":", column_names)]
     X_new_int = design__matrix_2[, int_names]
-
-
+    
+    
     #----------------------------
     # prediction the survival probability
     # for each participant at a specific
     # time point
     #-----------------------------
-
+    
     # quadrature points, evaluated for each row of data
     qpts_new_event <- uapply(qp, unstandardise_qpts, 0, t_new) #500 first node for all t_new, 500 second node for all t_new
-
-
+    
+    
     # quadrature weights, evaluated for each row of data
     qwts_new_event <- uapply(qw, unstandardise_qwts, 0, t_new)
-
-
-
+    
+    
+    
     # number of quadrature points
     qevent_new <- length(qwts_new_event)
-
-
+    
+    
     #----- basis terms for baseline hazard
     basis_new_qpts_event <- make_basis(qpts_new_event, basehaz) #500 first node for all t_new, 500 second node for all t_new
-
-
-
+    
+    
+    
     #----- model frames for generating predictor matrices
-
-
+    
+    
     # combined model frame, with quadrature
     X_main_cpts_new <- rep_rows(X_new_main, times = qnodes) #X_main first for all t_new; X_main second for all t_new
     X_int_cpts_new <- rep_rows(X_new_int, times = qnodes)
-
-
-
+    
+    
+    
     # time-fixed predictor matrices, with quadrature
     x_new_qpts_event <- X_main_cpts_new[, , drop = FALSE] #X_main first for all t_new; X_main second for all t_new
-
+    
     x_new_int_qpts_event <- X_int_cpts_new[, , drop = FALSE]
-
+    
     #----------------
     # add data to Constructed data for prediction
     #----------------
-
+    
     stan_data = c(stan_data, list(
       #--- for prediction ----
       nnew = nrow(testing_dataset),
@@ -602,7 +667,8 @@ validate_positive_scalar <- function(x, not_greater_than = NULL) {
 get_quadpoints <- function(nodes = 15) {
   if (!is.numeric(nodes) || (length(nodes) > 1L)) {
     stop("'qnodes' should be a numeric vector of length 1.")
-  } else if (nodes == 15) {
+  } else {
+    messgae("we set the number of nodes being 15.")
     list(
       points = c(
         -0.991455371120812639207,
@@ -636,51 +702,7 @@ get_quadpoints <- function(nodes = 15) {
         0.1047900103222501838399,
         0.063092092629978553291,
         0.0229353220105292249637))      
-  } else if (nodes == 11) {
-    list(
-      points = c(
-        -0.984085360094842464496,
-        -0.906179845938663992798,
-        -0.754166726570849220441,
-        -0.5384693101056830910363,
-        -0.2796304131617831934135,
-        0,
-        0.2796304131617831934135,
-        0.5384693101056830910363,
-        0.754166726570849220441,
-        0.906179845938663992798,
-        0.984085360094842464496),
-      weights = c(
-        0.042582036751081832865,
-        0.1152333166224733940246,
-        0.186800796556492657468,
-        0.2410403392286475866999,
-        0.272849801912558922341,
-        0.2829874178574912132043,
-        0.272849801912558922341,
-        0.241040339228647586701,
-        0.186800796556492657467,
-        0.115233316622473394025,
-        0.042582036751081832865))     
-  } else if (nodes == 7) {
-    list(
-      points = c(
-        -0.9604912687080202834235,
-        -0.7745966692414833770359,
-        -0.4342437493468025580021,
-        0,
-        0.4342437493468025580021,
-        0.7745966692414833770359,
-        0.9604912687080202834235),
-      weights = c(
-        0.1046562260264672651938,
-        0.268488089868333440729,
-        0.401397414775962222905,
-        0.450916538658474142345,
-        0.401397414775962222905,
-        0.268488089868333440729,
-        0.104656226026467265194))      
-  } else stop("'qnodes' must be either 7, 11 or 15.")  
+  } 
 }
 
 # Unlist the result from an lapply call

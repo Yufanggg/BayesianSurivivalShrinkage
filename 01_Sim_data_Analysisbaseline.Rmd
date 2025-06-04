@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 
 
 install_and_load <- function(packages) {
@@ -38,7 +38,7 @@ n_samples <- 300
 n_features <- 10 
 
 # function for one simulation
-simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE, n_samples = n_samples, n_features = n_features){
+simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE, n_samples = n_sample, n_features = n_feature){
   
   output = list()
   
@@ -46,6 +46,13 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   dataset <- simulated_data$dataset
   Beta <- simulated_data$Beta
   output$Beta_true = Beta
+  
+  # Adjust observed times for censored individuals
+  dataset$obstime <- ifelse(dataset$status == 0,
+                               runif(sum(dataset$status == 0), 0, dataset$eventtime),
+                               dataset$eventtime)
+  dataset <- dataset[, !(names(dataset) %in% c("eventtime"))]
+  
   output$NumTied = length(dataset$obstime) - length(unique(dataset$obstime))
   print(output$NumTied)
   

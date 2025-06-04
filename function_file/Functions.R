@@ -30,7 +30,7 @@ g <- function(main_indices_for_int, index){
 
 # Function to fit a Bayesian survival model with different baseline assumptions
 # @param: stan_data, a list including items for the corresponding stan model
-Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential", withPrediction = TRUE, shrinkage = TRUE,
+Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential", withPrediction = TRUE, shrinkage = TRUE, log_likSaving = FALSE,
                                                 niter = 10000, 
                                                 nwarmup = 1000,
                                                 thin = 10,
@@ -44,21 +44,33 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
     if (baseline_modelling == "exponential") {
       # compile the model
       message("We assume that the baseline hazard function is exponentially distributed.")
-      bayesian_model <-
-        rstan::stan_model("./stan_file/exponential_est.stan")
+      if (log_likSaving == TRUE){
+        bayesian_model <- rstan::stan_model("./stan_file/exponential_est_loglik.stan")
+      } else {
+        bayesian_model <- rstan::stan_model("./stan_file/exponential_est.stan")
+        }
     }
     
     else if (baseline_modelling == "weibull") {
       # compile the model
       message("We assume that the baseline hazard function is weibully distributed.")
-      bayesian_model <- rstan::stan_model("./stan_file/weibull_est.stan")
+      if (log_likSaving == TRUE){
+        bayesian_model <- rstan::stan_model("./stan_file/weibull_est_loglik.stan")
+      } else {
+        bayesian_model <- rstan::stan_model("./stan_file/weibull_est.stan")
+      }
+     
     }
     
     else if (baseline_modelling == "bSplines") {
       message("We utilized B-splines to estimate the log baseline hazard function.")
       
       # compile the model
-      bayesian_model <- rstan::stan_model("./stan_file/bSpline_est.stan")
+      if (log_likSaving == TRUE){
+        bayesian_model <- rstan::stan_model("./stan_file/bSpline_est_loglik.stan")
+      } else {
+        bayesian_model <- rstan::stan_model("./stan_file/bSpline_est.stan")
+      }
     }
     
     else if (baseline_modelling == "none"){
@@ -126,8 +138,6 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
 # Generate a simulate dateset
 DataGenerator <- function(n_samples, n_features) {
   sim_data <- list()
-  
-  print(n_features)
   
   # generate design matrix in the formate of dataframe
   # Generate covariance matrix
@@ -446,4 +456,27 @@ metric_visualization <- function(cross_val_metric){
   boxplot(FDR_vals, main = "FDR for the variable selection", ylab = "FDR", col = "orange")
 
 
+}
+
+# Obtaining the cvl
+cross_validated_log_likelihood <- function(model_fit_bSpline, nObs) {
+  cvl_s = rep(NA, nObs)
+  log_lik_matrix <- extract_log_lik(model_fit_bSpline,
+                                    parameter_name = "log_lik",
+                                    merge_chains = TRUE) # S*N
+  
+  
+  for (i in 1:ncol(log_lik_matrix)) {
+    cvl_s[i] <- max(apply(log_lik_matrix[, -i], 1, sum))
+  }
+  return(sum(cvl_s))
+}
+
+max_log_likelihood <- function(model_fit_bSpline, nObs) {
+  cvl_s = rep(NA, nObs)
+  log_lik_matrix <- extract_log_lik(model_fit_bSpline,
+                                    parameter_name = "log_lik",
+                                    merge_chains = TRUE) # S*N
+  log_lik <- max(apply(log_lik_matrix, 1, sum))
+  return(log_lik)
 }

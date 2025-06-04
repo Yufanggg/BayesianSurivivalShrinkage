@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 install_and_load <- function(packages) {
   for (pkg in packages) {
     if (!require(pkg, character.only = TRUE)) {
@@ -35,8 +35,8 @@ source("./function_file/stan_constructor.R")
 simulation_bayint_survival <- function(
   criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"),
   withPrediction = FALSE,
-  event_prop = 0.1,
-  n_samples = c(200, 600, 1000),
+  event_props = c(0.1, 0.4, 0.5),
+  n_sample = 200,
   n_features = 10
 ) {
   output <- list()
