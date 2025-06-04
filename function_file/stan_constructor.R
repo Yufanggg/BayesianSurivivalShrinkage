@@ -364,49 +364,94 @@ stan_data_Constructer_BSpline <- function (training_dataset, testing_dataset, ob
   # Prepare data for saving log_lik
   #-----------------------------
   if (log_lik_saving == TRUE){
+    # #=====TO BE ADDRESSED ===== for reference
+    # 
+    # # combined model frame, with quadrature
+    # X_main_cpts <- rbind(X_main[id_event,],
+    #                      rep_rows(X_main[id_event,], times = qnodes),
+    #                      rep_rows(X_main[id_rcens,], times = qnodes))
+    # X_int_cpts <- rbind(X_int[id_event,],
+    #                     rep_rows(X_int[id_event,], times = qnodes),
+    #                     rep_rows(X_int[id_rcens,], times = qnodes))
+    # 
+    # 
+    # 
+    # # time-fixed predictor matrices, with quadrature
+    # x_epts_event <- X_main_cpts[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
+    # x_qpts_event <- X_main_cpts[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
+    # x_qpts_rcens <- X_main_cpts[idx_cpts[3,1]:idx_cpts[3,2], , drop = FALSE]
+    # 
+    # x_int_epts_event <- X_int_cpts[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
+    # x_int_qpts_event <- X_int_cpts[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
+    # x_int_qpts_rcens <- X_int_cpts[idx_cpts[3,1]:idx_cpts[3,2], , drop = FALSE]
+    
+    # 
+    # # standardised nodes and weights for quadrature
+    # qq <- get_quadpoints(nodes = qnodes)
+    # qp <- qq$points
+    # qw <- qq$weights
+    # 
+    # # quadrature points, evaluated for each row of data
+    # qpts_event <- uapply(qp, unstandardise_qpts, 0, t_event)
+    # qpts_rcens <- uapply(qp, unstandardise_qpts, 0, t_rcens)
+    # 
+    # 
+    # # quadrature weights, evaluated for each row of data
+    # qwts_event <- uapply(qw, unstandardise_qwts, 0, t_event)
+    # qwts_rcens <- uapply(qw, unstandardise_qwts, 0, t_rcens)
+    # 
+    # 
+    # # times at events and all quadrature points
+    # cpts_list <- list(t_event,
+    #                   qpts_event,
+    #                   qpts_rcens)
+    # 
+    # idx_cpts <- get_idx_array(sapply(cpts_list, length))
+    # basis_epts_event <- make_basis(t_event,    basehaz)
+    # basis_qpts_event <- make_basis(qpts_event, basehaz)
+    # basis_qpts_rcens <- make_basis(qpts_rcens, basehaz)
+    
+    
     #=====TO BE ADDRESSED =====
-    # number of quadrature points
-    qevent <- length(qwts_event)
-    qrcens <- length(qwts_rcens)
+    t_all = training_dataset$obstime
+    qpts_all <- uapply(qp, unstandardise_qpts, 0, t_all)
     
+    qwts_all <- uapply(qw, unstandardise_qwts, 0, t_all)
     
-    #----- basis terms for baseline hazard
+    basis_epts_all <- make_basis(t_all,    basehaz)
+    basis_qpts_all <- make_basis(qpts_all, basehaz)
+
     
-    basis_epts_event <- make_basis(t_event,    basehaz)
-    basis_qpts_event <- make_basis(qpts_event, basehaz)
-    basis_qpts_rcens <- make_basis(qpts_rcens, basehaz)
-    
-    
-    #----- model frames for generating predictor matrices
-    
-    id_event <- which(training_dataset$status == 1)
-    id_rcens <-  which(training_dataset$status == 0)
     
     # combined model frame, with quadrature  
-    X_main_cpts_unorder <- rbind(X_main,
-                         rep_rows(X_main, times = qnodes),
-                         rep_rows(X_main, times = qnodes))
-    X_int_cpts__unorder <- rbind(X_int,
-                        rep_rows(X_int, times = qnodes),
-                        rep_rows(X_int, times = qnodes))
+    X_main_cpts_all <- rbind(X_main,
+                             X_main[rep(1:nrow(X_main), each = qnodes), ])
+    X_int_cpts_all <- rbind(X_int,
+                            X_int[rep(1:nrow(X_int), each = qnodes), ])
     
     
     
     # time-fixed predictor matrices, with quadrature
-    x_epts_event <- X_main_cpts[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
-    x_qpts_event <- X_main_cpts[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
-    x_qpts_rcens <- X_main_cpts[idx_cpts[3,1]:idx_cpts[3,2], , drop = FALSE]
-    
-    x_int_epts_event <- X_int_cpts[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
-    x_int_qpts_event <- X_int_cpts[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
-    x_int_qpts_rcens <- X_int_cpts[idx_cpts[3,1]:idx_cpts[3,2], , drop = FALSE]
+    Nobs <- nrow(training_dataset)
+    x_epts_all <- X_main_cpts_all[1:Nobs, , drop = FALSE]
+    x_qpts_all <- X_main_cpts_all[Nobs: (Nobs*(qnodes+1) - 1), , drop = FALSE]
+
+    x_int_epts_all <- X_int_cpts_all[1:Nobs, , drop = FALSE]
+    x_int_qpts_all <- X_int_cpts_all[Nobs: (Nobs*(qnodes+1) - 1), , drop = FALSE]
+
     
     stan_data = c(stan_data, list(
       Nobs = nrow(training_dataset),
+      Nobs_qnode = nrow(training_dataset) * 15,
+      status = training_dataset$status,
       x_epts_all = x_epts_all,
       x_int_epts_all = x_int_epts_all,
       x_qpts_all = x_qpts_all,
-      x_int_qpts_all = x_int_qpts_all
+      x_int_qpts_all = x_int_qpts_all,
+      
+      basis_epts_all = basis_epts_all,
+      basis_qpts_all = basis_qpts_all,
+      qwts_all = qwts_all
     ))
   }
   
@@ -668,7 +713,7 @@ get_quadpoints <- function(nodes = 15) {
   if (!is.numeric(nodes) || (length(nodes) > 1L)) {
     stop("'qnodes' should be a numeric vector of length 1.")
   } else {
-    messgae("we set the number of nodes being 15.")
+    message("we set the number of nodes being 15.")
     list(
       points = c(
         -0.991455371120812639207,
@@ -868,3 +913,4 @@ basis_matrix <- function(times, basis, integrate = FALSE) {
   }
   aa(out)
 }
+

@@ -19,6 +19,7 @@ functions{
   * @return A vector
   */
   vector bspline_log_haz(vector eta, matrix bSpline_basis, vector coefs) {
+
     return bSpline_basis * coefs + eta;
   }
   
@@ -88,6 +89,21 @@ data {
   // link the interaction effect with the corresponding main effects
   int g1[q];
   int g2[q];
+  
+  // for log_lik
+  int<lower=0> Nobs;
+  matrix[Nobs, p] x_epts_all;
+  matrix[Nobs, q] x_int_epts_all;
+  
+  int<lower=0> Nobs_qnode;
+  matrix[Nobs_qnode, p] x_qpts_all;
+  matrix[Nobs_qnode, q] x_int_qpts_all;
+  vector[Nobs] status;
+  
+  matrix[Nobs,nvars] basis_epts_all; 
+  matrix[Nobs_qnode,nvars] basis_qpts_all;
+  vector[Nobs_qnode] qwts_all;
+  
 
 }
 
@@ -153,23 +169,31 @@ model {
 
 // save the log_lik explicitly
 generated quantities{
-  vector[Nobs] log_lik_Saving;
+  vector[Nobs] log_lik;
+
   for (n in 1: Nobs){
     if (status[n] == 1){
-      eta_epts_event = x_epts_all[n*15] * Beta + x_int_epts_all[n*15] * Beta_int;
-      lhaz_epts_event = bspline_log_haz(eta_epts_event, basis_epts_event, coefs);// B-splines, on log haz scale 
-      eta_qpts_event = x_int_qpts_all[n: (n+15-1)] * Beta + x_int_qpts_all[n: (n+15-1)] * Beta_int;
-      lhaz_qpts_event = bspline_log_haz(eta_qpts_event, basis_qpts_event, coefs);
-      print(lhaz_epts_event +  quadrature_log_surv(qwts_event, lhaz_qpts_event));
-      log_lik_Saving[n] = lhaz_epts_event +  quadrature_log_surv(qwts_event, lhaz_qpts_event);
+      real eta_epts_current_real = x_epts_all[n, ] * Beta + x_int_epts_all[n, ] * Beta_int;
+      vector[1] eta_epts_current;
+      eta_epts_current[1] = eta_epts_current_real;
+      
+      matrix[1, nvars] basis_epts_current;
+      basis_epts_current[1] = basis_epts_all[n, ];
+      vector[1] lhaz_epts_current = bspline_log_haz(eta_epts_current, basis_epts_current, coefs);
+
+
+      vector[15] eta_qpts_current = x_qpts_all[n: (n+15-1), ] * Beta + x_int_qpts_all[n: (n+15-1), ] * Beta_int;
+      vector[15] lhaz_qpts_current = bspline_log_haz(eta_qpts_current, basis_qpts_all[n: (n+15-1), ], coefs);
+
+      log_lik[n] =  quadrature_log_surv(qwts_all[n: (n+15-1) ] , lhaz_qpts_current); // log(f(t)) = -H(t) + log(h(t))for uncensored data
     }
     else {
-      eta_qpts_rcens = x_int_qpts_all[n: (n+15-1)] * Beta + x_int_qpts_all[n: (n+15-1)] * Beta_int;
-      lhaz_qpts_rcens = bspline_log_haz(eta_qpts_rcens, basis_qpts_rcens, coefs);
-      print(quadrature_log_surv(qwts_rcens, lhaz_qpts_rcens));
-      log_lik_Saving[n] = quadrature_log_surv(qwts_rcens, lhaz_qpts_rcens);
+      vector[15] eta_qpts_current_ = x_qpts_all[n: (n+15-1), ] * Beta + x_int_qpts_all[n: (n+15-1), ] * Beta_int;
+      vector[15] lhaz_qpts_current_ = bspline_log_haz(eta_qpts_current_, basis_qpts_all[n: (n+15-1), ], coefs);
+
+      log_lik[n] =  quadrature_log_surv(qwts_all[n: (n+15-1)] , lhaz_qpts_current_); // log(S(t)) = - H(t)for right censored data
     }
   }
-  
+
 }
 

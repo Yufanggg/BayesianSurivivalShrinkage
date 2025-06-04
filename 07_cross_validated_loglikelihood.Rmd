@@ -5,9 +5,9 @@ date: "2025-06-03"
 output: html_document
 ---
 
-```{r, echo=TRUE}
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 
 install_and_load <- function(packages) {
   for (pkg in packages) {
@@ -129,25 +129,15 @@ includingInter <- function(dataframe_) {
 # For DBD
 ## cross-validated log likelihood
 ```{r, echo=TRUE}
-strafied_Data_DBD_int <- includingInter(strafied_Data_DBD)
-
-
-
-cross_validated_likelihood <- function(strafied_Data_int){
-  cvl_s = rep(NA, nrow(strafied_Data_int))
-  for (i in 1:nrow(strafied_Data_int)){
-    new_strafied_Data_int <- strafied_Data_int[-i, ]
-    stan_data_bSpline <- stan_data_Constructer_BSpline(
-      training_dataset = new_strafied_Data_int,
-      testing_dataset = NULL,
-      obs_window = 3415
-    )
-    model_fit_bSpline <- Bayesian_Survival_model(stan_data = stan_data_bSpline, baseline_modelling = "bSplines", withPrediction = FALSE, shrinkage = TRUE)
-    diagnostics_bSpline <- summary(model_fit_bSpline)$summary[, c("Rhat", "n_eff")]
-    
-    log_lik_matrix <- extract_log_lik(stanfit, parameter_name = "log_lik", merge_chains = TRUE) # S*N
-    log_lik_n <- apply(log_lik_matrix, 2, sum)
-    cvl_s[i] <- max(log_lik_n)
+cross_validated_likelihood <- function(model_fit_bSpline, nObs) {
+  cvl_s = rep(NA, nObs)
+  log_lik_matrix <- extract_log_lik(model_fit_bSpline,
+                                    parameter_name = "log_lik",
+                                    merge_chains = TRUE) # S*N
+  log_lik <- max(apply(log_lik_matrix, 1, sum))
+  
+  for (i in 1:ncol(log_lik_matrix)) {
+    cvl_s[i] <- max(apply(log_lik_matrix[, -i], 1, sum))
   }
   return(sum(cvl_s))
 }
