@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 install_and_load <- function(packages) {
   for (pkg in packages) {
     if (!require(pkg, character.only = TRUE)) {
@@ -239,12 +239,12 @@ for (i in 1:replicate_times){
   
   
   # Number of selected variables (Type II error)
-  Num_Selected_bSplines_200[i] = sum(Selection_bSplines_200)
-  Num_Selected_bSplines_600[i] = sum(Selection_bSplines_600)
-  Num_Selected_bSplines_1000[i] = sum(Selection_bSplines_1000)
-  Num_Selected_PH_200[i] = sum(Selection_PH_200)
-  Num_Selected_PH_600[i] = sum(Selection_PH_600)
-  Num_Selected_PH_1000[i] = sum(Selection_PH_1000)
+  Prop_Selected_bSplines_200[i] = sum(!Selection_bSplines_200 & variableSelection_reference) /variableSelection_reference
+  Prop_Selected_bSplines_600[i] = sum(!Selection_bSplines_600 & variableSelection_reference)/variableSelection_reference
+  Prop_Selected_bSplines_1000[i] = sum(!Selection_bSplines_1000 & variableSelection_reference)/variableSelection_reference
+  Prop_Selected_PH_200[i] = sum(!Selection_PH_200 & variableSelection_reference)/variableSelection_reference
+  Prop_Selected_PH_600[i] = sum(!Selection_PH_600 & variableSelection_reference)/variableSelection_reference
+  Prop_Selected_PH_1000[i] = sum(!Selection_PH_1000 & variableSelection_reference)/variableSelection_reference
 }
 
 # Bias
