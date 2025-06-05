@@ -239,12 +239,12 @@ for (i in 1:replicate_times){
   
   
   # Number of selected variables (Type II error)
-  Prop_Selected_bSplines_200[i] = sum(!Selection_bSplines_200 & variableSelection_reference) /variableSelection_reference
-  Prop_Selected_bSplines_600[i] = sum(!Selection_bSplines_600 & variableSelection_reference)/variableSelection_reference
-  Prop_Selected_bSplines_1000[i] = sum(!Selection_bSplines_1000 & variableSelection_reference)/variableSelection_reference
-  Prop_Selected_PH_200[i] = sum(!Selection_PH_200 & variableSelection_reference)/variableSelection_reference
-  Prop_Selected_PH_600[i] = sum(!Selection_PH_600 & variableSelection_reference)/variableSelection_reference
-  Prop_Selected_PH_1000[i] = sum(!Selection_PH_1000 & variableSelection_reference)/variableSelection_reference
+  Prop_Selected_bSplines_200[i] = sum(!Selection_bSplines_200 & variableSelection_reference) /sum(variableSelection_reference)
+  Prop_Selected_bSplines_600[i] = sum(!Selection_bSplines_600 & variableSelection_reference)/sum(variableSelection_reference)
+  Prop_Selected_bSplines_1000[i] = sum(!Selection_bSplines_1000 & variableSelection_reference)/sum(variableSelection_reference)
+  Prop_Selected_PH_200[i] = sum(!Selection_PH_200 & variableSelection_reference)/sum(variableSelection_reference)
+  Prop_Selected_PH_600[i] = sum(!Selection_PH_600 & variableSelection_reference)/sum(variableSelection_reference)
+  Prop_Selected_PH_1000[i] = sum(!Selection_PH_1000 & variableSelection_reference)/sum(variableSelection_reference)
 }
 
 # Bias
