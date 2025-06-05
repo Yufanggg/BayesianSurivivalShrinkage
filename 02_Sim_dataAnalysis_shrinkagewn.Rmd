@@ -34,7 +34,7 @@ source("./function_file/stan_constructor.R")
 set.seed(123)
 
 # function for one simulation
-simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE, n_samples = 300, n_features = 10){
+simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE, n_samples = 300, n_features = 10, event_prop = 0.75){
   
   output = list()
   
@@ -42,17 +42,27 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   dataset <- simulated_data$dataset
   Beta <- simulated_data$Beta
   output$Beta_true = Beta
-  output$NumTied = length(dataset$obstime) - length(unique(dataset$obstime))
-  print(output$NumTied)
+  
+  # Apply censoring to achieve desired event proportion
+  n_events <- round(event_prop * n_samples)
+  event_ids <- sample(dataset$id, size = n_events)
+  dataset$status <- ifelse(dataset$id %in% event_ids, 1, 0)
+  
+  # Adjust observed times for censored individuals
+  dataset$obstime <- ifelse(dataset$status == 0,
+                               runif(sum(dataset$status == 0), 0, dataset$eventtime),
+                               dataset$eventtime)
+  dataset_ <- dataset[, !(names(dataset) %in% c("eventtime"))]
+
   
   #constructor data for the model
   #constructor data for the model
   if (withPrediction) {
-    samples <- sample(1:nrow(dataset), 100)
-    training_dataset <- dataset[-samples, ]
-    testing_dataset <- dataset[samples, ]
+    samples <- sample(1:nrow(dataset_), 100)
+    training_dataset <- dataset_[-samples, ]
+    testing_dataset <- dataset_[samples, ]
   } else{
-    training_dataset = dataset
+    training_dataset = dataset_
     testing_dataset = NULL
   }
   stan_data_PH <- stan_data_Constructer_PH(
@@ -161,7 +171,7 @@ save.image(file = "./Data/sim_50_para_shrinkagenowith_PH_tiedTimes.RData")
 ```
 
 ```{r, echo=TRUE}
-#load(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
+load(file = "./Data/sim_50_para_shrinkagenowith_PH_tiedTimes.RData")
 Beta_est_bSplines_withShrinkag <- matrix(nrow = replicate_times, ncol = 55)
 Beta_est_bSplines_noShrinkag <- matrix(nrow = replicate_times, ncol = 55)
 Beta_est_PH_withShrinkage <- matrix(nrow = replicate_times, ncol = 55)
@@ -173,12 +183,6 @@ Bias_bSplines_withShrinkag = rep(NA, ncol = 55)
 Bias_bSplines_noShrinkag = rep(NA, ncol = 55)
 Bias_PH_withShrinkage = rep(NA, ncol = 55)
 Bias_PH_noShrinkag = rep(NA, ncol = 55)
-
-# Variance
-Variance_bSplines_withShrinkag_ = matrix(nrow = replicate_times, ncol = 55)
-Variance_bSplines_noShrinkag_ = matrix(nrow = replicate_times, ncol = 55)
-Variance_PH_withShrinkage_ = matrix(nrow = replicate_times, ncol = 55)
-Variance_PH_noShrinkag_ = matrix(nrow = replicate_times, ncol = 55)
 
 # MSE
 MSEs_bSplines_withShrinkag_ = matrix(nrow = replicate_times, ncol = 55)
@@ -219,11 +223,6 @@ for (i in 1:replicate_times){
   Beta_est_PH_withShrinkage[i, ] <- simulated_results[,i]$Beta_est_PH_withShrinkage
   Beta_est_PH_noShrinkag[i, ] <-  simulated_results[,i]$Beta_est_PH_noShrinkage
   
-  # Variance
-  Variance_bSplines_withShrinkag_[i, ] = simulated_results[,i]$Beta_est_bSplines_withShrinkage - Beta_true
-  Variance_bSplines_noShrinkag_[i, ] = simulated_results[,i]$Beta_est_bSplines_noShrinkage - Beta_true
-  Variance_PH_withShrinkage_[i, ] = simulated_results[,i]$Beta_est_PH_withShrinkage - Beta_true
-  Variance_PH_noShrinkag_[i, ] = simulated_results[,i]$Beta_est_PH_noShrinkage - Beta_true
   
   # MSE
   MSEs_bSplines_withShrinkag_[i, ] <- (simulated_results[,i]$Beta_est_bSplines_withShrinkage - Beta_true)**2
@@ -286,10 +285,10 @@ Bias_PH_withShrinkage = apply(Beta_est_PH_withShrinkage, 2, mean) - Beta_true
 Bias_PH_noShrinkag = apply(Beta_est_PH_noShrinkag, 2, mean) - Beta_true
 
 # Variance 
-Variance_bSplines_withShrinkag = apply(Variance_bSplines_withShrinkag_, 2, var)
-Variance_bSplines_noShrinkag = apply(Variance_bSplines_noShrinkag_, 2, var)
-Variance_PH_withShrinkage = apply(Variance_PH_withShrinkage_, 2, var)
-Variance_PH_noShrinkag = apply(Variance_PH_noShrinkag_, 2, var)
+Variance_bSplines_withShrinkag = apply(Beta_est_bSplines_withShrinkag, 2, var)
+Variance_bSplines_noShrinkag = apply(Beta_est_bSplines_noShrinkag, 2, var)
+Variance_PH_withShrinkage = apply(Beta_est_PH_withShrinkage, 2, var)
+Variance_PH_noShrinkag = apply(Beta_est_PH_noShrinkag, 2, var)
 
 # MSE
 MSEs_bSplines_withShrinkag <- apply(MSEs_bSplines_withShrinkag_, 2, mean)
@@ -313,16 +312,16 @@ for (i in 1:length(Beta_true)) {
 }
 
 
-lines(Bias_bSplines_noShrinkag, type = "o", col = "green", pch = 16)
-lines(Bias_PH_withShrinkage, type = "o", col = "orange", pch = 16)
 lines(Bias_bSplines_withShrinkag, type = "o", col = "blue", pch = 16)
+lines(Bias_PH_withShrinkage, type = "o", col = "green", pch = 16)
+lines(Bias_bSplines_noShrinkag, type = "o", col = "orange", pch = 16)
 lines(Bias_PH_noShrinkag, type = "o", col = "purple", pch = 16)
 
 abline(v = 10, col = "red", lty = 2)
-legend("topright", legend = c("bSplines_withShrinkag", "bSplines_noShrinkag", "PL_withShrinkage", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
+legend("topright", legend = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
 
 # Subfigure 2: Variance
-plot(Variance_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Variance", ylim = c(0, 0.3), main = "Variance for Beta estimation", pch = 16)
+plot(Variance_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Variance", ylim = c(0, 0.1), main = "Variance for Beta estimation", pch = 16)
 
 # Add background rectangles
 for (i in 1:length(Beta_true)) {
@@ -331,186 +330,48 @@ for (i in 1:length(Beta_true)) {
   }
 }
 
-lines(Variance_bSplines_noShrinkag, type = "o", col = "green", pch = 16)
-lines(Variance_PH_withShrinkage, type = "o", col = "orange", pch = 16)
 lines(Variance_bSplines_withShrinkag, type = "o", col = "blue", pch = 16)
+lines(Variance_PH_withShrinkage, type = "o", col = "green", pch = 16)
+lines(Variance_bSplines_noShrinkag, type = "o", col = "orange", pch = 16)
 lines(Variance_PH_noShrinkag, type = "o", col = "purple", pch = 16)
 
 abline(v = 10, col = "red", lty = 2)
 abline(h = 0, col = "red", lty = 2)
-legend("topright", legend = c("bSplines_withShrinkag", "bSplines_noShrinkag", "PL_withShrinkage", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
+legend("topright", legend = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
 
-# # Subfigure 3: MSE
-# plot(MSEs_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.3), main = "MSE for Beta estimation", pch = 16)
-# 
-# # Add background rectangles
-# for (i in 1:length(Beta_true)) {
-#   if (fill_vector[i]) {
-#     rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
-#   }
-# }
-# 
-# lines(MSEs_bSplines_noShrinkag, type = "o", col = "green", pch = 16)
-# lines(MSEs_PH_withShrinkage, type = "o", col = "orange", pch = 16)
-# lines(MSEs_bSplines_withShrinkag, type = "o", col = "blue", pch = 16)
-# lines(MSEs_PH_noShrinkag, type = "o", col = "purple", pch = 16)
-# 
-# abline(v = 10, col = "red", lty = 2)
-# legend("topright", legend = c("bSplines_withShrinkag", "bSplines_noShrinkag", "PL_withShrinkage", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
+# Subfigure 3: MSE
+plot(MSEs_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.1), main = "MSE for Beta estimation", pch = 16)
+
+# Add background rectangles
+for (i in 1:length(Beta_true)) {
+  if (fill_vector[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+lines(MSEs_bSplines_withShrinkag, type = "o", col = "blue", pch = 16)
+lines(MSEs_PH_withShrinkage, type = "o", col = "green", pch = 16)
+lines(MSEs_bSplines_noShrinkag, type = "o", col = "orange", pch = 16)
+lines(MSEs_PH_noShrinkag, type = "o", col = "purple", pch = 16)
+
+abline(v = 10, col = "red", lty = 2)
+legend("topright", legend = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
 
 
 # Subfigure 4 Type I error
 # Create side-by-side boxplots for FDR
 FDR_list = list(bSplines_withShrinkag = FDR_bSplines_withShrinkag, bSplines_noShrinkag = FDR_bSplines_noShrinkag, PL_withShrinkage = FDR_PH_withShrinkage, PL_noShrinkag = FDR_PH_noShrinkag)
-boxplot(FDR_list, names = c("bSplines_withShrinkag", "bSplines_noShrinkag", "PL_withShrinkage", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), main = "FDR Boxplots", xlab = "", ylab = "FDR")
+boxplot(FDR_list, names = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), main = "FDR Boxplots", xlab = "", ylab = "FDR")
 
 # Subfigure 5 Type II error
-Num_Selected_list = list(bSplines_withShrinkag = Num_Selected_bSplines_withShrinkag/sum(Beta_true != 0), bSplines_noShrinkag = Num_Selected_bSplines_noShrinkag/sum(Beta_true != 0), PL_withShrinkage = Num_Selected_PH_withShrinkage/sum(Beta_true != 0), PL_noShrinkag = Num_Selected_PH_noShrinkag/sum(Beta_true != 0))
-boxplot(Num_Selected_list, names = c("bSplines_withShrinkag", "bSplines_noShrinkag", "PL_withShrinkage", "PL_noShrinkag"), col = c("blue", "green", "orange", "grey"), main = "Proportional of Selected variables", xlab = "", ylab = "Prop of Selected variables")
+Num_Selected_list = list(bSplines_withShrinkag = Num_Selected_bSplines_withShrinkag/sum(Beta_true != 0), bSplines_noShrinkag = Num_Selected_bSplines_noShrinkag/sum(Beta_true != 0),  PL_withShrinkage = Num_Selected_PH_withShrinkage/sum(Beta_true != 0), PL_noShrinkag = Num_Selected_PH_noShrinkag/sum(Beta_true != 0))
+boxplot(Num_Selected_list, names = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "grey"), main = "Proportional of Selected variables", xlab = "", ylab = "Prop of Selected variables")
 
 # Subfigure 6 Correlation for linear predictors
-cor_list = list(bSplines_withShrinkag = cor_bSplines_withShrinkag, bSplines_noShrinkag = cor_bSplines_noShrinkag, PL_withShrinkage = cor_PH_withShrinkage, PL_noShrinkag = cor_PH_noShrinkag)
-boxplot(cor_list, names = c("bSplines_withShrinkag", "bSplines_noShrinkag", "PL_withShrinkage", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), main = "True vs. predicted linear predictor", xlab = "", ylab = "correlation")
+# cor_list = list(bSplines_withShrinkag = cor_bSplines_withShrinkag, bSplines_noShrinkag = cor_bSplines_noShrinkag, PL_withShrinkage = cor_PH_withShrinkage, PL_noShrinkag = cor_PH_noShrinkag)
+# boxplot(cor_list, names = c("bSplines_withShrinkag", "bSplines_noShrinkag", "PL_withShrinkage", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), main = "True vs. predicted linear predictor", xlab = "", ylab = "correlation")
 
 # # Subfigure 7 C index
 C_index_list = list(bSplines_withShrinkag = C_index_bSplines_withShrinkag, bSplines_noShrinkag = C_index_bSplines_noShrinkag, PL_withShrinkage = C_index_PH_withShrinkage, PL_noShrinkag = C_index_PH_noShrinkag)
-boxplot(C_index_list, names = c("bSplines_withShrinkag", "bSplines_noShrinkag", "PL_withShrinkage", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), main = "C index Boxplots", xlab = "", ylab = "C index")
+boxplot(C_index_list, names = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), main = "C index", xlab = "", ylab = "C index")
 ```
 
-# Step 3: Furture check bias-variance
-```{r, echo=TRUE}
-#load(file = "./Data/sim_50_para_shrinkagenowith_PH.RData")
-
-# Ground-truth info
-Beta_true = rep(NA, 55)
-LinearPred_true = matrix(nrow = replicate_times, ncol = 100)
-
-# Output of bSplines with vs. no shrinkage for betas
-Beta_bSpline_noShrinkage = matrix(nrow = replicate_times, ncol = 55)
-Beta_bSpline_withShrinkage =  matrix(nrow = replicate_times, ncol = 55)
-
-LinearPred_bSpline_noShrinkage = matrix(nrow = replicate_times, ncol = 100)
-LinearPred_bSpline_withShrinkage = matrix(nrow = replicate_times, ncol = 100)
-
-#Output of partical likelihood with vs. no shrinkage for betas
-Beta_PH_noShrinkage = matrix(nrow = replicate_times, ncol = 55)
-Beta_PH_withShrinkage =  matrix(nrow = replicate_times, ncol = 55)
-
-LinearPred_PH_noShrinkage = matrix(nrow = replicate_times, ncol = 100)
-LinearPred_PH_withShrinkage = matrix(nrow = replicate_times, ncol = 100)
-
-
-
-# FDR
-variableSelection_reference = rep(NA, 55)
-Selection_bSplines_withShrinkage = matrix(nrow = replicate_times, ncol = 55)
-Selection_bSplines_noShrinkage = matrix(nrow = replicate_times, ncol = 55)
-
-Selection_PH_withShrinkage = matrix(nrow = replicate_times, ncol = 55)
-Selection_PH_noShrinkage = matrix(nrow = replicate_times, ncol = 55)
-
-
-
-for (i in 1:replicate_times){
-  # Ground-truth info 
-  Beta_true <- simulated_results[,i]$Beta_true
-  
-  Beta_bSpline_withShrinkage[i, ] <-  simulated_results[,i]$Beta_est_bSplines_withShrinkage
-  Beta_bSpline_noShrinkage[i, ] <-  simulated_results[,i]$Beta_est_bSplines_noShrinkage
-  
-  
-  Beta_PH_withShrinkage[i,] <-  simulated_results[,i]$Beta_est_PH_withShrinkage
-  Beta_PH_noShrinkage[i, ] <-  simulated_results[,i]$Beta_est_PH_noShrinkage
-  
-  
-  # Linear predictor
-  LinearPred_true[i, ] <- simulated_results[,i]$eta_true
-  LinearPred_bSpline_withShrinkage[i, ] <- simulated_results[,i]$eta_pred_bSplines_withShrinkage
-  LinearPred_bSpline_noShrinkage[i, ] <- simulated_results[,i]$eta_pred_bSplines_noShrinkage
-  
-  LinearPred_PH_withShrinkage[i, ] <- simulated_results[,i]$eta_pred_PH_withShrinkage
-  LinearPred_PH_noShrinkage[i, ] <- simulated_results[,i]$eta_pred_PH_noShrinkage
-  
-  
-  # FDR
-  variableSelection_reference <- ifelse(simulated_results[,i]$Beta_true != 0, TRUE, FALSE)
-  
-  Selection_bSplines_withShrinkage[i, ] <- simulated_results[,i]$variableSelection_bSplines_withShrinkage
-  Selection_bSplines_noShrinkage[i, ] <- simulated_results[,i]$variableSelection_bSplines_noShrinkage
-
-  Selection_PH_withShrinkage[i, ] <- simulated_results[,i]$variableSelection_PH_withShrinkage
-  Selection_PH_noShrinkage[i, ] <- simulated_results[,i]$variableSelection_PH_noShrinkage
-}
-
-
-par(mfrow = c(2, 2))
-Bias_bSpline_withShrinkage <- apply(Beta_bSpline_withShrinkage, 2, mean) - Beta_true
-Bias_bSpline_noShrinkage <- apply(Beta_bSpline_noShrinkage, 2, mean) - Beta_true
-plot(Bias_bSpline_noShrinkage, Bias_bSpline_withShrinkage,
-     xlab = "Bias (No Shrinkage)", ylab = "Bias (With Shrinkage)",
-     main = "Bias Comparison: No Shrinkage vs With Shrinkage")
-abline(0, 1, col = "red", lty = 2)  # y = x line
-
-
-var_bSpline_withShrinkage <- apply(Beta_bSpline_withShrinkage - apply(Beta_bSpline_withShrinkage, 2, mean), 2, function(x){mean(x^2)})
-Var_bSpline_noShrinkage <- apply(Beta_bSpline_noShrinkage - apply(Beta_bSpline_noShrinkage, 2, mean), 2, function(x){mean(x^2)})
-plot(Var_bSpline_noShrinkage, var_bSpline_withShrinkage,
-     xlab = "Variance (No Shrinkage)", ylab = "Variance (With Shrinkage)",
-     main = "Variance Comparison: No Shrinkage vs With Shrinkage")
-abline(0, 1, col = "red", lty = 2)  # y = x line
-
-# visualized result
-fill_vector = (simulated_results[, 1]$Beta_true != 0)
-
-plot(apply(Selection_bSplines_withShrinkage, 2, mean), type = "o", col = "blue", xlab = "estimated Betas", ylab = "FDR", ylim = c(0, 1), main = "FDR for Beta estimation", pch = 16)
-
-# Add background rectangles
-for (i in 1:length(variableSelection_reference)) {
-  if (fill_vector[i]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
-  }
-}
-
-lines(apply(Selection_bSplines_withShrinkage, 2, mean), type = "o", col = "blue", pch = 16)
-lines(apply(Selection_bSplines_noShrinkage, 2, mean), type = "o", col = "green", pch = 16)
-lines(apply(Selection_PH_withShrinkage, 2, mean), type = "o", col = "orange", pch = 16)
-lines(apply(Selection_PH_noShrinkage, 2, mean), type = "o", col = "grey", pch = 16)
-# Add legend
-legend("topright", legend = c("B_withshrinkage", "B_noshrinkage", "PH_withshrinkage", "PH_noshrinkage"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1)
-```
-
-# Tracking time
-```{r, echo=TRUE}
-set.seed(123)
-n_samples <- 300
-n_features <- 10 
-simulated_data <- DataGenerator(n_samples = n_samples, n_features = 10)
-samples <- sample(1:nrow(dataset), 100)
-training_dataset <- dataset[-samples, ]
-testing_dataset <- dataset[samples, ]
-
-stan_data_PH <- stan_data_Constructer_PH(
-    training_dataset = training_dataset,
-    testing_dataset = testing_dataset)
-
-stan_data_bSplines <- stan_data_Constructer_BSpline(
-    training_dataset = training_dataset,
-    testing_dataset = testing_dataset,
-    obs_window = 5
-  )
-
-t_eval = benchmark(
-  "bSpline_shrinkage" = {
-     model_fit_withShrinkage <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_modelling = "bSplines", shrinkage = TRUE)
-  },
-  
-  "PH_shrinkage" = {
-     model_fit_withShrinkage <- Bayesian_Survival_model(stan_data = stan_data_PH, baseline_modelling = "none", shrinkage = TRUE)
-  },
-  
-  replications = 50
-)
-t_eval
-
-save(t.eval, file = "./Data/t_eval.RData")
-```
