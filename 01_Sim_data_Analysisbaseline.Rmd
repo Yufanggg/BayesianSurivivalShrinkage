@@ -38,7 +38,7 @@ n_samples <- 300
 n_features <- 10 
 
 # function for one simulation
-simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE, n_samples = n_sample, n_features = n_feature){
+simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "baseline", "variableSelection", "Prediction_SurvivalProb"), withPrediction = TRUE, n_samples = n_samples, n_features = n_features, event_prop = 0.75){
   
   output = list()
   
@@ -47,22 +47,25 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   Beta <- simulated_data$Beta
   output$Beta_true = Beta
   
+  
+  # Apply censoring to achieve desired event proportion
+  n_events <- round(event_prop * n_samples)
+  event_ids <- sample(dataset$id, size = n_events)
+  dataset$status <- ifelse(dataset$id %in% event_ids, 1, 0)
+  
   # Adjust observed times for censored individuals
   dataset$obstime <- ifelse(dataset$status == 0,
                                runif(sum(dataset$status == 0), 0, dataset$eventtime),
                                dataset$eventtime)
-  dataset <- dataset[, !(names(dataset) %in% c("eventtime"))]
-  
-  output$NumTied = length(dataset$obstime) - length(unique(dataset$obstime))
-  print(output$NumTied)
+  dataset_ <- dataset[, !(names(dataset) %in% c("eventtime"))]
   
   #constructor data for the model
   if (withPrediction) {
-    samples <- sample(1:nrow(dataset), 100)
-    training_dataset <- dataset[-samples, ]
-    testing_dataset <- dataset[samples, ]
+    samples <- sample(1:nrow(dataset_), 100)
+    training_dataset <- dataset_[-samples, ]
+    testing_dataset <- dataset_[samples, ]
   } else{
-    training_dataset = dataset
+    training_dataset = dataset_
     testing_dataset = NULL
   }
   
@@ -178,7 +181,7 @@ save.image(file = "./Data/sim_50_para_int_PH_tiedTimes.RData")
 ```
 
 ```{r, echo=TRUE}
-# load(file = "./Data/sim_50_para_int.RData")
+load(file = "./Data/sim_50_para_int_PH_tiedTimes.RData")
 Beta_est_exponential <- matrix(nrow = replicate_times, ncol = 55)
 Beta_est_weibull <- matrix(nrow = replicate_times, ncol = 55)
 Beta_est_bSplines <- matrix(nrow = replicate_times, ncol = 55)
@@ -191,10 +194,10 @@ Bias_bSplines = rep(NA, ncol = 55)
 Bias_PH = rep(NA, ncol = 55)
 
 # Variance
-Variance_exponential_ = matrix(nrow = replicate_times, ncol = 55)
-Variance_weibull_ = matrix(nrow = replicate_times, ncol = 55)
-Variance_bSplines_ = matrix(nrow = replicate_times, ncol = 55)
-Variance_PH_ = matrix(nrow = replicate_times, ncol = 55)
+Variance_exponential = matrix(nrow = replicate_times, ncol = 55)
+Variance_weibull = matrix(nrow = replicate_times, ncol = 55)
+Variance_bSplines = matrix(nrow = replicate_times, ncol = 55)
+Variance_PH = matrix(nrow = replicate_times, ncol = 55)
 
 # MSE
 MSEs_exponential_ = matrix(nrow = replicate_times, ncol = 55)
@@ -235,17 +238,12 @@ for (i in 1:replicate_times){
   Beta_est_bSplines[i, ] <- simulated_results[,i]$Beta_est_bSplines
   Beta_est_PH[i, ] <-  simulated_results[,i]$Beta_est_PH
   
-  # Variance
-  Variance_exponential_[i, ] = simulated_results[,i]$Beta_est_exponential - Beta_true
-  Variance_weibull_[i, ] = simulated_results[,i]$Beta_est_weibull - Beta_true
-  Variance_bSplines_[i, ] = simulated_results[,i]$Beta_est_bSplines - Beta_true
-  Variance_PH_[i, ] = simulated_results[,i]$Beta_est_PH - Beta_true
   
   # MSE
   MSEs_exponential_[i, ] <- (simulated_results[,i]$Beta_est_exponential - Beta_true)**2
   MSEs_weibull_[i, ] <- (simulated_results[,i]$Beta_est_weibull - Beta_true)**2
-  MSEs_bSplines_[i, ] <- (simulated_results[,i]$Beta_est_bSplines - Beta_true - Beta_true)**2
-  MSEs_PH_[i, ] <- (simulated_results[,i]$Beta_est_PH - Beta_true - Beta_true)**2
+  MSEs_bSplines_[i, ] <- (simulated_results[,i]$Beta_est_bSplines - Beta_true)**2
+  MSEs_PH_[i, ] <- (simulated_results[,i]$Beta_est_PH - Beta_true)**2
   
   # FDR (Type I error)
   variableSelection_reference <- ifelse(simulated_results[,i]$Beta_true != 0, TRUE, FALSE)
@@ -295,17 +293,16 @@ Bias_bSplines = apply(Beta_est_bSplines, 2, mean) - Beta_true
 Bias_PH = apply(Beta_est_PH, 2, mean) - Beta_true
 
 # Variance 
-Variance_exponential = apply(Variance_exponential_, 2, var)
-Variance_weibull = apply(Variance_weibull_, 2, var)
-Variance_bSplines = apply(Variance_bSplines_, 2, var)
-Variance_PH = apply(Variance_PH_, 2, var)
-
+Variance_exponential = apply(Beta_est_exponential, 2, var)
+Variance_weibull = apply(Beta_est_weibull, 2, var)
+Variance_bSplines = apply(Beta_est_bSplines, 2, var)
+Variance_PH = apply(Beta_est_PH, 2, var)
 
 # MSE
-MSEs_exponential <- apply(MSEs_exponential_, 2, mean)
-MSEs_weibull <- apply(MSEs_weibull_, 2, mean)
-MSEs_bSplines <- apply(MSEs_bSplines_, 2, mean)
-MSEs_PH <- apply(MSEs_PH_, 2, mean)
+rMSEs_exponential <- sqrt(apply(MSEs_exponential_, 2, mean))
+rMSEs_weibull <- sqrt(apply(MSEs_weibull_, 2, mean))
+rMSEs_bSplines <- sqrt(apply(MSEs_bSplines_, 2, mean))
+rMSEs_PH <- sqrt(apply(MSEs_PH_, 2, mean))
 
 # visualized result
 fill_vector = (Beta_true != 0)
@@ -331,7 +328,7 @@ abline(v = 10, col = "red", lty = 2)
 legend("topright", legend = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
 
 # Subfigure 2: Variance
-plot(Variance_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Variance", main = "Variance for Beta estimation", pch = 16, ylim = c(0, 0.3))
+plot(Variance_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Variance", main = "Variance for Beta estimation", ylim = c(0, 0.1), pch = 16)
 
 # Add background rectangles
 for (i in 1:length(Beta_true)) {
@@ -347,23 +344,23 @@ lines(Variance_PH, type = "o", col = "purple", pch = 16)
 legend("topright", legend = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1)# Add legend
 
 
-# # Subfigure 3: MSE
-# plot(MSEs_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.3), main = "MSE for Beta estimation", pch = 16)
-# 
-# # Add background rectangles
-# for (i in 1:length(Beta_true)) {
-#   if (fill_vector[i]) {
-#     rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
-#   }
-# }
-# 
-# lines(MSEs_weibull, type = "o", col = "green", pch = 16)
-# lines(MSEs_bSplines, type = "o", col = "orange", pch = 16)
-# lines(MSEs_exponential, type = "o", col = "blue", pch = 16)
-# lines(MSEs_PH, type = "o", col = "purple", pch = 16)
-# 
-# abline(v = 10, col = "red", lty = 2)
-# legend("topright", legend = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
+# Subfigure 3: MSE
+plot(rMSEs_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "rMSE", main = "rMSE for Beta estimation", ylim = c(0, 0.5), pch = 16)
+
+# Add background rectangles
+for (i in 1:length(Beta_true)) {
+  if (fill_vector[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+
+lines(rMSEs_weibull, type = "o", col = "green", pch = 16)
+lines(rMSEs_bSplines, type = "o", col = "orange", pch = 16)
+lines(rMSEs_exponential, type = "o", col = "blue", pch = 16)
+lines(rMSEs_PH, type = "o", col = "purple", pch = 16)
+
+abline(v = 10, col = "red", lty = 2)
+legend("topright", legend = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
 
 # Subfigure 4 Type I error
 # Create side-by-side boxplots for FDR
@@ -375,9 +372,9 @@ abline(h = 0.05, col = "red", lty = 2)
 Num_Selected_list = list(Exponential = Num_Selected_exponential/sum(Beta_true != 0), Weibull = Num_Selected_weibull/sum(Beta_true != 0), BSplines = Num_Selected_bSplines/sum(Beta_true != 0), ParticalLiklihood = Num_Selected_PH/sum(Beta_true != 0))
 boxplot(Num_Selected_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), main = "Selected variables Boxplots", xlab = "", ylab = "Selected variables", ylim = c(0, 1))
 
-# Subfigure 6 Correlation for linear predictors
-cor_list = list(exponential = cor_exponential, weibull = cor_weibull, bSplines = cor_bSplines, PH = cor_PH)
-boxplot(cor_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), main = "True vs. predicted linear predictor", xlab = "", ylab = "correlation", ylim = c(0, 1))
+# # Subfigure 6 Correlation for linear predictors
+# cor_list = list(exponential = cor_exponential, weibull = cor_weibull, bSplines = cor_bSplines, PH = cor_PH)
+# boxplot(cor_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), main = "True vs. predicted linear predictor", xlab = "", ylab = "correlation", ylim = c(0, 1))
 
 # # Subfigure 7 C index
 CI_index_list = list(CI_index_exponential = CI_index_exponential, CI_index_weibull = CI_index_weibull, CI_index_bSplines = CI_index_bSplines, CI_index_PH = CI_index_PH)
