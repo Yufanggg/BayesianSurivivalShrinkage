@@ -198,12 +198,12 @@ FDR_PH_0.4 = rep(NA, replicate_times)
 FDR_PH_0.9 = rep(NA, replicate_times)
 
 # Type II error
-Num_Selected_bSplines_0.1 = rep(NA, replicate_times)
-Num_Selected_bSplines_0.4 = rep(NA, replicate_times)
-Num_Selected_bSplines_0.9 = rep(NA, replicate_times)
-Num_Selected_PH_0.1 = rep(NA, replicate_times)
-Num_Selected_PH_0.4 = rep(NA, replicate_times)
-Num_Selected_PH_0.9 = rep(NA, replicate_times)
+FNR_bSplines_0.1 = rep(NA, replicate_times)
+FNR_bSplines_0.4 = rep(NA, replicate_times)
+FNR_bSplines_0.9 = rep(NA, replicate_times)
+FNR_PH_0.1 = rep(NA, replicate_times)
+FNR_PH_0.4 = rep(NA, replicate_times)
+FNR_PH_0.9 = rep(NA, replicate_times)
 
 
 for (i in 1:replicate_times){
@@ -246,12 +246,12 @@ for (i in 1:replicate_times){
   
   
   # Number of selected variables (Type II error)
-  Num_Selected_bSplines_0.1[i] = sum(Selection_bSplines_0.1)
-  Num_Selected_bSplines_0.4[i] = sum(Selection_bSplines_0.4)
-  Num_Selected_bSplines_0.9[i] = sum(Selection_bSplines_0.9)
-  Num_Selected_PH_0.1[i] = sum(Selection_PH_0.1)
-  Num_Selected_PH_0.4[i] = sum(Selection_PH_0.4)
-  Num_Selected_PH_0.9[i] = sum(Selection_PH_0.9)
+  FNR_bSplines_0.1[i] = sum(!Selection_bSplines_0.1 & variableSelection_reference)/sum(variableSelection_reference)
+  FNR_bSplines_0.4[i] = sum(!Selection_bSplines_0.4 & variableSelection_reference)/sum(variableSelection_reference)
+  FNR_bSplines_0.9[i] = sum(!Selection_bSplines_0.9 & variableSelection_reference)/sum(variableSelection_reference)
+  FNR_PH_0.1[i] = sum(!Selection_PH_0.1 & variableSelection_reference)/sum(variableSelection_reference)
+  FNR_PH_0.4[i] = sum(!Selection_PH_0.4 & variableSelection_reference)/sum(variableSelection_reference)
+  FNR_PH_0.9[i] = sum(!Selection_PH_0.9 & variableSelection_reference)/sum(variableSelection_reference)
 }
 
 # Bias
@@ -331,7 +331,7 @@ abline(h = 0, col = "red", lty = 2)
 legend("topright", legend = c("bSplines_0.1", "bSplines_0.4", "bSplines_0.9", "PH_0.1", "PH_0.4", "PH_0.9"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), pch = 16, lty = 1) # Add legend
 
 # Subfigure 3: MSE
-plot(rMSEs_bSplines_0.1, type = "o", col = "#641e16", xlab = "estimated Betas", ylab = "rMSE", ylim = c(0, 0.8), main = "MSE for Beta estimation", pch = 16)
+plot(rMSEs_bSplines_0.1, type = "o", col = "#641e16", xlab = "estimated Betas", ylab = "rMSE", ylim = c(0, 0.8), main = "rMSE for Beta estimation", pch = 16)
 
 # Add background rectangles
 for (i in 1:length(Beta_true)) {
@@ -358,8 +358,8 @@ boxplot(FDR_list, names = c("bSplines_0.1", "bSplines_0.4", "bSplines_0.9", "PH_
 
 # Subfigure 5 Type II error
 # Create side-by-side boxplots for FDR
-Num_Selected_list = list(bSplines_0.1 = Num_Selected_bSplines_0.1/sum(Beta_true != 0), bSplines_0.4 = Num_Selected_bSplines_0.4/sum(Beta_true != 0), bSplines_0.9 = Num_Selected_bSplines_0.9/sum(Beta_true != 0), 
-                         PH_0.1 = Num_Selected_PH_0.1/sum(Beta_true != 0), PH_0.4 = Num_Selected_PH_0.4/sum(Beta_true != 0), PH_0.9 = Num_Selected_PH_0.9/sum(Beta_true != 0))
-boxplot(Num_Selected_list, names = c("bSplines_0.1", "bSplines_0.4", "bSplines_0.9", "PH_0.1", "PH_0.4", "PH_0.9"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), main = "Proportional of Selected variables", xlab = "", ylab = "Prop of Selected variables", ylim = c(0, 1))
+Power_list = list(bSplines_0.1 = 1 - FNR_bSplines_0.1, bSplines_0.4 = 1 - FNR_bSplines_0.4, bSplines_0.9 = FNR_bSplines_0.9, 
+                         PH_0.1 = 1 - FNR_PH_0.1, PH_0.4 = 1 - FNR_PH_0.4, PH_0.9 = FNR_PH_0.9)
+boxplot(Power_list, names = c("bSplines_0.1", "bSplines_0.4", "bSplines_0.9", "PH_0.1", "PH_0.4", "PH_0.9"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), main = "Power", xlab = "", ylab = "Power", ylim = c(0, 1))
 ```
 

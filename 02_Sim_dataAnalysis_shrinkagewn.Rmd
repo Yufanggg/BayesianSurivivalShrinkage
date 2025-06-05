@@ -197,10 +197,10 @@ FDR_PH_withShrinkage = rep(NA, replicate_times)
 FDR_PH_noShrinkag = rep(NA, replicate_times)
 
 # Type II error
-Num_Selected_bSplines_withShrinkag = rep(NA, replicate_times)
-Num_Selected_bSplines_noShrinkag = rep(NA, replicate_times)
-Num_Selected_PH_withShrinkage = rep(NA, replicate_times)
-Num_Selected_PH_noShrinkag = rep(NA, replicate_times)
+FNR_bSplines_withShrinkag = rep(NA, replicate_times)
+FNR_bSplines_noShrinkag = rep(NA, replicate_times)
+FNR_PH_withShrinkage = rep(NA, replicate_times)
+FNR_PH_noShrinkag = rep(NA, replicate_times)
 
 # correlation, i.e., Prediction at the linear predictor level
 cor_bSplines_withShrinkag = rep(NA, replicate_times)
@@ -248,10 +248,10 @@ for (i in 1:replicate_times){
   FDR_PH_noShrinkag[i] <- sum(Selection_PH_noShrinkage & !variableSelection_reference) / sum(Selection_PH_noShrinkage)
   
   # Number of selected variables (Type II error)
-  Num_Selected_bSplines_withShrinkag[i] = sum(Selection_bSplines_withShrinkage)
-  Num_Selected_bSplines_noShrinkag[i] = sum(Selection_bSplines_noShrinkage)
-  Num_Selected_PH_withShrinkage[i] = sum(Selection_PH_withShrinkage)
-  Num_Selected_PH_noShrinkag[i] = sum(Selection_PH_noShrinkage)
+  FNR_bSplines_withShrinkag[i] = sum(!Selection_bSplines_withShrinkage & variableSelection_reference)/sum(variableSelection_reference)
+  FNR_bSplines_noShrinkag[i] = sum(!Selection_bSplines_noShrinkage & variableSelection_reference)/sum(variableSelection_reference)
+  FNR_PH_withShrinkage[i] = sum(!Selection_PH_withShrinkage & variableSelection_reference)/sum(variableSelection_reference)
+  FNR_PH_noShrinkag[i] = sum(!Selection_PH_noShrinkage & variableSelection_reference)/sum(variableSelection_reference)
 
   
   #linear predictor
@@ -363,8 +363,8 @@ FDR_list = list(bSplines_withShrinkag = FDR_bSplines_withShrinkag, bSplines_noSh
 boxplot(FDR_list, names = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), main = "FDR Boxplots", xlab = "", ylab = "FDR")
 
 # Subfigure 5 Type II error
-Num_Selected_list = list(bSplines_withShrinkag = Num_Selected_bSplines_withShrinkag/sum(Beta_true != 0), bSplines_noShrinkag = Num_Selected_bSplines_noShrinkag/sum(Beta_true != 0),  PL_withShrinkage = Num_Selected_PH_withShrinkage/sum(Beta_true != 0), PL_noShrinkag = Num_Selected_PH_noShrinkag/sum(Beta_true != 0))
-boxplot(Num_Selected_list, names = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "grey"), main = "Proportional of Selected variables", xlab = "", ylab = "Prop of Selected variables")
+Power_list = list(bSplines_withShrinkag = 1 - FNR_bSplines_withShrinkag, bSplines_noShrinkag = 1 - FNR_bSplines_noShrinkag,  PL_withShrinkage = 1 - FNR_PH_withShrinkage, PL_noShrinkag = 1 - FNR_PH_noShrinkag)
+boxplot(Power_list, names = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "grey"), main = "Power", xlab = "", ylab = "Power")
 
 # Subfigure 6 Correlation for linear predictors
 # cor_list = list(bSplines_withShrinkag = cor_bSplines_withShrinkag, bSplines_noShrinkag = cor_bSplines_noShrinkag, PL_withShrinkage = cor_PH_withShrinkage, PL_noShrinkag = cor_PH_noShrinkag)
