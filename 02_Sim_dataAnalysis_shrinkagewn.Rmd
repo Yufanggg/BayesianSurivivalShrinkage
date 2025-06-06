@@ -318,10 +318,10 @@ lines(Bias_bSplines_noShrinkag, type = "o", col = "orange", pch = 16)
 lines(Bias_PH_noShrinkag, type = "o", col = "purple", pch = 16)
 
 abline(v = 10, col = "red", lty = 2)
-legend("topright", legend = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
+legend("top", legend = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1, horiz = TRUE) # Add legend
 
 # Subfigure 2: Variance
-plot(Variance_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Variance", ylim = c(0, 0.15), main = "Variance for Beta estimation", pch = 16)
+plot(Variance_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Variance", ylim = c(0, 0.2), main = "Variance for Beta estimation", pch = 16)
 
 # Add background rectangles
 for (i in 1:length(Beta_true)) {
@@ -337,10 +337,10 @@ lines(Variance_PH_noShrinkag, type = "o", col = "purple", pch = 16)
 
 abline(v = 10, col = "red", lty = 2)
 abline(h = 0, col = "red", lty = 2)
-legend("topright", legend = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
+legend("top", legend = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1, horiz = TRUE) # Add legend
 
 # Subfigure 3: MSE
-plot(rMSEs_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.4), main = "rMSE for Beta estimation", pch = 16)
+plot(rMSEs_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.5), main = "rMSE for Beta estimation", pch = 16)
 
 # Add background rectangles
 for (i in 1:length(Beta_true)) {
@@ -354,7 +354,7 @@ lines(rMSEs_bSplines_noShrinkag, type = "o", col = "orange", pch = 16)
 lines(rMSEs_PH_noShrinkag, type = "o", col = "purple", pch = 16)
 
 abline(v = 10, col = "red", lty = 2)
-legend("topright", legend = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
+legend("top", legend = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1, horiz = TRUE) # Add legend
 
 
 # Subfigure 4 Type I error

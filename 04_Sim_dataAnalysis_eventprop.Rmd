@@ -287,7 +287,7 @@ fill_vector = (Beta_true != 0)
 par(mfrow = c(3, 2))
 
 # Subfigure 1: Bias
-plot(Bias_bSplines_0.1, type = "o", col = "#641e16", xlab = "estimated Betas", ylab = "Bias", main = "Bias for Beta estimation", pch = 16)
+plot(Bias_bSplines_0.1, type = "o", col = "#641e16", xlab = "estimated Betas", ylab = "Bias", main = "Bias for Beta estimation", pch = 16, ylim = c(0, 0.8))
 
 # Add background rectangles
 for (i in 1:length(Beta_true)) {
@@ -306,10 +306,10 @@ lines(Bias_PH_0.9, type = "o", col = "#a2d9ce", pch = 16)
 
 
 abline(v = 10, col = "red", lty = 2)
-legend("topright", legend = c("bSplines_0.1", "bSplines_0.4", "bSplines_0.9", "PH_0.1", "PH_0.4", "PH_0.9"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), pch = 16, lty = 1) # Add legend
+legend("top", legend = c("bSplines_0.1", "bSplines_0.4", "bSplines_0.9", "PH_0.1", "PH_0.4", "PH_0.9"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), pch = 16, lty = 1,  horiz = TRUE) # Add legend
 
 # Subfigure 2: Variance
-plot(Variance_bSplines_0.1, type = "o", col = "#641e16", xlab = "estimated Betas", ylab = "Variance", ylim = c(0, 0.6), main = "Variance for Beta estimation", pch = 16)
+plot(Variance_bSplines_0.1, type = "o", col = "#641e16", xlab = "estimated Betas", ylab = "Variance", ylim = c(0, 0.8), main = "Variance for Beta estimation", pch = 16,  horiz = TRUE)
 
 # Add background rectangles
 for (i in 1:length(Beta_true)) {
@@ -328,10 +328,10 @@ lines(Variance_PH_0.9, type = "o", col = "#a2d9ce", pch = 16)
 abline(v = 10, col = "red", lty = 2)
 abline(h = 0, col = "red", lty = 2)
 
-legend("topright", legend = c("bSplines_0.1", "bSplines_0.4", "bSplines_0.9", "PH_0.1", "PH_0.4", "PH_0.9"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), pch = 16, lty = 1) # Add legend
+legend("top", legend = c("bSplines_0.1", "bSplines_0.4", "bSplines_0.9", "PH_0.1", "PH_0.4", "PH_0.9"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), pch = 16, lty = 1, horiz = TRUE) # Add legend
 
 # Subfigure 3: MSE
-plot(rMSEs_bSplines_0.1, type = "o", col = "#641e16", xlab = "estimated Betas", ylab = "rMSE", ylim = c(0, 0.8), main = "rMSE for Beta estimation", pch = 16)
+plot(rMSEs_bSplines_0.1, type = "o", col = "#641e16", xlab = "estimated Betas", ylab = "rMSE", ylim = c(0, 1), main = "rMSE for Beta estimation", pch = 16)
 
 # Add background rectangles
 for (i in 1:length(Beta_true)) {
@@ -348,7 +348,7 @@ lines(rMSEs_PH_0.4, type = "o", col = "#229954", pch = 16)
 lines(rMSEs_PH_0.9, type = "o", col = "#a2d9ce", pch = 16)
 
 abline(v = 10, col = "red", lty = 2)
-legend("topright", legend = c("bSplines_0.1", "bSplines_0.4", "bSplines_0.9", "PH_0.1", "PH_0.4", "PH_0.9"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), pch = 16, lty = 1) # Add legend
+legend("top", legend = c("bSplines_0.1", "bSplines_0.4", "bSplines_0.9", "PH_0.1", "PH_0.4", "PH_0.9"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), pch = 16, lty = 1, horiz = TRUE) # Add legend
 
 
 # Subfigure 4 Type I error
