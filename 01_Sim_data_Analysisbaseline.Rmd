@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 
 
 install_and_load <- function(packages) {
@@ -364,10 +364,6 @@ boxplot(FDR_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLikl
 abline(h = 0.05, col = "red", lty = 2)
 
 # Subfigure 5 Type II error
-Power_list = list(bSplines_withShrinkag = 1 - FNR_bSplines_withShrinkag, bSplines_noShrinkag = 1 - FNR_bSplines_noShrinkag,  PL_withShrinkage = 1 - FNR_PH_withShrinkage, PL_noShrinkag = 1 - FNR_PH_noShrinkag)
-boxplot(Power_list, names = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "grey"), main = "Power", xlab = "", ylab = "Power")
-
-
 Power_list = list(Exponential = 1 - FNR_exponential, Weibull = 1 - FNR_weibull, BSplines =  1- FNR_bSplines, ParticalLiklihood = 1 - FNR_PH)
 boxplot(Power_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), main = "Power", xlab = "", ylab = "Power", ylim = c(0, 1))
 

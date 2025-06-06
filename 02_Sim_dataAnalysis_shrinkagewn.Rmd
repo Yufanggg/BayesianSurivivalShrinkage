@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 install_and_load <- function(packages) {
   for (pkg in packages) {
     if (!require(pkg, character.only = TRUE)) {
@@ -302,7 +302,7 @@ fill_vector = (Beta_true != 0)
 par(mfrow = c(3, 2))
 
 # Subfigure 1: Bias
-plot(Bias_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Bias", main = "Bias for Beta estimation", pch = 16)
+plot(Bias_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Bias", main = "Bias for Beta estimation", pch = 16, ylim = c(-0.25, 0.25))
 
 # Add background rectangles
 for (i in 1:length(Beta_true)) {
@@ -321,7 +321,7 @@ abline(v = 10, col = "red", lty = 2)
 legend("topright", legend = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
 
 # Subfigure 2: Variance
-plot(Variance_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Variance", ylim = c(0, 0.1), main = "Variance for Beta estimation", pch = 16)
+plot(Variance_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Variance", ylim = c(0, 0.15), main = "Variance for Beta estimation", pch = 16)
 
 # Add background rectangles
 for (i in 1:length(Beta_true)) {
@@ -340,7 +340,7 @@ abline(h = 0, col = "red", lty = 2)
 legend("topright", legend = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
 
 # Subfigure 3: MSE
-plot(rMSEs_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.1), main = "rMSE for Beta estimation", pch = 16)
+plot(rMSEs_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "MSE", ylim = c(0, 0.4), main = "rMSE for Beta estimation", pch = 16)
 
 # Add background rectangles
 for (i in 1:length(Beta_true)) {
