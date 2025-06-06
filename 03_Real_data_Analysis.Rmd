@@ -6,10 +6,10 @@ output: pdf_document
 ---
 
 # Step 1: Set up the environment
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 source("./function_file/stan_constructor.R")
 
@@ -23,39 +23,39 @@ install_and_load <- function(packages) {
 }
 
 # List of required packages
-required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret", "corrplot","ggplot2")
+required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret", "corrplot","ggplot2", "loo")
 # Install and/or load packages
 install_and_load(required_packages)
 ```
 
 
-# Step 2: Organize the real-world data
+# Step 2: Organize and strafied the real-world data
 ```{r, echo=TRUE}
 real_df <- readRDS("./Data/imputed_NOTR_DGF.rds")
-sum(!complete.cases(real_df))
-mean(real_df$status == "graftloss")
-mean(real_df$status == "alive")
-mean(real_df$status == "death")
+# sum(!complete.cases(real_df))
+# mean(real_df$status == "graftloss")
+# mean(real_df$status == "alive")
+# mean(real_df$status == "death")
 
-# Reversed KM for follow-up analysis
-fit <- survfit(Surv(real_df$time, real_df$status != "graftloss") ~ 1)
-plot(fit)
-abline(h = 0.5, col = "red", lty = 2)
-
-str(real_df)
+# # Reversed KM for follow-up analysis
+# fit <- survfit(Surv(real_df$time, real_df$status != "graftloss") ~ 1)
+# plot(fit)
+# abline(h = 0.5, col = "red", lty = 2)
+# 
+# str(real_df)
 real_df <- real_df[, !names(real_df) %in% "ID"]
 
 # get a general idea about the dataset
-for (i in 1:ncol(real_df)) { 
-  if (is.factor(real_df[[i]])) {
-    print(names(real_df)[i])
-    print(length(unique(real_df[[i]])))
-    }
-}
+# for (i in 1:ncol(real_df)) { 
+#   if (is.factor(real_df[[i]])) {
+#     print(names(real_df)[i])
+#     print(length(unique(real_df[[i]])))
+#     }
+# }
 factorName <- sapply(real_df, is.factor)
 factorName["status"] <- FALSE
 
-print(colnames(real_df)[factorName])
+# print(colnames(real_df)[factorName])
 
 real_df <- real_df[, !(names(real_df) %in% "InitialOnmachineindicator")]
 real_df$Donorcauseofdeath_group <- ifelse(real_df$Donorcauseofdeath_group == "Cardiac", "Cardiac", "Others")
@@ -66,89 +66,59 @@ strafied_Data_DBD <- subset(subset(real_df, real_df$TypecadavericDBDDCD == "DBD"
 strafied_Data_DCD <- subset(subset(real_df, real_df$TypecadavericDBDDCD == "DCD"), select = -c(TypecadavericDBDDCD))
 ```
 
-
+# Section 1
+## Step 3: EDA for strafied data DBD
 ```{r, echo=TRUE}
-includingInter <- function(dataframe_) {
-  #sum-coded all factor variables
-  factor_var <- sapply(dataframe_, is.factor)
-  for (var in names(dataframe_)[factor_var]) {
-    if (var != "status") {
-      contrasts(dataframe_[[var]]) <- contr.sum(levels(dataframe_[[var]]))
-    }
-  }
-  numeric_var <- sapply(dataframe_, is.numeric)
-  for (var in names(dataframe_)[numeric_var]){
-    if (var != "time"){
-      dataframe_[[var]] <- (dataframe_[[var]] - mean(dataframe_[[var]], na.rm = TRUE)) / sd(dataframe_[[var]], na.rm = TRUE)
-    }
-    
-  }
-  
-  # print(colnames(dataframe_)[numeric_var])
-  
-  # build up interaction effect
-  predictors <- subset(dataframe_, select = -c(status, time))
-  
-  interaction_formula <- as.formula(paste("~ (", paste(colnames(predictors), collapse = " + "), ")^2"))
-  interaction_matrix <- model.matrix(interaction_formula, data = dataframe_)
-  
-  interaction_df <- as.data.frame(interaction_matrix)
-  interaction_df <- interaction_df[, -1]
-  
-# Exclude interactions involving categorical variables
-  all_terms <- colnames(interaction_df)
-  interaction_terms <- all_terms[grepl(":", all_terms)]
-  # print(interaction_terms)
-  factor_vars <- c("Recipientsex", "Donorsex", "Smoking", "InitialOnmachineindicator", "status", "InitialPrimaryDiseaseET_regroup", "Donorcauseofdeath_group")#colnames(dataframe_)[factor_var]
-  # print(factor_vars)
-  
-  exclude_terms <- sapply(interaction_terms, function(term) {
-    terms_ <- unlist(strsplit(term, ":"))
-    Con1 <- any(agrepl(terms_[1], factor_vars))
-    Con2 <- any(agrepl(terms_[2], factor_vars))
-    if ((Con2 | Con1)){
-      Con1 = agrepl(terms_[1], "InitialPrimaryDiseaseET_regroup")
-      Con2 = agrepl(terms_[2], "InitialPrimaryDiseaseET_regroup")
+str(strafied_Data_DBD)
+# Get the overall range for numeric columns
+numeric_data <- strafied_Data_DBD[sapply(strafied_Data_DBD, is.numeric)]
+apply(numeric_data, 2, range)
 
-      return(any(Con1, Con2))
-      # print(terms_[2])
-      # print(Con2)
-    }
-    # print(term)
-    # print(all(Con1, Con2))
-    return(all(Con1, Con2))
-  })
-  
-  # print(exclude_terms)
-  exclude_columns <- interaction_terms[exclude_terms]
-  selected_columns <- setdiff(all_terms, exclude_columns)
-  interaction_df <- subset(interaction_df, select = selected_columns)
-  interaction_df$id = 1:nrow(dataframe_)#dataframe_$ID
-  interaction_df$status = ifelse(dataframe_$status == "graftloss", 1, 0)
-  interaction_df$obstime = dataframe_$time
+# Get the levels for factor columns
+factor_data <- strafied_Data_DBD[sapply(strafied_Data_DBD, is.factor)]
+lapply(factor_data, levels)
 
+# # Reversed KM for follow-up analysis
+fit <- survfit(Surv(strafied_Data_DBD$time, strafied_Data_DBD$status != "graftloss") ~ 1)
+plot(fit)
+abline(h = 0.5, col = "red", lty = 2)
 
-  # print(interaction_terms[exclude_terms])
-
-  
-  return(interaction_df)
-}
+sum(!names(strafied_Data_DBD) %in% c("time", "status"))
 ```
-# Section 1: Data analysis for DBD
-## Step 1: EDA -have a look at the correlation for DBD
+## Step 4: Verify the existence of interaction effects
 ```{r, echo = TRUE}
-# only for estimating the Betas
+#Build up b-Spline models in the absence of interaction effects
 strafied_Data_DBD_int <- includingInter(strafied_Data_DBD)
-num_strafied_Data_DBD_int <- strafied_Data_DBD_int
-cor_matrix <- cor(num_strafied_Data_DBD_int)
+Data_DBD_bSplines_noInt <- stan_data_Constructer_BSpline(
+    training_dataset = strafied_Data_DBD_int,
+    testing_dataset = NULL,
+    obs_window = 3415,
+    log_lik_saving = TRUE,
+    havingInt = FALSE
+  )
+bSplines_model_noInt <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_noInt, baseline_modelling = "bSplines", shrinkage = TRUE, withPrediction = FALSE, log_likSaving = TRUE, havingInt = FALSE)
 
-png(filename = "./Image/correlation_plot.png", width = 6000, height = 6000, res = 300)
-par(mar = c(0.1, 0.1, 0.1, 0.1), oma = c(0.1, 0.1, 0.1, 0.1))
-corrplot(cor_matrix, method = "color", type = "upper", tl.cex = 0.5, 
-         tl.col = "black", cl.cex = 0.5, tl.srt = 45)
+diagnostics_bSplines_model_noInt <- summary(bSplines_model_noInt)$summary[, c("Rhat", "n_eff")]
+cvl_bSplines_model_noInt <- cross_validated_log_likelihood (bSplines_model_noInt, nrow(DBD_bSplines_noInt))
+l_bSplines_model_noInt <- max_log_likelihood (bSplines_model_noInt, nrow(DBD_bSplines_noInt))
 
-# Close the device
-dev.off()
+  
+strafied_Data_DBD_int <- includingInter(strafied_Data_DBD)
+Data_DBD_bSplines_withInt <- stan_data_Constructer_BSpline(
+    training_dataset = strafied_Data_DBD_int,
+    testing_dataset = NULL,
+    obs_window = 3415,
+    log_lik_saving = TRUE
+  )
+bSplines_model_withInt <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_withInt, baseline_modelling = "bSplines", shrinkage = TRUE, withPrediction = FALSE, log_likSaving = TRUE)
+
+diagnostics_bSplines_model_withInt <- summary(bSplines_model_withInt)$summary[, c("Rhat", "n_eff")]
+cvl_bSplines_model_withInt <- cross_validated_log_likelihood (bSplines_model_withInt, nrow(DBD_bSplines_noInt))
+l_bSplines_model_withInt <- max_log_likelihood (bSplines_model_withInt, nrow(DBD_bSplines_noInt))
+
+output_DBD <- c(cvl_bSplines_model_noInt, cvl_bSplines_model_withInt)
+names(output_DBD) <- ("bSplines_noInt, bSplines_withInt")
+output_DBD
 ```
 
 ## Step 1: EDA -have a look at the linear vs. non-linear relationship between variables and the survivial data

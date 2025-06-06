@@ -30,7 +30,7 @@ g <- function(main_indices_for_int, index){
 
 # Function to fit a Bayesian survival model with different baseline assumptions
 # @param: stan_data, a list including items for the corresponding stan model
-Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential", withPrediction = TRUE, shrinkage = TRUE, log_likSaving = FALSE,
+Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential", withPrediction = TRUE, shrinkage = TRUE, log_likSaving = FALSE, havingInt = TRUE,
                                                 niter = 10000, 
                                                 nwarmup = 1000,
                                                 thin = 10,
@@ -66,8 +66,13 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
       message("We utilized B-splines to estimate the log baseline hazard function.")
       
       # compile the model
-      if (log_likSaving == TRUE){
-        bayesian_model <- rstan::stan_model("./stan_file/bSpline_est_loglik.stan")
+      if (log_likSaving == TRUE) {
+        if (havingInt == TRUE) {
+          bayesian_model <- rstan::stan_model("./stan_file/bSpline_est_loglik.stan")
+        } else {
+          bayesian_model <- rstan::stan_model("./stan_file/bSpline_est_loglik_noInt.stan")
+        }
+        
       } else {
         bayesian_model <- rstan::stan_model("./stan_file/bSpline_est.stan")
       }
@@ -479,4 +484,71 @@ max_log_likelihood <- function(model_fit_bSpline, nObs) {
                                     merge_chains = TRUE) # S*N
   log_lik <- max(apply(log_lik_matrix, 1, sum))
   return(log_lik)
+}
+
+# include the interaction effect for the dataframe, tailed for the real kindney data.
+includingInter <- function(dataframe_) {
+  #sum-coded all factor variables
+  factor_var <- sapply(dataframe_, is.factor)
+  for (var in names(dataframe_)[factor_var]) {
+    if (var != "status") {
+      contrasts(dataframe_[[var]]) <- contr.sum(levels(dataframe_[[var]]))
+    }
+  }
+  numeric_var <- sapply(dataframe_, is.numeric)
+  for (var in names(dataframe_)[numeric_var]){
+    if (var != "time"){
+      dataframe_[[var]] <- (dataframe_[[var]] - mean(dataframe_[[var]], na.rm = TRUE)) / sd(dataframe_[[var]], na.rm = TRUE)
+    }
+    
+  }
+  
+  # print(colnames(dataframe_)[numeric_var])
+  
+  # build up interaction effect
+  predictors <- subset(dataframe_, select = -c(status, time))
+  
+  interaction_formula <- as.formula(paste("~ (", paste(colnames(predictors), collapse = " + "), ")^2"))
+  interaction_matrix <- model.matrix(interaction_formula, data = dataframe_)
+  
+  interaction_df <- as.data.frame(interaction_matrix)
+  interaction_df <- interaction_df[, -1]
+  
+  # Exclude interactions involving categorical variables
+  all_terms <- colnames(interaction_df)
+  interaction_terms <- all_terms[grepl(":", all_terms)]
+  # print(interaction_terms)
+  factor_vars <- c("Recipientsex", "Donorsex", "Smoking", "InitialOnmachineindicator", "status", "InitialPrimaryDiseaseET_regroup", "Donorcauseofdeath_group")#colnames(dataframe_)[factor_var]
+  # print(factor_vars)
+  
+  exclude_terms <- sapply(interaction_terms, function(term) {
+    terms_ <- unlist(strsplit(term, ":"))
+    Con1 <- any(agrepl(terms_[1], factor_vars))
+    Con2 <- any(agrepl(terms_[2], factor_vars))
+    if ((Con2 | Con1)){
+      Con1 = agrepl(terms_[1], "InitialPrimaryDiseaseET_regroup")
+      Con2 = agrepl(terms_[2], "InitialPrimaryDiseaseET_regroup")
+      
+      return(any(Con1, Con2))
+      # print(terms_[2])
+      # print(Con2)
+    }
+    # print(term)
+    # print(all(Con1, Con2))
+    return(all(Con1, Con2))
+  })
+  
+  # print(exclude_terms)
+  exclude_columns <- interaction_terms[exclude_terms]
+  selected_columns <- setdiff(all_terms, exclude_columns)
+  interaction_df <- subset(interaction_df, select = selected_columns)
+  interaction_df$id = 1:nrow(dataframe_)#dataframe_$ID
+  interaction_df$status = ifelse(dataframe_$status == "graftloss", 1, 0)
+  interaction_df$obstime = dataframe_$time
+  
+  
+  # print(interaction_terms[exclude_terms])
+  
+  
+  return(interaction_df)
 }

@@ -44,8 +44,6 @@ data {
   //-----for model fitting-----/
   // dimensions
   int<lower=0> p;          // num. cols in main effects (time-fixed)
-  int<lower=0> q;          // num. cols in interaction effects (time-fixed)
-  
   
   int<lower=0> Nevent;     // num. rows w/ an event;      used only w/ quadrature
   int<lower=0> Nrcens;     // num. rows w/ right cens;    used only w/ quadrature
@@ -65,13 +63,9 @@ data {
 
   // predictor matrices (time-fixed), with quadrature
   matrix[Nevent,p] x_epts_event; // for rows with events
-  matrix[Nevent,q] x_int_epts_event; // for rows with events
   
   matrix[qevent,p] x_qpts_event; // for rows with events
-  matrix[qevent,q] x_int_qpts_event; // for rows with events
-  
   matrix[qrcens,p] x_qpts_rcens; // for rows with right censoring
-  matrix[qrcens,q] x_int_qpts_rcens; // for rows with right censoring
 
 
 
@@ -86,18 +80,13 @@ data {
   vector[qevent] qwts_event;
   vector[qrcens] qwts_rcens;
   
-  // link the interaction effect with the corresponding main effects
-  int g1[q];
-  int g2[q];
   
   // for log_lik
   int<lower=0> Nobs;
   matrix[Nobs, p] x_epts_all;
-  matrix[Nobs, q] x_int_epts_all;
   
   int<lower=0> Nobs_qnode;
   matrix[Nobs_qnode, p] x_qpts_all;
-  matrix[Nobs_qnode, q] x_int_qpts_all;
   vector[Nobs] status;
   
   matrix[Nobs,nvars] basis_epts_all; 
@@ -111,7 +100,6 @@ data {
 parameters {
   vector[nvars] coefs;
   vector[p] Beta; // coefficients for design matrix;
-  vector[q] Beta_int;
   
   real<lower=0.01, upper=1> tau2int;
   real<lower=0>  tau2[p];
@@ -142,25 +130,22 @@ model {
   for (i in 1:p){
     Beta[i] ~ normal(0, sqrt(tau2[i]));
     }
-  for (i in 1:q){
-    Beta_int[i] ~ normal(0, sqrt(sqrt(tau2[g1[i]]*tau2[g2[i]])*tau2int));
-    }
   
   //log-likelihood, represented by [target]
   if (Nevent > 0) {
-    eta_epts_event = x_epts_event * Beta + x_int_epts_event * Beta_int;
+    eta_epts_event = x_epts_event * Beta;
     lhaz_epts_event = bspline_log_haz(eta_epts_event, basis_epts_event, coefs);// B-splines, on log haz scale 
     target +=  lhaz_epts_event;
     }
     
   if (qevent > 0){
-    eta_qpts_event = x_qpts_event * Beta + x_int_qpts_event * Beta_int;
+    eta_qpts_event = x_qpts_event * Beta;
     lhaz_qpts_event = bspline_log_haz(eta_qpts_event, basis_qpts_event, coefs);
     target +=  quadrature_log_surv(qwts_event, lhaz_qpts_event); // log(f(t)) = -H(t) + log(h(t))for uncensored data
   }
   
   if (qrcens > 0) {
-    eta_qpts_rcens = x_qpts_rcens * Beta + x_int_qpts_rcens * Beta_int;
+    eta_qpts_rcens = x_qpts_rcens * Beta;
     lhaz_qpts_rcens = bspline_log_haz(eta_qpts_rcens, basis_qpts_rcens, coefs);
     target +=  quadrature_log_surv(qwts_rcens, lhaz_qpts_rcens); // log(S(t)) = - H(t)for right censored data
     }
@@ -173,7 +158,7 @@ generated quantities{
 
   for (n in 1: Nobs){
     if (status[n] == 1){
-      real eta_epts_current_real = x_epts_all[n, ] * Beta + x_int_epts_all[n, ] * Beta_int;
+      real eta_epts_current_real = x_epts_all[n, ] * Beta;
       vector[1] eta_epts_current;
       eta_epts_current[1] = eta_epts_current_real;
       
@@ -182,13 +167,13 @@ generated quantities{
       vector[1] lhaz_epts_current = bspline_log_haz(eta_epts_current, basis_epts_current, coefs);
 
 
-      vector[15] eta_qpts_current = x_qpts_all[n: (n+15-1), ] * Beta + x_int_qpts_all[n: (n+15-1), ] * Beta_int;
+      vector[15] eta_qpts_current = x_qpts_all[n: (n+15-1), ] * Beta;
       vector[15] lhaz_qpts_current = bspline_log_haz(eta_qpts_current, basis_qpts_all[n: (n+15-1), ], coefs);
 
       log_lik[n] =  quadrature_log_surv(qwts_all[n: (n+15-1) ] , lhaz_qpts_current); // log(f(t)) = -H(t) + log(h(t))for uncensored data
     }
     else {
-      vector[15] eta_qpts_current_ = x_qpts_all[n: (n+15-1), ] * Beta + x_int_qpts_all[n: (n+15-1), ] * Beta_int;
+      vector[15] eta_qpts_current_ = x_qpts_all[n: (n+15-1), ] * Beta;
       vector[15] lhaz_qpts_current_ = bspline_log_haz(eta_qpts_current_, basis_qpts_all[n: (n+15-1), ], coefs);
 
       log_lik[n] =  quadrature_log_surv(qwts_all[n: (n+15-1)] , lhaz_qpts_current_); // log(S(t)) = - H(t)for right censored data

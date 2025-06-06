@@ -102,103 +102,181 @@ stan_data_Constructer_PL <- function (training_dataset, testing_dataset = NULL){
 
 # assumptions: all data are right censored data with the observed window being [0, obs_window]
 # Construct stan data structure for baseline hazard of exponential and weibull.
-stan_data_Constructer_noBSpline <- function (training_dataset, testing_dataset = NULL, log_lik_saving = TRUE) {
+stan_data_Constructer_noBSpline <- function (training_dataset, testing_dataset = NULL, log_lik_saving = TRUE, havingInt = TRUE) {
   
   #----------------------------
   # Prepare data for model fitting
   #-----------------------------
   #----- organize the data regarding predictor
   
-  design__matrix = training_dataset[,!(names(training_dataset) %in% c("id", "obstime", "status"))]
+  design__matrix = training_dataset[, !(names(training_dataset) %in% c("id", "obstime", "status"))]
   
   column_names = colnames(design__matrix)
-  main_names =  column_names[!grepl(":", column_names)] #whether or not having intercept needs to be verified
-  X_main = design__matrix[, main_names]
   
-  int_names =  column_names[grepl(":", column_names)]
-  X_int = design__matrix[, int_names]
-  
-  p <- dim(X_main)[2]
-  q <- dim(X_int)[2]
-  
-  main_indices_for_int = find_main_effect_indices(int_names, main_names)
-  g1 <- g(main_indices_for_int, 1)
-  g2 <- g(main_indices_for_int, 2)
-  
-  # x_event = X_main[training_dataset$status == 1,]
-  # x_int_event =  X_int[training_dataset$status == 1,]
-  
- 
-  
-  #----------------
-  # Construct data
-  #----------------
-  stan_data = list(
-    #----- for model fitting --------
-    nevent = nrow(training_dataset[training_dataset$status == 1, ]),
-    nrcens = nrow(training_dataset[training_dataset$status == 0, ]),
-    t_event = training_dataset[training_dataset$status == 1, "obstime"],
-    t_rcens = training_dataset[training_dataset$status == 0, "obstime"],
-    
-    # predictor matrices (time-fixed)
-    p = p,
-    q = q,
-    
-    x_event = X_main[training_dataset$status == 1,],
-    x_int_event =  X_int[training_dataset$status == 1,],
-    
-    x_rcens = X_main[training_dataset$status == 0,],
-    x_int_rcens = X_int[training_dataset$status == 0,],
-    
-    # link the interaction effect with the corresponding main effects
-    g1 = g1,
-    g2 = g2
-  )
-  
-  #----------------------------
-  # Prepare data for log_lik
-  #-----------------------------
-  
-  if (log_lik_saving == TRUE){
-    #----- for generate log_lik
-    stan_data = c(stan_data, list(
-      #--- for log_lik ----
-      N = nrow(training_dataset),
-      status = training_dataset$status,
-      t = training_dataset$obstime,
-      X = X_main,
-      X_int = X_int)
-      )
-    
-  }
-  
-  #----------------------------
-  # Prepare data for prediction
-  #-----------------------------
-  if(! is.null(testing_dataset)){
-    nnew <- nrow(testing_dataset)
-    t_new <- testing_dataset$obstime
-    design__matrix_2 = testing_dataset[,!(names(testing_dataset) %in% c("id", "obstime", "status"))]
-    
-    column_names = colnames(design__matrix_2)
-    main_names =  column_names[!grepl(":", column_names) &
-                                 column_names != "(Intercept)"] #whether or not having intercept needs to be verified
-    X_new_main = design__matrix_2[, main_names]
+  if (havingInt == TRUE) {
+    main_names =  column_names[!grepl(":", column_names)] #whether or not having intercept needs to be verified
+    X_main = design__matrix[, main_names]
     
     int_names =  column_names[grepl(":", column_names)]
-    X_new_int = design__matrix_2[, int_names]
+    X_int = design__matrix[, int_names]
+    
+    p <- dim(X_main)[2]
+    q <- dim(X_int)[2]
+    
+    main_indices_for_int = find_main_effect_indices(int_names, main_names)
+    g1 <- g(main_indices_for_int, 1)
+    g2 <- g(main_indices_for_int, 2)
+    
+    # x_event = X_main[training_dataset$status == 1,]
+    # x_int_event =  X_int[training_dataset$status == 1,]
+    
     
     
     #----------------
-    # add data to Constructed data for prediction
+    # Construct data
     #----------------
+    stan_data = list(
+      #----- for model fitting --------
+      nevent = nrow(training_dataset[training_dataset$status == 1, ]),
+      nrcens = nrow(training_dataset[training_dataset$status == 0, ]),
+      t_event = training_dataset[training_dataset$status == 1, "obstime"],
+      t_rcens = training_dataset[training_dataset$status == 0, "obstime"],
+      
+      # predictor matrices (time-fixed)
+      p = p,
+      q = q,
+      
+      x_event = X_main[training_dataset$status == 1, ],
+      x_int_event =  X_int[training_dataset$status == 1, ],
+      
+      x_rcens = X_main[training_dataset$status == 0, ],
+      x_int_rcens = X_int[training_dataset$status == 0, ],
+      
+      # link the interaction effect with the corresponding main effects
+      g1 = g1,
+      g2 = g2
+    )
     
-    stan_data = c(stan_data, list(
-      nnew = nrow(testing_dataset),
-      x_new = X_new_main,
-      x_int_new = X_new_int,
-      t_new = testing_dataset[, "obstime"]
-    ))
+    #----------------------------
+    # Prepare data for log_lik
+    #-----------------------------
+    
+    if (log_lik_saving == TRUE) {
+      #----- for generate log_lik
+      stan_data = c(
+        stan_data,
+        list(
+          #--- for log_lik ----
+          N = nrow(training_dataset),
+          status = training_dataset$status,
+          t = training_dataset$obstime,
+          X = X_main,
+          X_int = X_int
+        )
+      )
+      
+    }
+    
+    #----------------------------
+    # Prepare data for prediction
+    #-----------------------------
+    if (!is.null(testing_dataset)) {
+      nnew <- nrow(testing_dataset)
+      t_new <- testing_dataset$obstime
+      design__matrix_2 = testing_dataset[, !(names(testing_dataset) %in% c("id", "obstime", "status"))]
+      
+      column_names = colnames(design__matrix_2)
+      main_names =  column_names[!grepl(":", column_names) &
+                                   column_names != "(Intercept)"] #whether or not having intercept needs to be verified
+      X_new_main = design__matrix_2[, main_names]
+      
+      int_names =  column_names[grepl(":", column_names)]
+      X_new_int = design__matrix_2[, int_names]
+      
+      
+      #----------------
+      # add data to Constructed data for prediction
+      #----------------
+      
+      stan_data = c(
+        stan_data,
+        list(
+          nnew = nrow(testing_dataset),
+          x_new = X_new_main,
+          x_int_new = X_new_int,
+          t_new = testing_dataset[, "obstime"]
+        )
+      )
+    }
+  } else {
+    main_names =  column_names[!grepl(":", column_names)] #whether or not having intercept needs to be verified
+    X_main = design__matrix[, main_names]
+    
+    # x_event = X_main[training_dataset$status == 1,]
+    # x_int_event =  X_int[training_dataset$status == 1,]
+    
+    
+    
+    #----------------
+    # Construct data
+    #----------------
+    stan_data = list(
+      #----- for model fitting --------
+      nevent = nrow(training_dataset[training_dataset$status == 1, ]),
+      nrcens = nrow(training_dataset[training_dataset$status == 0, ]),
+      t_event = training_dataset[training_dataset$status == 1, "obstime"],
+      t_rcens = training_dataset[training_dataset$status == 0, "obstime"],
+      
+      # predictor matrices (time-fixed)
+      
+      x_event = X_main[training_dataset$status == 1, ],
+      x_rcens = X_main[training_dataset$status == 0, ],
+    )
+    
+    #----------------------------
+    # Prepare data for log_lik
+    #-----------------------------
+    
+    if (log_lik_saving == TRUE) {
+      #----- for generate log_lik
+      stan_data = c(
+        stan_data,
+        list(
+          #--- for log_lik ----
+          N = nrow(training_dataset),
+          status = training_dataset$status,
+          t = training_dataset$obstime,
+          X = X_main
+        )
+      )
+      
+    }
+    
+    #----------------------------
+    # Prepare data for prediction
+    #-----------------------------
+    if (!is.null(testing_dataset)) {
+      nnew <- nrow(testing_dataset)
+      t_new <- testing_dataset$obstime
+      design__matrix_2 = testing_dataset[, !(names(testing_dataset) %in% c("id", "obstime", "status"))]
+      
+      column_names = colnames(design__matrix_2)
+      main_names =  column_names[!grepl(":", column_names) &
+                                   column_names != "(Intercept)"] #whether or not having intercept needs to be verified
+      X_new_main = design__matrix_2[, main_names]
+      
+      
+      #----------------
+      # add data to Constructed data for prediction
+      #----------------
+      
+      stan_data = c(stan_data,
+                    list(
+                      nnew = nrow(testing_dataset),
+                      x_new = X_new_main,
+                      t_new = testing_dataset[, "obstime"]
+                    ))
+    }
   }
   
   return(stan_data)
@@ -210,7 +288,7 @@ stan_data_Constructer_noBSpline <- function (training_dataset, testing_dataset =
 #'   Options are 15 (the default), 11 or 7.
 
 # assumptions: all data are right censored data with the observed window being [0, obs_window]
-stan_data_Constructer_BSpline <- function (training_dataset, testing_dataset, obs_window, qnodes = 15, log_lik_saving = FALSE){
+stan_data_Constructer_BSpline <- function (training_dataset, testing_dataset, obs_window, qnodes = 15, log_lik_saving = FALSE, havingInt = TRUE){
   
   #----------------------------
   # Prepare data for model fitting
@@ -224,312 +302,490 @@ stan_data_Constructer_BSpline <- function (training_dataset, testing_dataset, ob
   main_names =  column_names[!grepl(":", column_names)] #whether or not having intercept needs to be verified
   X_main = design__matrix[, main_names]
   
-  int_names =  column_names[grepl(":", column_names)]
-  X_int = design__matrix[, int_names]
-  
-  p <- dim(X_main)[2]
-  q <- dim(X_int)[2]
-  
-  main_indices_for_int = find_main_effect_indices(int_names, main_names)
-  g1 <- g(main_indices_for_int, 1)
-  g2 <- g(main_indices_for_int, 2)
-  
-  t_event = training_dataset[training_dataset$status == 1, "obstime"]
-  t_rcens = training_dataset[training_dataset$status == 0, "obstime"]
-  
-  
-  
-  #----- baseline hazard
-  basehaz <- handle_basehaz_surv(times          = training_dataset$obstime, 
-                                 status         = training_dataset$status,
-                                 min_t          = 0,
-                                 max_t          = max(c(training_dataset$obstime, obs_window), na.rm = TRUE))
-  nvars <- basehaz$nvars # number of basehaz aux parameters
-  
-  
-  
-  # model uses quadrature
-  
-  # standardised nodes and weights for quadrature
-  qq <- get_quadpoints(nodes = qnodes)
-  qp <- qq$points
-  qw <- qq$weights
-  
-  # quadrature points, evaluated for each row of data
-  qpts_event <- uapply(qp, unstandardise_qpts, 0, t_event)
-  qpts_rcens <- uapply(qp, unstandardise_qpts, 0, t_rcens)
-  
-  
-  # quadrature weights, evaluated for each row of data
-  qwts_event <- uapply(qw, unstandardise_qwts, 0, t_event)
-  qwts_rcens <- uapply(qw, unstandardise_qwts, 0, t_rcens)
-  
-  
-  # times at events and all quadrature points
-  cpts_list <- list(t_event,
-                    qpts_event,
-                    qpts_rcens)
-  
-  idx_cpts <- get_idx_array(sapply(cpts_list, length))
-  # cpts     <- unlist(cpts_list) # as vector 
-  
-  # number of quadrature points
-  qevent <- length(qwts_event)
-  qrcens <- length(qwts_rcens)
-  
-  
-  #----- basis terms for baseline hazard
-  
-  basis_epts_event <- make_basis(t_event,    basehaz)
-  basis_qpts_event <- make_basis(qpts_event, basehaz)
-  basis_qpts_rcens <- make_basis(qpts_rcens, basehaz)
-  
-  
-  #----- model frames for generating predictor matrices
-  
-  id_event <- which(training_dataset$status == 1)
-  id_rcens <-  which(training_dataset$status == 0)
-  
-  # combined model frame, with quadrature  
-  X_main_cpts <- rbind(X_main[id_event,],
-                       rep_rows(X_main[id_event,], times = qnodes),
-                       rep_rows(X_main[id_rcens,], times = qnodes))
-  X_int_cpts <- rbind(X_int[id_event,],
-                      rep_rows(X_int[id_event,], times = qnodes),
-                      rep_rows(X_int[id_rcens,], times = qnodes))
-  
-  
-  
-  # time-fixed predictor matrices, with quadrature
-  x_epts_event <- X_main_cpts[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
-  x_qpts_event <- X_main_cpts[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
-  x_qpts_rcens <- X_main_cpts[idx_cpts[3,1]:idx_cpts[3,2], , drop = FALSE]
-  
-  x_int_epts_event <- X_int_cpts[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
-  x_int_qpts_event <- X_int_cpts[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
-  x_int_qpts_rcens <- X_int_cpts[idx_cpts[3,1]:idx_cpts[3,2], , drop = FALSE]
-  
-  
-  
-  
-  #----------------
-  # Construct data
-  #----------------
-  stan_data = list(
-    basis = basehaz$bs_basis,
-    #----- for model fitting --------
-    p = p,
-    q = q,
-    
-    nvars = nvars,
-    
-    qnodes  = 15,
-    
-    
-    Nevent       = sum(training_dataset$status == 1),
-    Nrcens       = sum(training_dataset$status == 0),
-    
-    qevent = qevent,
-    qrcens = qrcens,
-    
-    
-    epts_event   = t_event,
-    qpts_event = qpts_event,
-    qpts_rcens = qpts_rcens,
-    
-    
-    qwts_event = qwts_event,
-    qwts_rcens = qwts_rcens,
-    
-    
-    x_epts_event = x_epts_event,
-    x_qpts_event = x_qpts_event,
-    x_qpts_rcens = x_qpts_rcens,
-    
-    x_int_epts_event = x_int_epts_event,
-    x_int_qpts_event = x_int_qpts_event,
-    x_int_qpts_rcens = x_int_qpts_rcens,
-    
-    
-    basis_epts_event = basis_epts_event,
-    basis_qpts_event = basis_qpts_event,
-    basis_qpts_rcens = basis_qpts_rcens,
-    
-    # link the interaction effect with the corresponding main effects
-    g1 = g1,
-    g2 = g2
-  )
-  
-  #----------------------------
-  # Prepare data for saving log_lik
-  #-----------------------------
-  if (log_lik_saving == TRUE){
-    # #=====TO BE ADDRESSED ===== for reference
-    # 
-    # # combined model frame, with quadrature
-    # X_main_cpts <- rbind(X_main[id_event,],
-    #                      rep_rows(X_main[id_event,], times = qnodes),
-    #                      rep_rows(X_main[id_rcens,], times = qnodes))
-    # X_int_cpts <- rbind(X_int[id_event,],
-    #                     rep_rows(X_int[id_event,], times = qnodes),
-    #                     rep_rows(X_int[id_rcens,], times = qnodes))
-    # 
-    # 
-    # 
-    # # time-fixed predictor matrices, with quadrature
-    # x_epts_event <- X_main_cpts[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
-    # x_qpts_event <- X_main_cpts[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
-    # x_qpts_rcens <- X_main_cpts[idx_cpts[3,1]:idx_cpts[3,2], , drop = FALSE]
-    # 
-    # x_int_epts_event <- X_int_cpts[idx_cpts[1,1]:idx_cpts[1,2], , drop = FALSE]
-    # x_int_qpts_event <- X_int_cpts[idx_cpts[2,1]:idx_cpts[2,2], , drop = FALSE]
-    # x_int_qpts_rcens <- X_int_cpts[idx_cpts[3,1]:idx_cpts[3,2], , drop = FALSE]
-    
-    # 
-    # # standardised nodes and weights for quadrature
-    # qq <- get_quadpoints(nodes = qnodes)
-    # qp <- qq$points
-    # qw <- qq$weights
-    # 
-    # # quadrature points, evaluated for each row of data
-    # qpts_event <- uapply(qp, unstandardise_qpts, 0, t_event)
-    # qpts_rcens <- uapply(qp, unstandardise_qpts, 0, t_rcens)
-    # 
-    # 
-    # # quadrature weights, evaluated for each row of data
-    # qwts_event <- uapply(qw, unstandardise_qwts, 0, t_event)
-    # qwts_rcens <- uapply(qw, unstandardise_qwts, 0, t_rcens)
-    # 
-    # 
-    # # times at events and all quadrature points
-    # cpts_list <- list(t_event,
-    #                   qpts_event,
-    #                   qpts_rcens)
-    # 
-    # idx_cpts <- get_idx_array(sapply(cpts_list, length))
-    # basis_epts_event <- make_basis(t_event,    basehaz)
-    # basis_qpts_event <- make_basis(qpts_event, basehaz)
-    # basis_qpts_rcens <- make_basis(qpts_rcens, basehaz)
-    
-    
-    #=====TO BE ADDRESSED =====
-    t_all = training_dataset$obstime
-    qpts_all <- uapply(qp, unstandardise_qpts, 0, t_all)
-    
-    qwts_all <- uapply(qw, unstandardise_qwts, 0, t_all)
-    
-    basis_epts_all <- make_basis(t_all,    basehaz)
-    basis_qpts_all <- make_basis(qpts_all, basehaz)
-
-    
-    
-    # combined model frame, with quadrature  
-    X_main_cpts_all <- rbind(X_main,
-                             X_main[rep(1:nrow(X_main), each = qnodes), ])
-    X_int_cpts_all <- rbind(X_int,
-                            X_int[rep(1:nrow(X_int), each = qnodes), ])
-    
-    
-    
-    # time-fixed predictor matrices, with quadrature
-    Nobs <- nrow(training_dataset)
-    x_epts_all <- X_main_cpts_all[1:Nobs, , drop = FALSE]
-    x_qpts_all <- X_main_cpts_all[Nobs: (Nobs*(qnodes+1) - 1), , drop = FALSE]
-
-    x_int_epts_all <- X_int_cpts_all[1:Nobs, , drop = FALSE]
-    x_int_qpts_all <- X_int_cpts_all[Nobs: (Nobs*(qnodes+1) - 1), , drop = FALSE]
-
-    
-    stan_data = c(stan_data, list(
-      Nobs = nrow(training_dataset),
-      Nobs_qnode = nrow(training_dataset) * 15,
-      status = training_dataset$status,
-      x_epts_all = x_epts_all,
-      x_int_epts_all = x_int_epts_all,
-      x_qpts_all = x_qpts_all,
-      x_int_qpts_all = x_int_qpts_all,
-      
-      basis_epts_all = basis_epts_all,
-      basis_qpts_all = basis_qpts_all,
-      qwts_all = qwts_all
-    ))
-  }
-  
-  
-  #----------------------------
-  # Prepare data for prediction
-  #-----------------------------
-  
-  if(! is.null(testing_dataset)){
-    nnew <- nrow(testing_dataset)
-    t_new <- testing_dataset$obstime
-    design__matrix_2 = testing_dataset[,!(names(testing_dataset) %in% c("id", "obstime", "status"))]
-    
-    column_names = colnames(design__matrix_2)
-    main_names =  column_names[!grepl(":", column_names) &
-                                 column_names != "(Intercept)"] #whether or not having intercept needs to be verified
-    X_new_main = design__matrix_2[, main_names]
-    
+  if (havingInt == TRUE) {
     int_names =  column_names[grepl(":", column_names)]
-    X_new_int = design__matrix_2[, int_names]
+    X_int = design__matrix[, int_names]
+    
+    p <- dim(X_main)[2]
+    q <- dim(X_int)[2]
+    
+    main_indices_for_int = find_main_effect_indices(int_names, main_names)
+    g1 <- g(main_indices_for_int, 1)
+    g2 <- g(main_indices_for_int, 2)
+    
+    t_event = training_dataset[training_dataset$status == 1, "obstime"]
+    t_rcens = training_dataset[training_dataset$status == 0, "obstime"]
     
     
-    #----------------------------
-    # prediction the survival probability
-    # for each participant at a specific
-    # time point
-    #-----------------------------
+    
+    #----- baseline hazard
+    basehaz <- handle_basehaz_surv(
+      times          = training_dataset$obstime,
+      status         = training_dataset$status,
+      min_t          = 0,
+      max_t          = max(c(training_dataset$obstime, obs_window), na.rm = TRUE)
+    )
+    nvars <- basehaz$nvars # number of basehaz aux parameters
+    
+    
+    
+    # model uses quadrature
+    
+    # standardised nodes and weights for quadrature
+    qq <- get_quadpoints(nodes = qnodes)
+    qp <- qq$points
+    qw <- qq$weights
     
     # quadrature points, evaluated for each row of data
-    qpts_new_event <- uapply(qp, unstandardise_qpts, 0, t_new) #500 first node for all t_new, 500 second node for all t_new
+    qpts_event <- uapply(qp, unstandardise_qpts, 0, t_event)
+    qpts_rcens <- uapply(qp, unstandardise_qpts, 0, t_rcens)
     
     
     # quadrature weights, evaluated for each row of data
-    qwts_new_event <- uapply(qw, unstandardise_qwts, 0, t_new)
+    qwts_event <- uapply(qw, unstandardise_qwts, 0, t_event)
+    qwts_rcens <- uapply(qw, unstandardise_qwts, 0, t_rcens)
     
     
+    # times at events and all quadrature points
+    cpts_list <- list(t_event, qpts_event, qpts_rcens)
+    
+    idx_cpts <- get_idx_array(sapply(cpts_list, length))
+    # cpts     <- unlist(cpts_list) # as vector
     
     # number of quadrature points
-    qevent_new <- length(qwts_new_event)
+    qevent <- length(qwts_event)
+    qrcens <- length(qwts_rcens)
     
     
     #----- basis terms for baseline hazard
-    basis_new_qpts_event <- make_basis(qpts_new_event, basehaz) #500 first node for all t_new, 500 second node for all t_new
     
+    basis_epts_event <- make_basis(t_event, basehaz)
+    basis_qpts_event <- make_basis(qpts_event, basehaz)
+    basis_qpts_rcens <- make_basis(qpts_rcens, basehaz)
     
     
     #----- model frames for generating predictor matrices
     
+    id_event <- which(training_dataset$status == 1)
+    id_rcens <-  which(training_dataset$status == 0)
     
     # combined model frame, with quadrature
-    X_main_cpts_new <- rep_rows(X_new_main, times = qnodes) #X_main first for all t_new; X_main second for all t_new
-    X_int_cpts_new <- rep_rows(X_new_int, times = qnodes)
+    X_main_cpts <- rbind(X_main[id_event, ],
+                         rep_rows(X_main[id_event, ], times = qnodes),
+                         rep_rows(X_main[id_rcens, ], times = qnodes))
+    X_int_cpts <- rbind(X_int[id_event, ],
+                        rep_rows(X_int[id_event, ], times = qnodes),
+                        rep_rows(X_int[id_rcens, ], times = qnodes))
     
     
     
     # time-fixed predictor matrices, with quadrature
-    x_new_qpts_event <- X_main_cpts_new[, , drop = FALSE] #X_main first for all t_new; X_main second for all t_new
+    x_epts_event <- X_main_cpts[idx_cpts[1, 1]:idx_cpts[1, 2], , drop = FALSE]
+    x_qpts_event <- X_main_cpts[idx_cpts[2, 1]:idx_cpts[2, 2], , drop = FALSE]
+    x_qpts_rcens <- X_main_cpts[idx_cpts[3, 1]:idx_cpts[3, 2], , drop = FALSE]
     
-    x_new_int_qpts_event <- X_int_cpts_new[, , drop = FALSE]
+    x_int_epts_event <- X_int_cpts[idx_cpts[1, 1]:idx_cpts[1, 2], , drop = FALSE]
+    x_int_qpts_event <- X_int_cpts[idx_cpts[2, 1]:idx_cpts[2, 2], , drop = FALSE]
+    x_int_qpts_rcens <- X_int_cpts[idx_cpts[3, 1]:idx_cpts[3, 2], , drop = FALSE]
+    
+    
+    
     
     #----------------
-    # add data to Constructed data for prediction
+    # Construct data
     #----------------
+    stan_data = list(
+      basis = basehaz$bs_basis,
+      #----- for model fitting --------
+      p = p,
+      q = q,
+      
+      nvars = nvars,
+      
+      qnodes  = 15,
+      
+      
+      Nevent       = sum(training_dataset$status == 1),
+      Nrcens       = sum(training_dataset$status == 0),
+      
+      qevent = qevent,
+      qrcens = qrcens,
+      
+      
+      epts_event   = t_event,
+      qpts_event = qpts_event,
+      qpts_rcens = qpts_rcens,
+      
+      
+      qwts_event = qwts_event,
+      qwts_rcens = qwts_rcens,
+      
+      
+      x_epts_event = x_epts_event,
+      x_qpts_event = x_qpts_event,
+      x_qpts_rcens = x_qpts_rcens,
+      
+      x_int_epts_event = x_int_epts_event,
+      x_int_qpts_event = x_int_qpts_event,
+      x_int_qpts_rcens = x_int_qpts_rcens,
+      
+      
+      basis_epts_event = basis_epts_event,
+      basis_qpts_event = basis_qpts_event,
+      basis_qpts_rcens = basis_qpts_rcens,
+      
+      # link the interaction effect with the corresponding main effects
+      g1 = g1,
+      g2 = g2
+    )
     
-    stan_data = c(stan_data, list(
-      #--- for prediction ----
-      nnew = nrow(testing_dataset),
-      qevent_new = qevent_new,
-      t_new = testing_dataset$obstime,
-      x_new_qpts_event = x_new_qpts_event,
-      x_new_int_qpts_event = x_new_int_qpts_event,
-      basis_qpts_event_new = basis_new_qpts_event,
-      qwts_event_new = qwts_new_event,
-      x_new = X_new_main,
-      x_int_new = X_new_int
-    ))
+    #----------------------------
+    # Prepare data for saving log_lik
+    #-----------------------------
+    if (log_lik_saving == TRUE) {
+
+      t_all = training_dataset$obstime
+      qpts_all <- uapply(qp, unstandardise_qpts, 0, t_all)
+      
+      qwts_all <- uapply(qw, unstandardise_qwts, 0, t_all)
+      
+      basis_epts_all <- make_basis(t_all, basehaz)
+      basis_qpts_all <- make_basis(qpts_all, basehaz)
+      
+      
+      
+      # combined model frame, with quadrature
+      X_main_cpts_all <- rbind(X_main, X_main[rep(1:nrow(X_main), each = qnodes), ])
+      X_int_cpts_all <- rbind(X_int, X_int[rep(1:nrow(X_int), each = qnodes), ])
+      
+      
+      
+      # time-fixed predictor matrices, with quadrature
+      Nobs <- nrow(training_dataset)
+      x_epts_all <- X_main_cpts_all[1:Nobs, , drop = FALSE]
+      x_qpts_all <- X_main_cpts_all[Nobs:(Nobs * (qnodes + 1) - 1), , drop = FALSE]
+      
+      x_int_epts_all <- X_int_cpts_all[1:Nobs, , drop = FALSE]
+      x_int_qpts_all <- X_int_cpts_all[Nobs:(Nobs * (qnodes + 1) - 1), , drop = FALSE]
+      
+      
+      stan_data = c(
+        stan_data,
+        list(
+          Nobs = nrow(training_dataset),
+          Nobs_qnode = nrow(training_dataset) * 15,
+          status = training_dataset$status,
+          x_epts_all = x_epts_all,
+          x_int_epts_all = x_int_epts_all,
+          x_qpts_all = x_qpts_all,
+          x_int_qpts_all = x_int_qpts_all,
+          
+          basis_epts_all = basis_epts_all,
+          basis_qpts_all = basis_qpts_all,
+          qwts_all = qwts_all
+        )
+      )
+    }
+    
+    
+    #----------------------------
+    # Prepare data for prediction
+    #-----------------------------
+    
+    if (!is.null(testing_dataset)) {
+      nnew <- nrow(testing_dataset)
+      t_new <- testing_dataset$obstime
+      design__matrix_2 = testing_dataset[, !(names(testing_dataset) %in% c("id", "obstime", "status"))]
+      
+      column_names = colnames(design__matrix_2)
+      main_names =  column_names[!grepl(":", column_names) &
+                                   column_names != "(Intercept)"] #whether or not having intercept needs to be verified
+      X_new_main = design__matrix_2[, main_names]
+      
+      int_names =  column_names[grepl(":", column_names)]
+      X_new_int = design__matrix_2[, int_names]
+      
+      
+      #----------------------------
+      # prediction the survival probability
+      # for each participant at a specific
+      # time point
+      #-----------------------------
+      
+      # quadrature points, evaluated for each row of data
+      qpts_new_event <- uapply(qp, unstandardise_qpts, 0, t_new) #500 first node for all t_new, 500 second node for all t_new
+      
+      
+      # quadrature weights, evaluated for each row of data
+      qwts_new_event <- uapply(qw, unstandardise_qwts, 0, t_new)
+      
+      
+      
+      # number of quadrature points
+      qevent_new <- length(qwts_new_event)
+      
+      
+      #----- basis terms for baseline hazard
+      basis_new_qpts_event <- make_basis(qpts_new_event, basehaz) #500 first node for all t_new, 500 second node for all t_new
+      
+      
+      
+      #----- model frames for generating predictor matrices
+      
+      
+      # combined model frame, with quadrature
+      X_main_cpts_new <- rep_rows(X_new_main, times = qnodes) #X_main first for all t_new; X_main second for all t_new
+      X_int_cpts_new <- rep_rows(X_new_int, times = qnodes)
+      
+      
+      
+      # time-fixed predictor matrices, with quadrature
+      x_new_qpts_event <- X_main_cpts_new[, , drop = FALSE] #X_main first for all t_new; X_main second for all t_new
+      
+      x_new_int_qpts_event <- X_int_cpts_new[, , drop = FALSE]
+      
+      #----------------
+      # add data to Constructed data for prediction
+      #----------------
+      
+      stan_data = c(
+        stan_data,
+        list(
+          #--- for prediction ----
+          nnew = nrow(testing_dataset),
+          qevent_new = qevent_new,
+          t_new = testing_dataset$obstime,
+          x_new_qpts_event = x_new_qpts_event,
+          x_new_int_qpts_event = x_new_int_qpts_event,
+          basis_qpts_event_new = basis_new_qpts_event,
+          qwts_event_new = qwts_new_event,
+          x_new = X_new_main,
+          x_int_new = X_new_int
+        )
+      )
+    }
+  } else{
+    p <- dim(X_main)[2]
+    
+    t_event = training_dataset[training_dataset$status == 1, "obstime"]
+    t_rcens = training_dataset[training_dataset$status == 0, "obstime"]
+    
+    
+    
+    #----- baseline hazard
+    basehaz <- handle_basehaz_surv(
+      times          = training_dataset$obstime,
+      status         = training_dataset$status,
+      min_t          = 0,
+      max_t          = max(c(training_dataset$obstime, obs_window), na.rm = TRUE)
+    )
+    nvars <- basehaz$nvars # number of basehaz aux parameters
+    
+    
+    
+    # model uses quadrature
+    
+    # standardised nodes and weights for quadrature
+    qq <- get_quadpoints(nodes = qnodes)
+    qp <- qq$points
+    qw <- qq$weights
+    
+    # quadrature points, evaluated for each row of data
+    qpts_event <- uapply(qp, unstandardise_qpts, 0, t_event)
+    qpts_rcens <- uapply(qp, unstandardise_qpts, 0, t_rcens)
+    
+    
+    # quadrature weights, evaluated for each row of data
+    qwts_event <- uapply(qw, unstandardise_qwts, 0, t_event)
+    qwts_rcens <- uapply(qw, unstandardise_qwts, 0, t_rcens)
+    
+    
+    # times at events and all quadrature points
+    cpts_list <- list(t_event, qpts_event, qpts_rcens)
+    
+    idx_cpts <- get_idx_array(sapply(cpts_list, length))
+    # cpts     <- unlist(cpts_list) # as vector
+    
+    # number of quadrature points
+    qevent <- length(qwts_event)
+    qrcens <- length(qwts_rcens)
+    
+    
+    #----- basis terms for baseline hazard
+    
+    basis_epts_event <- make_basis(t_event, basehaz)
+    basis_qpts_event <- make_basis(qpts_event, basehaz)
+    basis_qpts_rcens <- make_basis(qpts_rcens, basehaz)
+    
+    
+    #----- model frames for generating predictor matrices
+    
+    id_event <- which(training_dataset$status == 1)
+    id_rcens <-  which(training_dataset$status == 0)
+    
+    # combined model frame, with quadrature
+    X_main_cpts <- rbind(X_main[id_event, ],
+                         rep_rows(X_main[id_event, ], times = qnodes),
+                         rep_rows(X_main[id_rcens, ], times = qnodes))
+    
+    
+    
+    # time-fixed predictor matrices, with quadrature
+    x_epts_event <- X_main_cpts[idx_cpts[1, 1]:idx_cpts[1, 2], , drop = FALSE]
+    x_qpts_event <- X_main_cpts[idx_cpts[2, 1]:idx_cpts[2, 2], , drop = FALSE]
+    x_qpts_rcens <- X_main_cpts[idx_cpts[3, 1]:idx_cpts[3, 2], , drop = FALSE]
+    
+    
+    
+    
+    #----------------
+    # Construct data
+    #----------------
+    stan_data = list(
+      p = p,
+      basis = basehaz$bs_basis,
+      #----- for model fitting --------
+      nvars = nvars,
+      
+      qnodes  = 15,
+      
+      
+      Nevent       = sum(training_dataset$status == 1),
+      Nrcens       = sum(training_dataset$status == 0),
+      
+      qevent = qevent,
+      qrcens = qrcens,
+      
+      
+      epts_event   = t_event,
+      qpts_event = qpts_event,
+      qpts_rcens = qpts_rcens,
+      
+      
+      qwts_event = qwts_event,
+      qwts_rcens = qwts_rcens,
+      
+      
+      x_epts_event = x_epts_event,
+      x_qpts_event = x_qpts_event,
+      x_qpts_rcens = x_qpts_rcens,
+      
+      
+      basis_epts_event = basis_epts_event,
+      basis_qpts_event = basis_qpts_event,
+      basis_qpts_rcens = basis_qpts_rcens
+    )
+    
+    #----------------------------
+    # Prepare data for saving log_lik
+    #-----------------------------
+    if (log_lik_saving == TRUE) {
+      
+      t_all = training_dataset$obstime
+      qpts_all <- uapply(qp, unstandardise_qpts, 0, t_all)
+      
+      qwts_all <- uapply(qw, unstandardise_qwts, 0, t_all)
+      
+      basis_epts_all <- make_basis(t_all, basehaz)
+      basis_qpts_all <- make_basis(qpts_all, basehaz)
+      
+      
+      
+      # combined model frame, with quadrature
+      X_main_cpts_all <- rbind(X_main, X_main[rep(1:nrow(X_main), each = qnodes), ])
+      
+      
+      # time-fixed predictor matrices, with quadrature
+      Nobs <- nrow(training_dataset)
+      x_epts_all <- X_main_cpts_all[1:Nobs, , drop = FALSE]
+      x_qpts_all <- X_main_cpts_all[Nobs:(Nobs * (qnodes + 1) - 1), , drop = FALSE]
+      
+      
+      stan_data = c(
+        stan_data,
+        list(
+          Nobs = nrow(training_dataset),
+          Nobs_qnode = nrow(training_dataset) * 15,
+          status = training_dataset$status,
+          x_epts_all = x_epts_all,
+          x_qpts_all = x_qpts_all,
+          
+          basis_epts_all = basis_epts_all,
+          basis_qpts_all = basis_qpts_all,
+          qwts_all = qwts_all
+        )
+      )
+    }
+    
+    
+    #----------------------------
+    # Prepare data for prediction
+    #-----------------------------
+    
+    if (!is.null(testing_dataset)) {
+      nnew <- nrow(testing_dataset)
+      t_new <- testing_dataset$obstime
+      design__matrix_2 = testing_dataset[, !(names(testing_dataset) %in% c("id", "obstime", "status"))]
+      
+      column_names = colnames(design__matrix_2)
+      main_names =  column_names[!grepl(":", column_names) &
+                                   column_names != "(Intercept)"] #whether or not having intercept needs to be verified
+      X_new_main = design__matrix_2[, main_names]
+      
+      
+      #----------------------------
+      # prediction the survival probability
+      # for each participant at a specific
+      # time point
+      #-----------------------------
+      
+      # quadrature points, evaluated for each row of data
+      qpts_new_event <- uapply(qp, unstandardise_qpts, 0, t_new) #500 first node for all t_new, 500 second node for all t_new
+      
+      
+      # quadrature weights, evaluated for each row of data
+      qwts_new_event <- uapply(qw, unstandardise_qwts, 0, t_new)
+      
+      
+      
+      # number of quadrature points
+      qevent_new <- length(qwts_new_event)
+      
+      
+      #----- basis terms for baseline hazard
+      basis_new_qpts_event <- make_basis(qpts_new_event, basehaz) #500 first node for all t_new, 500 second node for all t_new
+      
+      
+      
+      #----- model frames for generating predictor matrices
+      
+      
+      # combined model frame, with quadrature
+      X_main_cpts_new <- rep_rows(X_new_main, times = qnodes) #X_main first for all t_new; X_main second for all t_new
+      
+      
+      # time-fixed predictor matrices, with quadrature
+      x_new_qpts_event <- X_main_cpts_new[, , drop = FALSE] #X_main first for all t_new; X_main second for all t_new
+      
+      #----------------
+      # add data to Constructed data for prediction
+      #----------------
+      
+      stan_data = c(
+        stan_data,
+        list(
+          #--- for prediction ----
+          nnew = nrow(testing_dataset),
+          qevent_new = qevent_new,
+          t_new = testing_dataset$obstime,
+          x_new_qpts_event = x_new_qpts_event,
+          basis_qpts_event_new = basis_new_qpts_event,
+          qwts_event_new = qwts_new_event,
+          x_new = X_new_main
+          )
+      )
+    }
   }
-  
   return(stan_data)
   
 }  
