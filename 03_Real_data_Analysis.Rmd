@@ -99,8 +99,8 @@ Data_DBD_bSplines_noInt <- stan_data_Constructer_BSpline(
 bSplines_model_noInt <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_noInt, baseline_modelling = "bSplines", shrinkage = TRUE, withPrediction = FALSE, log_likSaving = TRUE, havingInt = FALSE)
 
 diagnostics_bSplines_model_noInt <- summary(bSplines_model_noInt)$summary[, c("Rhat", "n_eff")]
-cvl_bSplines_model_noInt <- cross_validated_log_likelihood (bSplines_model_noInt, nrow(DBD_bSplines_noInt))
-l_bSplines_model_noInt <- max_log_likelihood (bSplines_model_noInt, nrow(DBD_bSplines_noInt))
+cvl_bSplines_model_noInt <- cross_validated_log_likelihood (bSplines_model_noInt, nrow(strafied_Data_DBD))
+l_bSplines_model_noInt <- max_log_likelihood(bSplines_model_noInt, nrow(strafied_Data_DBD))
 
   
 strafied_Data_DBD_int <- includingInter(strafied_Data_DBD)
@@ -113,12 +113,13 @@ Data_DBD_bSplines_withInt <- stan_data_Constructer_BSpline(
 bSplines_model_withInt <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_withInt, baseline_modelling = "bSplines", shrinkage = TRUE, withPrediction = FALSE, log_likSaving = TRUE)
 
 diagnostics_bSplines_model_withInt <- summary(bSplines_model_withInt)$summary[, c("Rhat", "n_eff")]
-cvl_bSplines_model_withInt <- cross_validated_log_likelihood (bSplines_model_withInt, nrow(DBD_bSplines_noInt))
-l_bSplines_model_withInt <- max_log_likelihood (bSplines_model_withInt, nrow(DBD_bSplines_noInt))
+cvl_bSplines_model_withInt <- cross_validated_log_likelihood (bSplines_model_withInt, nrow(strafied_Data_DBD))
+l_bSplines_model_withInt <- max_log_likelihood (bSplines_model_withInt, nrow(strafied_Data_DBD))
 
 output_DBD <- c(cvl_bSplines_model_noInt, cvl_bSplines_model_withInt)
 names(output_DBD) <- ("bSplines_noInt, bSplines_withInt")
 output_DBD
+save.image(file = "./Data/real_test.RData")
 ```
 
 ## Step 1: EDA -have a look at the linear vs. non-linear relationship between variables and the survivial data
