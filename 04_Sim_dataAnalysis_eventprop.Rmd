@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 install_and_load <- function(packages) {
   for (pkg in packages) {
     if (!require(pkg, character.only = TRUE)) {
@@ -213,17 +213,17 @@ for (i in 1:replicate_times){
   Beta_est_bSplines_0.4[i, ] <- simulated_results[,i]$Beta_bSplines_0.4
   Beta_est_bSplines_0.9[i, ] <- simulated_results[,i]$Beta_bSplines_0.9
   
-  Beta_est_PL_0.1[i, ] <-  simulated_results[,i]$Beta_PL_0.1
-  Beta_est_PL_0.4[i, ] <-  simulated_results[,i]$Beta_PL_0.4
-  Beta_est_PL_0.9[i, ] <-  simulated_results[,i]$Beta_PL_0.9
+  Beta_est_PL_0.1[i, ] <-  simulated_results[,i]$Beta_PH_0.1
+  Beta_est_PL_0.4[i, ] <-  simulated_results[,i]$Beta_PH_0.4
+  Beta_est_PL_0.9[i, ] <-  simulated_results[,i]$Beta_PH_0.9
   
   # MSE
   MSEs_bSplines_0.1_[i, ] <- (simulated_results[,i]$Beta_bSplines_0.1 - Beta_true)**2
   MSEs_bSplines_0.4_[i, ] <- (simulated_results[,i]$Beta_bSplines_0.4 - Beta_true)**2
   MSEs_bSplines_0.9_[i, ] <- (simulated_results[,i]$Beta_bSplines_0.9 - Beta_true)**2
-  MSEs_PL_0.1_[i, ] <- (simulated_results[,i]$Beta_PL_0.1 - Beta_true)**2
-  MSEs_PL_0.4_[i, ] <- (simulated_results[,i]$Beta_PL_0.4 - Beta_true)**2
-  MSEs_PL_0.9_[i, ] <- (simulated_results[,i]$Beta_PL_0.9 - Beta_true)**2
+  MSEs_PL_0.1_[i, ] <- (simulated_results[,i]$Beta_PH_0.1 - Beta_true)**2
+  MSEs_PL_0.4_[i, ] <- (simulated_results[,i]$Beta_PH_0.4 - Beta_true)**2
+  MSEs_PL_0.9_[i, ] <- (simulated_results[,i]$Beta_PH_0.9 - Beta_true)**2
   
   # FDR (Type I error)
   variableSelection_reference <- simulated_results[, i]$Beta_true != 0
@@ -232,9 +232,9 @@ for (i in 1:replicate_times){
   Selection_bSplines_0.4 <- simulated_results[,i]$varSel_bSplines_0.4
   Selection_bSplines_0.9 <- simulated_results[,i]$varSel_bSplines_0.9
 
-  Selection_PL_0.1 <- simulated_results[,i]$varSel_PL_0.1
-  Selection_PL_0.4 <- simulated_results[,i]$varSel_PL_0.4
-  Selection_PL_0.9 <- simulated_results[,i]$varSel_PL_0.9
+  Selection_PL_0.1 <- simulated_results[,i]$varSel_PH_0.1
+  Selection_PL_0.4 <- simulated_results[,i]$varSel_PH_0.4
+  Selection_PL_0.9 <- simulated_results[,i]$varSel_PH_0.9
   
 
   FDR_bSplines_0.1[i] <- sum(Selection_bSplines_0.1 & !variableSelection_reference) / sum(Selection_bSplines_0.1)
@@ -287,7 +287,7 @@ fill_vector = (Beta_true != 0)
 par(mfrow = c(3, 2))
 
 # Subfigure 1: Bias
-plot(Bias_bSplines_0.1, type = "o", col = "#641e16", xlab = "Betas", ylab = "Bias", main = "Bias for Beta estimation", pch = 16, ylim = c(0, 0.4))
+plot(Bias_bSplines_0.1, type = "o", col = "#641e16", xlab = "Betas", ylab = "Bias", main = "Bias for Beta estimation", pch = 16, ylim = c(-0.35, 0.35))
 
 # Add background rectangles
 for (i in 1:length(Beta_true)) {
@@ -309,7 +309,7 @@ abline(v = 10, col = "red", lty = 2)
 legend("top", legend = c("bSplines_0.1", "bSplines_0.4", "bSplines_0.9", "PL_0.1", "PL_0.4", "PL_0.9"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), pch = 16, lty = 1,  horiz = TRUE) # Add legend
 
 # Subfigure 2: Variance
-plot(Variance_bSplines_0.1, type = "o", col = "#641e16", xlab = "Betas", ylab = "Variance", ylim = c(0, 0.8), main = "Variance for Beta estimation", pch = 16,  horiz = TRUE)
+plot(Variance_bSplines_0.1, type = "o", col = "#641e16", xlab = "Betas", ylab = "Variance", ylim = c(0, 0.65), main = "Variance for Beta estimation", pch = 16,  horiz = TRUE)
 
 # Add background rectangles
 for (i in 1:length(Beta_true)) {
@@ -331,7 +331,7 @@ abline(h = 0, col = "red", lty = 2)
 legend("top", legend = c("bSplines_0.1", "bSplines_0.4", "bSplines_0.9", "PL_0.1", "PL_0.4", "PL_0.9"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), pch = 16, lty = 1, horiz = TRUE) # Add legend
 
 # Subfigure 3: MSE
-plot(rMSEs_bSplines_0.1, type = "o", col = "#641e16", xlab = "Betas", ylab = "rMSE", ylim = c(0, 1.2), main = "rMSE for Beta estimation", pch = 16)
+plot(rMSEs_bSplines_0.1, type = "o", col = "#641e16", xlab = "Betas", ylab = "rMSE", ylim = c(0, 0.9), main = "rMSE for Beta estimation", pch = 16)
 
 # Add background rectangles
 for (i in 1:length(Beta_true)) {
