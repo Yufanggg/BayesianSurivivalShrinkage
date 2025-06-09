@@ -112,6 +112,7 @@ diagnostics_bSplines_model_noInt <- summary(bSplines_model_noInt)$summary[, c("R
 cvl_bSplines_model_noInt <- cross_validated_log_likelihood (bSplines_model_noInt, nrow(strafied_Data_DBD_int))
 l_bSplines_model_noInt <- max_log_likelihood (bSplines_model_noInt, nrow(strafied_Data_DBD_int))
 
+
   
 strafied_Data_DBD_int <- includingInter(strafied_Data_DBD)
 Data_DBD_bSplines_withInt <- stan_data_Constructer_BSpline(
@@ -123,6 +124,7 @@ Data_DBD_bSplines_withInt <- stan_data_Constructer_BSpline(
 bSplines_model_withInt <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_withInt, baseline_modelling = "bSplines", shrinkage = TRUE, withPrediction = FALSE, log_likSaving = TRUE)
 
 diagnostics_bSplines_model_withInt <- summary(bSplines_model_withInt)$summary[, c("Rhat", "n_eff")]
+
 cvl_bSplines_model_withInt <- cross_validated_log_likelihood (bSplines_model_withInt, nrow(strafied_Data_DBD_int))
 l_bSplines_model_withInt <- max_log_likelihood (bSplines_model_withInt, nrow(strafied_Data_DBD_int))
 
