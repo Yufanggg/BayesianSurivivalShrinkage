@@ -39,10 +39,6 @@ data {
 parameters {
   vector[p] Beta; // coefficients for design matrix;
   vector[q] Beta_int;
-  
-  real<lower=0.01, upper=1> tau2int;
-  real<lower=0>  tau2[p];
-  real<lower=0>  gam2[p];
   }
 
 model {

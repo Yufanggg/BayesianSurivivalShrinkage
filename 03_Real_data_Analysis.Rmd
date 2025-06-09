@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 source("./function_file/stan_constructor.R")
 
@@ -23,7 +23,7 @@ install_and_load <- function(packages) {
 }
 
 # List of required packages
-required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret", "corrplot","ggplot2", "loo")
+required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret", "corrplot","ggplot2", "loo", "survival")
 # Install and/or load packages
 install_and_load(required_packages)
 ```
@@ -45,15 +45,25 @@ real_df <- readRDS("./Data/imputed_NOTR_DGF.rds")
 # str(real_df)
 real_df <- real_df[, !names(real_df) %in% "ID"]
 
-# get a general idea about the dataset
-# for (i in 1:ncol(real_df)) { 
-#   if (is.factor(real_df[[i]])) {
-#     print(names(real_df)[i])
-#     print(length(unique(real_df[[i]])))
-#     }
-# }
-factorName <- sapply(real_df, is.factor)
-factorName["status"] <- FALSE
+# set the factor variable being sum-to-zero encoded
+contrasts(real_df$Recipientsex) <- contr.sum(levels(real_df$Recipientsex))
+contrasts(real_df$Donorsex) <- contr.sum(levels(real_df$Donorsex))
+contrasts(real_df$Smoking) <- contr.sum(levels(real_df$Smoking))
+contrasts(real_df$InitialPrimaryDiseaseET_regroup) <- contr.sum(levels(real_df$InitialPrimaryDiseaseET_regroup))
+contrasts(real_df$Donorcauseofdeath_group) <- contr.sum(levels(real_df$Donorcauseofdeath_group))
+
+
+# center the numeric variables
+real_df$Recipientage <- (real_df$Recipientage - mean(real_df$Recipientage))/sd(real_df$Recipientage)
+real_df$Dialysisdaysrenine <- (real_df$Dialysisdaysrenine - mean(real_df$Dialysisdaysrenine))/sd(real_df$Dialysisdaysrenine)
+real_df$Donorage <- (real_df$Donorage - mean(real_df$Donorage))/sd(real_df$Donorage)
+real_df$Lastcreatininemgdl <- (real_df$Lastcreatininemgdl - mean(real_df$Lastcreatininemgdl))/sd(real_df$Lastcreatininemgdl)
+real_df$Warm_ischaemic_period_1 <- (real_df$Warm_ischaemic_period_1 - mean(real_df$Warm_ischaemic_period_1))/sd(real_df$Warm_ischaemic_period_1)
+real_df$Cold_ischaemic_period <- (real_df$Cold_ischaemic_period - mean(real_df$Cold_ischaemic_period))/sd(real_df$Cold_ischaemic_period)
+real_df$HLA_mismatch <- (real_df$HLA_mismatch - mean(real_df$HLA_mismatch))/sd(real_df$HLA_mismatch)
+real_df$DonorBMI <- (real_df$DonorBMI - mean(real_df$DonorBMI))/sd(real_df$DonorBMI)
+real_df$Recipient_BMI <- (real_df$Recipient_BMI - mean(real_df$Recipient_BMI))/sd(real_df$Recipient_BMI)
+#
 
 # print(colnames(real_df)[factorName])
 
@@ -99,8 +109,8 @@ Data_DBD_bSplines_noInt <- stan_data_Constructer_BSpline(
 bSplines_model_noInt <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_noInt, baseline_modelling = "bSplines", shrinkage = TRUE, withPrediction = FALSE, log_likSaving = TRUE, havingInt = FALSE)
 
 diagnostics_bSplines_model_noInt <- summary(bSplines_model_noInt)$summary[, c("Rhat", "n_eff")]
-cvl_bSplines_model_noInt <- cross_validated_log_likelihood (bSplines_model_noInt, nrow(DBD_bSplines_noInt))
-l_bSplines_model_noInt <- max_log_likelihood (bSplines_model_noInt, nrow(DBD_bSplines_noInt))
+cvl_bSplines_model_noInt <- cross_validated_log_likelihood (bSplines_model_noInt, nrow(strafied_Data_DBD_int))
+l_bSplines_model_noInt <- max_log_likelihood (bSplines_model_noInt, nrow(strafied_Data_DBD_int))
 
   
 strafied_Data_DBD_int <- includingInter(strafied_Data_DBD)
@@ -113,84 +123,56 @@ Data_DBD_bSplines_withInt <- stan_data_Constructer_BSpline(
 bSplines_model_withInt <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_withInt, baseline_modelling = "bSplines", shrinkage = TRUE, withPrediction = FALSE, log_likSaving = TRUE)
 
 diagnostics_bSplines_model_withInt <- summary(bSplines_model_withInt)$summary[, c("Rhat", "n_eff")]
-cvl_bSplines_model_withInt <- cross_validated_log_likelihood (bSplines_model_withInt, nrow(DBD_bSplines_noInt))
-l_bSplines_model_withInt <- max_log_likelihood (bSplines_model_withInt, nrow(DBD_bSplines_noInt))
+cvl_bSplines_model_withInt <- cross_validated_log_likelihood (bSplines_model_withInt, nrow(strafied_Data_DBD_int))
+l_bSplines_model_withInt <- max_log_likelihood (bSplines_model_withInt, nrow(strafied_Data_DBD_int))
 
-output_DBD <- c(cvl_bSplines_model_noInt, cvl_bSplines_model_withInt)
-names(output_DBD) <- ("bSplines_noInt, bSplines_withInt")
+output_DBD <- c(cvl_bSplines_model_noInt, cvl_bSplines_model_withInt, l_bSplines_model_noInt, l_bSplines_model_withInt, l_bSplines_model_noInt - cvl_bSplines_model_noInt, l_bSplines_model_withInt - cvl_bSplines_model_withInt)
+names(output_DBD) <- c("cvl_bSplines_noInt", "cvl_bSplines_withInt", "l_bSplines_noInt", "l_bSplines_withInt", "d_bSplines_noInt", "d_bSplines_withInt")
 output_DBD
-```
 
-## Step 1: EDA -have a look at the linear vs. non-linear relationship between variables and the survivial data
-```{r, echo=TRUE}
 
-```
-## Step 2: estimate the Betas for DBD
-```{r, echo=TRUE}
-obs_window = 3415 #max(df_using$time_tx_date_max2)
-stan_data_bSpline_DBD <- stan_data_Constructer_BSpline(
-      training_dataset = strafied_Data_DBD_int,
-      testing_dataset = NULL,
-      obs_window = 3415
-    )
+model_result_bSplines_withInt <- Bayesian_Survival_result_Extract(bayesian_model_fit = bSplines_model_withInt, model_type = "bSplines", criteria = c("DesignCoefficients", "variableSelection"))
+beta_bSplines_withInt = model_result_bSplines_withInt$Beta_bayesian_est[, "mean"]
+variableSelection_DBD_bSplines_model_withInt = model_result_bSplines_withInt$variableSelection
 
-stan_data_PH_DBD <- stan_data_Constructer_PH(
+stan_data_PL_DBD <- stan_data_Constructer_PL(
       training_dataset = strafied_Data_DBD_int,
       testing_dataset = NULL
     )
+model_fit_PL_DBD <- Bayesian_Survival_model(stan_data = stan_data_PL_DBD, baseline_modelling = "none", withPrediction = FALSE, shrinkage = TRUE)
 
-model_fit_bSpline_DBD <- Bayesian_Survival_model(stan_data = stan_data_bSpline_DBD, baseline_modelling = "bSplines", withPrediction = FALSE, shrinkage = TRUE)
-
-model_fit_PH_DBD <- Bayesian_Survival_model(stan_data = stan_data_PH_DBD, baseline_modelling = "none", withPrediction = FALSE, shrinkage = TRUE)
-
-#model diagnotics
-diagnostics_bSpline_DBD <- summary(model_fit_bSpline_DBD)$summary[, c("Rhat", "n_eff")]
-
-diagnostics_PH_DBD <- summary(model_fit_PH_DBD)$summary[, c("Rhat", "n_eff")]
-print(diagnostics_bSpline_DBD)
-print(diagnostics_PH_DBD)
+diagnostics_PL_DBD <- summary(model_fit_PL_DBD)$summary[, c("Rhat", "n_eff")]
+print(diagnostics_PL_DBD)
 
 #extract the info from the bayesian model fit
-model_result_bSpline_DBD <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSpline_DBD, model_type = "none", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
+model_result_PL_DBD <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_PL_DBD, model_type = "none", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
+beta_DBD_PL = model_result_PL_DBD$Beta_bayesian_est[, "mean"]
+variableSelection_DBD_PL = model_result_PL_DBD$variableSelection
 
-model_result_PH_DBD <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_PH_DBD, model_type = "none", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
-
-mean_beta_DBD = model_result_bSpline_DBD$Beta_bayesian_est[, "mean"]
-variableSelection_DBD = model_result_bSpline_DBD$variableSelection
-
-mean_beta_DBD_PH = model_result_PH_DBD$Beta_bayesian_est[, "mean"]
-variableSelection_DBD_PH = model_result_PH_DBD$variableSelection
-
-#cross_val_metric_DBD <- cross_validation(whole_dataset = strafied_Data_DBD_int, baseline_modelling = "bSplines", num_folds = 5, obs_window = 3415)
 save.image(file = "./Data/03_results_DBD.RData")
 ```
 
-### STEP 3: visualize the results for DBD
+## STEP 5: Visulize the beta estimation
 ```{r, echo=TRUE}
-load(file = "./Data/03_results_DBD.RData")
-results_DBD_df <- data.frame(variableName = colnames(strafied_Data_DBD_int)[!(colnames(strafied_Data_DBD_int) %in% c("id", "status", "obstime"))],
-                             beta_int = mean_beta_DBD, 
-                             variableSelection = variableSelection_DBD[,1])
+save.image(file = "./Data/03_results_DBD.RData")
+plot(beta_bSplines_withInt, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Beta", main = "Beta estimation", pch = 16, ylim = c(-10, 10))
+# Add background rectangles
+for (i in 1:length(variableSelection_DBD_bSplines_model_withInt)) {
+  if (variableSelection_DBD_bSplines_model_withInt[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
 
-# visualized result
-ggplot(results_DBD_df, aes(x = variableName, y = beta_int, color = variableSelection, shape = variableSelection)) + 
-  geom_line() + 
-  geom_point(size = 3) + 
-  theme_minimal() + 
-  labs(title = "Estimated Beta", x = "", y = "Estimated Beta") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+for (i in 1:length(variableSelection_DBD_PL)) {
+  if (variableSelection_DBD_PL[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
+  }
+}
 
-
-# # Add background rectangles
-# for (i in 1:length(results_DBD_df$variableSelection)) {
-#   if (fill_vector[i]) {
-#     rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
-#   }
-# }
+lines(beta_bSplines_withInt, type = "o", col = "blue", pch = 16)
+lines(beta_DBD_PL, type = "o", col = "green", pch = 16)
+legend("top", legend = c("beta_bSplines_withInt", "beta_DBD_PL"), col = c("blue", "green"), pch = 16, lty = 1, horiz = TRUE) 
 ```
-
-## STEP 2: prediction 
-
 # Section 2: Data analysis for DCD
 ## STEP 1: estimate the Betas for DCD
 ```{r, echo=TRUE}

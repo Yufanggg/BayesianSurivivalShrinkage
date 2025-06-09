@@ -350,13 +350,6 @@ boxplot(FDR_list, names = c("bSplines_200", "bSplines_600", "bSplines_1000", "PL
 
 # Subfigure 5 Type II error
 # Create side-by-side boxplots for FDR
- FNR_bSplines_200[i] = sum(!Selection_bSplines_200 & variableSelection_reference) /sum(variableSelection_reference)
-  FNR_bSplines_200[i] = sum(!Selection_bSplines_600 & variableSelection_reference)/sum(variableSelection_reference)
-  FNR_bSplines_1000[i] = sum(!Selection_bSplines_1000 & variableSelection_reference)/sum(variableSelection_reference)
-  FNR_PL_200[i] = sum(!Selection_PL_200 & variableSelection_reference)/sum(variableSelection_reference)
-  FNR_PL_600[i] = sum(!Selection_PL_600 & variableSelection_reference)/sum(variableSelection_reference)
-  FNR_PL_1000[i] = sum(!Selection_PL_1000 & variableSelection_reference)/sum(variableSelection_reference)
-  
 Power_list = list(bSplines_200 = 1 - FNR_bSplines_200, bSplines_600 = 1 - FNR_bSplines_600, bSplines_1000 = 1 - FNR_bSplines_1000, 
                          PL_200 = 1 - FNR_PL_200, PL_600 = 1 - FNR_PL_600, PL_1000 = 1 - FNR_PL_1000)
 boxplot(Power_list, names = c("bSplines_200", "bSplines_600", "bSplines_1000", "PL_200", "PL_600", "PL_1000"), col = c("#641e16", "#c0392b", "#f2d7d5", "#145a32", "#229954", "#a2d9ce"), main = "Proportional of Selected variables", xlab = "", ylab = "Power", ylim = c(0, 1))
