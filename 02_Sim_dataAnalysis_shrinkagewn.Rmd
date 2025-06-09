@@ -78,11 +78,11 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   )
     
   #fit model
-  model_fit_bSplines_withShrinkage <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_modelling = "bSplines", shrinkage = TRUE)
-  model_fit_bSplines_noShrinkage <- Bayesian_Survival_model(stan_data = stan_data_bSplines, baseline_modelling = "bSplines", shrinkage = FALSE)
+  model_fit_bSplines_withShrinkage <- Bayesian_Survival_model(stan_data = stan_data_bSplines, withPrediction = TRUE, baseline_modelling = "bSplines", shrinkage = TRUE)
+  model_fit_bSplines_noShrinkage <- Bayesian_Survival_model(stan_data = stan_data_bSplines, withPrediction = TRUE, baseline_modelling = "bSplines", shrinkage = FALSE)
 
-  model_fit_PL_withShrinkage <- Bayesian_Survival_model(stan_data = stan_data_PL, baseline_modelling = "none", shrinkage = TRUE)
-  model_fit_PL_noShrinkage <- Bayesian_Survival_model(stan_data = stan_data_PL, baseline_modelling = "none", shrinkage = FALSE)
+  model_fit_PL_withShrinkage <- Bayesian_Survival_model(stan_data = stan_data_PL, withPrediction = TRUE, baseline_modelling = "none", shrinkage = TRUE)
+  model_fit_PL_noShrinkage <- Bayesian_Survival_model(stan_data = stan_data_PL, withPrediction = TRUE,  baseline_modelling = "none", shrinkage = FALSE)
   
   #collect diagnostics
   output$diagnostics_bSplines_withShrinkage <- summary(model_fit_bSplines_withShrinkage)$summary[, c("Rhat", "n_eff")]
