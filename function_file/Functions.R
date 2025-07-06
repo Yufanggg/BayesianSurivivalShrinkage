@@ -521,27 +521,27 @@ includingInter <- function(dataframe_) {
   factor_vars <- c("Recipientsex", "Donorsex", "Smoking", "InitialOnmachineindicator", "status", "InitialPrimaryDiseaseET_regroup", "Donorcauseofdeath_group")#colnames(dataframe_)[factor_var]
   # print(factor_vars)
   
-  exclude_terms <- sapply(interaction_terms, function(term) {
-    terms_ <- unlist(strsplit(term, ":"))
-    Con1 <- any(agrepl(terms_[1], factor_vars))
-    Con2 <- any(agrepl(terms_[2], factor_vars))
-    if ((Con2 | Con1)){
-      Con1 = agrepl(terms_[1], "InitialPrimaryDiseaseET_regroup")
-      Con2 = agrepl(terms_[2], "InitialPrimaryDiseaseET_regroup")
-      
-      return(any(Con1, Con2))
-      # print(terms_[2])
-      # print(Con2)
-    }
-    # print(term)
-    # print(all(Con1, Con2))
-    return(all(Con1, Con2))
-  })
-  
-  # print(exclude_terms)
-  exclude_columns <- interaction_terms[exclude_terms]
-  selected_columns <- setdiff(all_terms, exclude_columns)
-  interaction_df <- subset(interaction_df, select = selected_columns)
+  # exclude_terms <- sapply(interaction_terms, function(term) {
+  #   terms_ <- unlist(strsplit(term, ":"))
+  #   Con1 <- any(agrepl(terms_[1], factor_vars))
+  #   Con2 <- any(agrepl(terms_[2], factor_vars))
+  #   if ((Con2 | Con1)){
+  #     Con1 = agrepl(terms_[1], "InitialPrimaryDiseaseET_regroup")
+  #     Con2 = agrepl(terms_[2], "InitialPrimaryDiseaseET_regroup")
+  #     
+  #     return(any(Con1, Con2))
+  #     # print(terms_[2])
+  #     # print(Con2)
+  #   }
+  #   # print(term)
+  #   # print(all(Con1, Con2))
+  #   return(all(Con1, Con2))
+  # })
+  # 
+  # # print(exclude_terms)
+  # exclude_columns <- interaction_terms[exclude_terms]
+  # selected_columns <- setdiff(all_terms, exclude_columns)
+  # interaction_df <- subset(interaction_df, select = selected_columns)
   interaction_df$id = 1:nrow(dataframe_)#dataframe_$ID
   interaction_df$status = ifelse(dataframe_$status == "graftloss", 1, 0)
   interaction_df$obstime = dataframe_$time
