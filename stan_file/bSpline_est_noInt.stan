@@ -19,7 +19,6 @@ functions{
   * @return A vector
   */
   vector bspline_log_haz(vector eta, matrix bSpline_basis, vector coefs) {
-
     return bSpline_basis * coefs + eta;
   }
   
@@ -45,6 +44,10 @@ data {
   // dimensions
   int<lower=0> p;          // num. cols in main effects (time-fixed)
   
+  
+/*  int<lower=0> nevent;     // num. rows w/ an event (ie. not censored)
+  int<lower=0> nrcens;     // num. rows w/ right censoring*/
+  
   int<lower=0> Nevent;     // num. rows w/ an event;      used only w/ quadrature
   int<lower=0> Nrcens;     // num. rows w/ right cens;    used only w/ quadrature
 
@@ -53,6 +56,12 @@ data {
   int<lower=0> qrcens;     // num. quadrature points for rows w/ right censoring
 
   int<lower=0> nvars;      // num. aux parameters for baseline hazard
+
+
+
+  // response and time variables
+/*  vector[nevent] t_event;  // time of events
+  vector[nrcens] t_rcens;  // time of right censoring*/
 
 
   vector[Nevent] epts_event;  // time of events
@@ -65,8 +74,8 @@ data {
   matrix[Nevent,p] x_epts_event; // for rows with events
   
   matrix[qevent,p] x_qpts_event; // for rows with events
+  
   matrix[qrcens,p] x_qpts_rcens; // for rows with right censoring
-
 
 
   // basis matrices for B-splines, with quadrature
@@ -79,20 +88,6 @@ data {
   // GK quadrature weights, with (b-a)/2 scaling already incorporated
   vector[qevent] qwts_event;
   vector[qrcens] qwts_rcens;
-  
-  
-  // for log_lik
-  int<lower=0> Nobs;
-  matrix[Nobs, p] x_epts_all;
-  
-  int<lower=0> Nobs_qnode;
-  matrix[Nobs_qnode, p] x_qpts_all;
-  vector[Nobs] status;
-  
-  matrix[Nobs,nvars] basis_epts_all; 
-  matrix[Nobs_qnode,nvars] basis_qpts_all;
-  vector[Nobs_qnode] qwts_all;
-  
 
 }
 
@@ -112,11 +107,13 @@ model {
   vector[Nevent] eta_epts_event; // for event times
   vector[qevent] eta_qpts_event; // for qpts for event time
   vector[qrcens] eta_qpts_rcens; // for qpts for right censoring time
+
   
   //log-scale hazard models
   vector[Nevent] lhaz_epts_event;
   vector[qevent] lhaz_qpts_event;
   vector[qrcens] lhaz_qpts_rcens;
+  
   
   //Prior
   coefs ~ normal(0, 100);
@@ -128,6 +125,8 @@ model {
   for (i in 1:p){
     Beta[i] ~ normal(0, sqrt(tau2[i]));
     }
+
+  
   
   //log-likelihood, represented by [target]
   if (Nevent > 0) {
@@ -142,41 +141,12 @@ model {
     target +=  quadrature_log_surv(qwts_event, lhaz_qpts_event); // log(f(t)) = -H(t) + log(h(t))for uncensored data
   }
   
+  
   if (qrcens > 0) {
     eta_qpts_rcens = x_qpts_rcens * Beta;
     lhaz_qpts_rcens = bspline_log_haz(eta_qpts_rcens, basis_qpts_rcens, coefs);
     target +=  quadrature_log_surv(qwts_rcens, lhaz_qpts_rcens); // log(S(t)) = - H(t)for right censored data
     }
-
-}
-
-// save the log_lik explicitly
-generated quantities{
-  vector[Nobs] log_lik;
-
-  for (n in 1: Nobs){
-    if (status[n] == 1){
-      real eta_epts_current_real = x_epts_all[n, ] * Beta;
-      vector[1] eta_epts_current;
-      eta_epts_current[1] = eta_epts_current_real;
-      
-      matrix[1, nvars] basis_epts_current;
-      basis_epts_current[1] = basis_epts_all[n, ];
-      vector[1] lhaz_epts_current = bspline_log_haz(eta_epts_current, basis_epts_current, coefs);
-
-
-      vector[15] eta_qpts_current = x_qpts_all[n: (n+15-1), ] * Beta;
-      vector[15] lhaz_qpts_current = bspline_log_haz(eta_qpts_current, basis_qpts_all[n: (n+15-1), ], coefs);
-
-      log_lik[n] =  quadrature_log_surv(qwts_all[n: (n+15-1) ] , lhaz_qpts_current); // log(f(t)) = -H(t) + log(h(t))for uncensored data
-    }
-    else {
-      vector[15] eta_qpts_current_ = x_qpts_all[n: (n+15-1), ] * Beta;
-      vector[15] lhaz_qpts_current_ = bspline_log_haz(eta_qpts_current_, basis_qpts_all[n: (n+15-1), ], coefs);
-
-      log_lik[n] =  quadrature_log_surv(qwts_all[n: (n+15-1)] , lhaz_qpts_current_); // log(S(t)) = - H(t)for right censored data
-    }
-  }
 
 }
 

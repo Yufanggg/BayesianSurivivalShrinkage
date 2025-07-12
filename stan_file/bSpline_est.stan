@@ -150,7 +150,7 @@ model {
     }
     
   if (qevent > 0){
-    eta_qpts_event = x_qpts_event * Beta + x_int_qpts_event * Beta_int;;
+    eta_qpts_event = x_qpts_event * Beta + x_int_qpts_event * Beta_int;
     lhaz_qpts_event = bspline_log_haz(eta_qpts_event, basis_qpts_event, coefs);
     target +=  quadrature_log_surv(qwts_event, lhaz_qpts_event); // log(f(t)) = -H(t) + log(h(t))for uncensored data
   }

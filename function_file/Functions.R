@@ -74,13 +74,23 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
         }
         
       } else {
-        bayesian_model <- rstan::stan_model("./stan_file/bSpline_est.stan")
+        if (havingInt == TRUE){
+          bayesian_model <- rstan::stan_model("./stan_file/bSpline_est.stan")
+        } else {
+          bayesian_model <- rstan::stan_model("./stan_file/bSpline_est_noInt.stan")
+        }
+        
       }
     }
     
     else if (baseline_modelling == "none"){
       message("we used the partical likelihood to estimate the cofficients of covariates")
-      bayesian_model <- rstan::stan_model("./stan_file/PH_est.stan")
+      if (havingInt == TRUE){
+        bayesian_model <- rstan::stan_model("./stan_file/PH_est.stan")
+      } else {
+        bayesian_model <- rstan::stan_model("./stan_file/PH_est_noInt.stan")
+      }
+      
     }
     
   } else {

@@ -109,17 +109,9 @@ model {
       }
 }
 
-// save the log_lik explicitly
+// save log_lik explicitly
 generated quantities{
-  vector [N] log_lik;
-  eta = x * Beta + x_int * Beta_int;
-  
-  for (n in 1:nobs){
-    if (status[n] == 1){
-      exp_eta[n] = exp(X[n] * Beta + X_int[n] * Beta_int);
-      log_lik[n] = exp_eta[n] - exp()
-    } else {
-      log_lik[n] = 1
-    }
-  }
+  vector(nobs) part_log_lik;
+  if ()
 }
+

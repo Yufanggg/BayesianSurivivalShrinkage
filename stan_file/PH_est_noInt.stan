@@ -18,24 +18,15 @@ data {
   
   // predictor matrices (time-fixed)
   int<lower=0> p; // num main effect
-  int<lower=0> q; // num interaction effect
+
   
   matrix[nobs,p] x; // for rows with both events and cencored
-  matrix[nobs,q] x_int; 
-  
-  
-  
-  // link the interaction effect with the corresponding main effects
-  int g1[q];
-  int g2[q];
   
 }
 
 parameters {
   vector[p] Beta; // coefficients for design matrix;
-  vector[q] Beta_int;
-  
-  real<lower=0.01, upper=1> tau2int;
+
   real<lower=0>  tau2[p];
   real<lower=0>  gam2[p];
   }
@@ -48,8 +39,6 @@ model {
 
 
     // prior
-    tau2int ~ uniform(0.01,1);
-    
     for (k in 1:p){
       gam2[k] ~ inv_gamma(0.5, 1);
       tau2[k] ~ inv_gamma(0.5, 1/gam2[k]);
@@ -58,14 +47,10 @@ model {
     for (i in 1:p){
       Beta[i] ~ normal(0, sqrt(tau2[i]));
       }
-    
-    for (i in 1:q){
-      Beta_int[i] ~ normal(0, sqrt(sqrt(tau2[g1[i]]*tau2[g2[i]])*tau2int));
-      }
       
       // Partial log-likelihood contribution
       if (nobs > 0) {
-        eta = x * Beta + x_int * Beta_int;
+        eta = x * Beta;
         }
 
     
@@ -107,19 +92,4 @@ model {
       
       target += numerator - sum(diff);
       }
-}
-
-// save the log_lik explicitly
-generated quantities{
-  vector [N] log_lik;
-  eta = x * Beta + x_int * Beta_int;
-  
-  for (n in 1:nobs){
-    if (status[n] == 1){
-      exp_eta[n] = exp(X[n] * Beta + X_int[n] * Beta_int);
-      log_lik[n] = exp_eta[n] - exp()
-    } else {
-      log_lik[n] = 1
-    }
-  }
 }

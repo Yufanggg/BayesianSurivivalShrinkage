@@ -1,6 +1,6 @@
 # assumptions: all data are right censored data with the observed window being [0, obs_window]
 # Construct stan data structure for baseline hazard of exponential and weibull.
-stan_data_Constructer_PL <- function (training_dataset, testing_dataset = NULL){
+stan_data_Constructer_PL <- function (training_dataset, testing_dataset = NULL, havingInt = FALSE){
   
   #----------------------------
   # Prepare data for model fitting
@@ -47,22 +47,34 @@ stan_data_Constructer_PL <- function (training_dataset, testing_dataset = NULL){
   #----------------
   # Construct data
   #----------------
-  stan_data = list(
-    #----- for model fitting --------
-    nobs = nrow(Sorted_training_dataset),
-    first_indices_events = first_indices_events,
-    last_indices_events = last_indices_events,
-    unique_nevent = length(unique_event_times),
-    p = p,
-    q = q,
-    
-    x = X_main,
-    x_int =  X_int,
-    
-    # link the interaction effect with the corresponding main effects
-    g1 = g1,
-    g2 = g2
-  )
+  if (havingInt == TRUE){
+    stan_data = list(
+      #----- for model fitting --------
+      nobs = nrow(Sorted_training_dataset),
+      first_indices_events = first_indices_events,
+      last_indices_events = last_indices_events,
+      unique_nevent = length(unique_event_times),
+      p = p,
+      q = q,
+      
+      x = X_main,
+      x_int =  X_int,
+      
+      # link the interaction effect with the corresponding main effects
+      g1 = g1,
+      g2 = g2
+    )
+  } else {
+    stan_data = list(
+      #----- for model fitting --------
+      nobs = nrow(Sorted_training_dataset),
+      first_indices_events = first_indices_events,
+      last_indices_events = last_indices_events,
+      unique_nevent = length(unique_event_times),
+      p = p,
+      x = X_main
+    )
+  }
   
   
   
