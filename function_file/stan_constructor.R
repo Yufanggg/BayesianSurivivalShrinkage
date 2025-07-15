@@ -981,7 +981,7 @@ get_quadpoints <- function(nodes = 15) {
   if (!is.numeric(nodes) || (length(nodes) > 1L)) {
     stop("'qnodes' should be a numeric vector of length 1.")
   } else {
-    message("we set the number of nodes being 15.")
+    message("we set the number of nodes for GK quadrature method being 15.")
     list(
       points = c(
         -0.991455371120812639207,

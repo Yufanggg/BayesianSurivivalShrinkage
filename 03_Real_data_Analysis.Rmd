@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 source("./function_file/stan_constructor.R")
 
@@ -54,22 +54,28 @@ contrasts(real_df$Donorcauseofdeath_group) <- contr.sum(levels(real_df$Donorcaus
 
 
 # center the numeric variables
-real_df$Recipientage <- (real_df$Recipientage - mean(real_df$Recipientage))/sd(real_df$Recipientage)
-real_df$Dialysisdaysrenine <- (real_df$Dialysisdaysrenine - mean(real_df$Dialysisdaysrenine))/sd(real_df$Dialysisdaysrenine)
-real_df$Donorage <- (real_df$Donorage - mean(real_df$Donorage))/sd(real_df$Donorage)
-real_df$Lastcreatininemgdl <- (real_df$Lastcreatininemgdl - mean(real_df$Lastcreatininemgdl))/sd(real_df$Lastcreatininemgdl)
-real_df$Warm_ischaemic_period_1 <- (real_df$Warm_ischaemic_period_1 - mean(real_df$Warm_ischaemic_period_1))/sd(real_df$Warm_ischaemic_period_1)
-real_df$Cold_ischaemic_period <- (real_df$Cold_ischaemic_period - mean(real_df$Cold_ischaemic_period))/sd(real_df$Cold_ischaemic_period)
-real_df$HLA_mismatch <- (real_df$HLA_mismatch - mean(real_df$HLA_mismatch))/sd(real_df$HLA_mismatch)
-real_df$DonorBMI <- (real_df$DonorBMI - mean(real_df$DonorBMI))/sd(real_df$DonorBMI)
-real_df$Recipient_BMI <- (real_df$Recipient_BMI - mean(real_df$Recipient_BMI))/sd(real_df$Recipient_BMI)
+real_df$Recipientage <- scale(real_df$Recipientage)
+real_df$Dialysisdaysrenine <- scale(real_df$Dialysisdaysrenine)
+real_df$Donorage <- scale(real_df$Donorage)
+real_df$Lastcreatininemgdl <- scale(real_df$Lastcreatininemgdl)
+real_df$Warm_ischaemic_period_1 <- scale(real_df$Warm_ischaemic_period_1)
+real_df$Cold_ischaemic_period <- scale(real_df$Cold_ischaemic_period)
+real_df$HLA_mismatch <- scale(real_df$HLA_mismatch)
+real_df$DonorBMI <- scale(real_df$DonorBMI)
+real_df$Recipient_BMI <- scale(real_df$Recipient_BMI)
 #
 
 # print(colnames(real_df)[factorName])
 
 real_df <- real_df[, !(names(real_df) %in% "InitialOnmachineindicator")]
 real_df$Donorcauseofdeath_group <- ifelse(real_df$Donorcauseofdeath_group == "Cardiac", "Cardiac", "Others")
+real_df$Donorcauseofdeath_group <- factor(real_df$Donorcauseofdeath_group)
+contrasts(real_df$Donorcauseofdeath_group) <- contr.sum(levels(real_df$Donorcauseofdeath_group))
+
 real_df$InitialPrimaryDiseaseET_regroup <- ifelse(real_df$InitialPrimaryDiseaseET_regroup == "Diabetes Mellitus", "Diabetes", "Others")
+real_df$InitialPrimaryDiseaseET_regroup <- factor(real_df$InitialPrimaryDiseaseET_regroup)
+contrasts(real_df$InitialPrimaryDiseaseET_regroup) <- contr.sum(levels(real_df$InitialPrimaryDiseaseET_regroup))
+
 
 strafied_Data_DBD <- subset(subset(real_df, real_df$TypecadavericDBDDCD == "DBD"), select = -c(TypecadavericDBDDCD, Warm_ischaemic_period_1))
 
@@ -97,8 +103,9 @@ sum(!names(strafied_Data_DBD) %in% c("time", "status"))
 ```
 ## Step 4: Verify the existence of interaction effects
 ```{r, echo = TRUE}
-#Build up b-Spline models in the absence of interaction effects
+# Step 1: simplified model results
 strafied_Data_DBD_int <- includingInter(strafied_Data_DBD)
+strafied_Data_DBD_int <- subset(strafied_Data_DBD_int, select = -c(id))
 Data_DBD_bSplines_noInt <- stan_data_Constructer_BSpline(
     training_dataset = strafied_Data_DBD_int,
     testing_dataset = NULL,
@@ -106,9 +113,130 @@ Data_DBD_bSplines_noInt <- stan_data_Constructer_BSpline(
     log_lik_saving = TRUE,
     havingInt = FALSE
   )
-bSplines_model_noInt <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_noInt, baseline_modelling = "bSplines", shrinkage = TRUE, withPrediction = FALSE, log_likSaving = TRUE, havingInt = FALSE)
 
+bSplines_model_noInt <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_noInt,
+                                                baseline_modelling = "bSplines", 
+                                                shrinkage = TRUE, 
+                                                withPrediction = FALSE, 
+                                                havingInt = FALSE)
+
+
+Data_DBD_PL_noInt <- stan_data_Constructer_PL(
+    training_dataset = strafied_Data_DBD_int,
+    testing_dataset = NULL,
+     havingInt = FALSE
+  )
+
+ph_model_noInt <- Bayesian_Survival_model(stan_data = Data_DBD_PL_noInt, 
+                                          baseline_modelling = "none", 
+                                          shrinkage = TRUE, 
+                                          withPrediction = FALSE, 
+                                          havingInt = FALSE)
+
+bSplines_model_noInt_results = Bayesian_Survival_result_Extract(bayesian_model_fit = bSplines_model_noInt, model_type = "bSplines", criteria = c("DesignCoefficients", "variableSelection"))
+bSplines_model_noInt_beta = bSplines_model_noInt_results$Beta_bayesian_est[, "mean"]
+bSplines_model_noInt_variableSelection = bSplines_model_noInt_results$variableSelection
+
+PL_model_noInt_results = Bayesian_Survival_result_Extract(bayesian_model_fit = ph_model_noInt, model_type = "none", criteria = c("DesignCoefficients", "variableSelection"))
+PL_noInt_beta = PL_model_noInt_results$Beta_bayesian_est[, "mean"]
+PL_noInt_variableSelection = PL_model_noInt_results$variableSelection
+
+
+## STEP 1: visualize the cofficients and see the differences
+par(mfrow = c(2, 1))
+plot(bSplines_model_noInt_beta, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, xaxt = "n")
+# Add background rectangles
+for (i in 1:length(bSplines_model_noInt_variableSelection)) {
+  if (bSplines_model_noInt_variableSelection[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+lines(bSplines_model_noInt_beta, type = "o", col = "blue", pch = 16)
+#axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
+axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
+abline(a = 0, b =0, col = "red")
+
+
+plot(PL_noInt_beta, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "", pch = 16, xaxt = "n")
+# Add background rectangles
+for (i in 1:length(PL_noInt_variableSelection)) {
+  if (PL_noInt_variableSelection[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
+  }
+}
+lines(PL_noInt_beta, type = "o", col = "darkgreen", pch = 16)
+abline(a = 0, b =0, col = "red")
+
+# STEP 2: Calculate the collinearity of data
+clean_data <- model.matrix(~. -1, data = strafied_Data_DBD)
+X <- scale(clean_data)
+kappa(X)
+
+clean_data2 <- model.matrix(~.-1, data = strafied_Data_DBD_int)
+X2 <- scale(clean_data2)
+kappa(X2)
+
+# STEP 3:
+Data_DBD_bSplines_Int <- stan_data_Constructer_BSpline(
+    training_dataset = strafied_Data_DBD_int,
+    testing_dataset = NULL,
+    obs_window = 3415,
+    log_lik_saving = TRUE,
+    havingInt = TRUE
+  )
+
+bSplines_model_Int <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_Int,
+                                                baseline_modelling = "bSplines", 
+                                                shrinkage = TRUE, 
+                                                withPrediction = FALSE, 
+                                                havingInt = TRUE)
+
+
+Data_DBD_PL_Int <- stan_data_Constructer_PL(
+    training_dataset = strafied_Data_DBD_int,
+    testing_dataset = NULL,
+    havingInt = TRUE
+  )
+
+ph_model_Int <- Bayesian_Survival_model(
+  stan_data = Data_DBD_PL_Int,
+  baseline_modelling = "none",
+  shrinkage = TRUE,
+  withPrediction = FALSE,
+  havingInt = TRUE,
+  niter = 10000,
+  nwarmup = 2000,
+  thin = 10,
+  chains = 4
+)
+
+bSplines_model_Int_results = Bayesian_Survival_result_Extract(bayesian_model_fit = bSplines_model_Int, model_type = "bSplines", criteria = c("DesignCoefficients", "variableSelection"))
+bSplines_model_Int_beta = bSplines_model_Int_results$Beta_bayesian_est[, "mean"]
+bSplines_model_Int_variableSelection = bSplines_model_Int_results$variableSelection
+
+PL_model_Int_results = Bayesian_Survival_result_Extract(bayesian_model_fit = ph_model_Int, model_type = "none", criteria = c("DesignCoefficients", "variableSelection"))
+PL_Int_beta = PL_model_Int_results$Beta_bayesian_est[, "mean"]
+PL_Int_variableSelection = PL_model_Int_results$variableSelection
+```
+
+```{r, echo=TRUE}
+#Build up b-Spline models in the absence of interaction effects
+strafied_Data_DBD_int <- includingInter(strafied_Data_DBD)
+strafied_Data_DBD_int <- subset(strafied_Data_DBD_int, select = -c(id))
+normal_ph <- coxph(Surv(obstime, status) ~ ., strafied_Data_DBD_int)
+Data_DBD_bSplines_noInt <- stan_data_Constructer_BSpline(
+    training_dataset = strafied_Data_DBD,
+    testing_dataset = NULL,
+    obs_window = 3415,
+    log_lik_saving = TRUE,
+    havingInt = FALSE
+  )
+bSplines_model_noInt <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_noInt, baseline_modelling = "bSplines", shrinkage = TRUE, withPrediction = FALSE, log_likSaving = TRUE, havingInt = FALSE)
 diagnostics_bSplines_model_noInt <- summary(bSplines_model_noInt)$summary[, c("Rhat", "n_eff")]
+
+
+
+
 cvl_bSplines_model_noInt <- cross_validated_log_likelihood (bSplines_model_noInt, nrow(strafied_Data_DBD_int))
 l_bSplines_model_noInt <- max_log_likelihood (bSplines_model_noInt, nrow(strafied_Data_DBD_int))
 
@@ -125,8 +253,8 @@ bSplines_model_withInt <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_
 
 diagnostics_bSplines_model_withInt <- summary(bSplines_model_withInt)$summary[, c("Rhat", "n_eff")]
 
-cvl_bSplines_model_withInt <- cross_validated_log_likelihood (bSplines_model_withInt, nrow(strafied_Data_DBD_int))
-l_bSplines_model_withInt <- max_log_likelihood (bSplines_model_withInt, nrow(strafied_Data_DBD_int))
+cvl_bSplines_model_withInt <- cross_validated_log_likelihood(bSplines_model_withInt, nrow(strafied_Data_DBD_int))
+l_bSplines_model_withInt <- max_log_likelihood(bSplines_model_withInt, nrow(strafied_Data_DBD_int))
 
 output_DBD <- c(cvl_bSplines_model_noInt, cvl_bSplines_model_withInt, l_bSplines_model_noInt, l_bSplines_model_withInt, l_bSplines_model_noInt - cvl_bSplines_model_noInt, l_bSplines_model_withInt - cvl_bSplines_model_withInt)
 names(output_DBD) <- c("cvl_bSplines_noInt", "cvl_bSplines_withInt", "l_bSplines_noInt", "l_bSplines_withInt", "d_bSplines_noInt", "d_bSplines_withInt")
@@ -141,7 +269,7 @@ stan_data_PL_DBD <- stan_data_Constructer_PL(
       training_dataset = strafied_Data_DBD_int,
       testing_dataset = NULL
     )
-model_fit_PL_DBD <- Bayesian_Survival_model(stan_data = stan_data_PL_DBD, baseline_modelling = "none", withPrediction = FALSE, shrinkage = TRUE)
+model_fit_PL_DBD <- Bayesian_Survival_model(stan_data = stan_data_PL_DBD, baseline_modelling = "none", withPrediction = FALSE, shrinkage = TRUE, log_likSaving = TRUE)
 
 diagnostics_PL_DBD <- summary(model_fit_PL_DBD)$summary[, c("Rhat", "n_eff")]
 print(diagnostics_PL_DBD)
@@ -151,29 +279,49 @@ model_result_PL_DBD <- Bayesian_Survival_result_Extract(bayesian_model_fit = mod
 beta_DBD_PL = model_result_PL_DBD$Beta_bayesian_est[, "mean"]
 variableSelection_DBD_PL = model_result_PL_DBD$variableSelection
 
+
 save.image(file = "./Data/03_results_DBD.RData")
 ```
 
 ## STEP 5: Visulize the beta estimation
 ```{r, echo=TRUE}
-save.image(file = "./Data/03_results_DBD.RData")
-plot(beta_bSplines_withInt, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Beta", main = "Beta estimation", pch = 16, ylim = c(-10, 10))
+load(file = "./Data/03_results_DBD.RData")
+par(mfrow = c(2, 1))
+plot(beta_bSplines_withInt, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, ylim = c(-10, 10), xaxt = "n")
 # Add background rectangles
 for (i in 1:length(variableSelection_DBD_bSplines_model_withInt)) {
   if (variableSelection_DBD_bSplines_model_withInt[i]) {
     rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
   }
 }
+lines(beta_bSplines_withInt, type = "o", col = "blue", pch = 16)
+#axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
+axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
+abline(a = 0, b =0, col = "red")
 
-for (i in 1:length(variableSelection_DBD_PL)) {
+
+plot(beta_DBD_PL, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "", pch = 16, ylim = c(-1, 1), xaxt = "n")
+# Add background rectangles
+for (i in 1:length(variableSelection_DBD_bSplines_model_withInt)) {
   if (variableSelection_DBD_PL[i]) {
     rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
   }
 }
+lines(beta_DBD_PL, type = "o", col = "darkgreen", pch = 16)
+abline(a = 0, b =0, col = "red")
 
-lines(beta_bSplines_withInt, type = "o", col = "blue", pch = 16)
-lines(beta_DBD_PL, type = "o", col = "green", pch = 16)
-legend("top", legend = c("beta_bSplines_withInt", "beta_DBD_PL"), col = c("blue", "green"), pch = 16, lty = 1, horiz = TRUE) 
+
+
+# 
+# for (i in 1:length(variableSelection_DBD_PL)) {
+#   if (variableSelection_DBD_PL[i]) {
+#     rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
+#   }
+# }
+# 
+# lines(beta_bSplines_withInt, type = "o", col = "blue", pch = 16)
+# lines(beta_DBD_PL, type = "o", col = "green", pch = 16)
+# legend("top", legend = c("beta_bSplines_withInt", "beta_DBD_PL"), col = c("blue", "green"), pch = 16, lty = 1, horiz = TRUE) 
 ```
 # Section 2: Data analysis for DCD
 ## STEP 1: estimate the Betas for DCD
@@ -217,6 +365,19 @@ variableSelection_DCD_PH = model_result_PH_DCD$variableSelection
 #cross_val_metric_DBD <- cross_validation(whole_dataset = strafied_Data_DBD_int, baseline_modelling = "bSplines", num_folds = 5, obs_window = 3415)
 save.image(file = "./Data/03_results_DCD.RData")
 ```
-
+## STEP 2: visualize DCD results
+```{r, echo=TRUE}
+load(file = "./Data/03_results_DCD.RData")
+plot(beta_bSplines_withInt, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, ylim = c(-10, 10), xaxt = "n")
+# Add background rectangles
+for (i in 1:length(variableSelection_DBD_bSplines_model_withInt)) {
+  if (variableSelection_DBD_bSplines_model_withInt[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+lines(beta_bSplines_withInt, type = "o", col = "blue", pch = 16)
+# lines(beta_bSplines_withInt, type = "o", col = "lightgreen", pch = 16)
+axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
+```
 
 
