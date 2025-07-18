@@ -149,13 +149,14 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
 }
 
 
+
 # Generate a simulate dateset
-DataGenerator <- function(n_samples, n_features) {
+DataGenerator <- function(n_samples, n_features, multicolinearity = 0.3) {
   sim_data <- list()
   
-  # generate design matrix in the formate of dataframe
+  # generate design matrix in the format of dataframe
   # Generate covariance matrix
-  Sigma <- matrix(0.3, nrow = n_features, ncol = n_features)
+  Sigma <- matrix(multicolinearity, nrow = n_features, ncol = n_features)
   diag(Sigma) <- 1
   
   design_matrix <- MASS::mvrnorm(n_samples, mu = rep(0, n_features), Sigma = Sigma)
