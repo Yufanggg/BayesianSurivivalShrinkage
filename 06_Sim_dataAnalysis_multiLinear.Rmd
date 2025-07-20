@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 install_and_load <- function(packages) {
   for (pkg in packages) {
     if (!require(pkg, character.only = TRUE)) {
@@ -46,13 +46,13 @@ simulation_bayint_survival <- function(
     print(collinear)
     # Generate data
     simulated_data <-
-      DataGenerator(n_samples = n_sample, n_features = n_features, multicolinearity = collinear)
+      DataGenerator(n_samples = n_samples, n_features = n_features, multicolinearity = collinear)
     dataset <- simulated_data$dataset
     Beta <- simulated_data$Beta
     output$Beta_true <- Beta
 
     # Apply censoring to achieve desired event proportion
-    n_events <- round(event_prop * n_sample)
+    n_events <- round(event_prop * n_samples)
     event_ids <- sample(dataset$id, size = n_events)
     dataset$status <- ifelse(dataset$id %in% event_ids, 1, 0)
 
@@ -83,44 +83,44 @@ simulation_bayint_survival <- function(
     model_fit_PL <- Bayesian_Survival_model(stan_data_PL, baseline_modelling = "none", shrinkage = TRUE, withPrediction = withPrediction)
 
     # Diagnostics
-    output[[paste0("diagnostics_bSplines_", n_sample)]] <- summary(model_fit_bSplines)$summary[, c("Rhat", "n_eff")]
-    output[[paste0("diagnostics_PL_", n_sample)]] <- summary(model_fit_PL)$summary[, c("Rhat", "n_eff")]
+    output[[paste0("diagnostics_bSplines_", collinear)]] <- summary(model_fit_bSplines)$summary[, c("Rhat", "n_eff")]
+    output[[paste0("diagnostics_PL_", collinear)]] <- summary(model_fit_PL)$summary[, c("Rhat", "n_eff")]
 
     # Extract results
     result_bSplines <- Bayesian_Survival_result_Extract(model_fit_bSplines, "bSplines", criteria)
     result_PL <- Bayesian_Survival_result_Extract(model_fit_PL, "none", criteria)
 
     if ("DesignCoefficients" %in% criteria) {
-      output[[paste0("Beta_bSplines_", n_sample)]] <- result_bSplines$Beta_bayesian_est[, "mean"]
-      output[[paste0("Beta_PL_", n_sample)]] <- result_PL$Beta_bayesian_est[, "mean"]
+      output[[paste0("Beta_bSplines_", collinear)]] <- result_bSplines$Beta_bayesian_est[, "mean"]
+      output[[paste0("Beta_PL_", collinear)]] <- result_PL$Beta_bayesian_est[, "mean"]
     }
 
     if ("baseline" %in% criteria) {
       time_vec <- sort(training_dataset[training_dataset$status == 1, ]$obstime)
-      output[[paste0("time_vec_", n_sample)]] <- time_vec
-      output[[paste0("baseline_true_", n_sample)]] <- 10 * 2 * (time_vec ^ (10 - 1))
-      output[[paste0("baseline_bSplines_", n_sample)]] <- exp(as.matrix(stan_data_bSplines$basis) %*% result_bSplines$baselinePara[, "mean"])
+      output[[paste0("time_vec_", collinear)]] <- time_vec
+      output[[paste0("baseline_true_", collinear)]] <- 10 * 2 * (time_vec ^ (10 - 1))
+      output[[paste0("baseline_bSplines_", collinear)]] <- exp(as.matrix(stan_data_bSplines$basis) %*% result_bSplines$baselinePara[, "mean"])
     }
 
     if ("variableSelection" %in% criteria) {
-      output[[paste0("varSel_bSplines_", n_sample)]] <- result_bSplines$variableSelection
-      output[[paste0("varSel_PL_", n_sample)]] <- result_PL$variableSelection
+      output[[paste0("varSel_bSplines_", collinear)]] <- result_bSplines$variableSelection
+      output[[paste0("varSel_PL_", collinear)]] <- result_PL$variableSelection
     }
 
     if ("Prediction_SurvivalProb" %in% criteria && withPrediction) {
-      output[[paste0("time_", n_sample)]] <- testing_dataset$obstime
-      output[[paste0("true_status_", n_sample)]] <- testing_dataset$status
-      output[[paste0("eta_true_", n_sample)]] <- as.vector(
+      output[[paste0("time_", collinear)]] <- testing_dataset$obstime
+      output[[paste0("true_status_", collinear)]] <- testing_dataset$status
+      output[[paste0("eta_true_", collinear)]] <- as.vector(
         as.matrix(stan_data_bSplines$x_new) %*% Beta[1:10] +
         as.matrix(stan_data_bSplines$x_int_new) %*% Beta[11:55]
       )
-      output[[paste0("eta_pred_bSplines_", n_sample)]] <- result_bSplines$eta_pred
-      output[[paste0("eta_pred_PL_", n_sample)]] <- result_PL$eta_pred
+      output[[paste0("eta_pred_bSplines_", collinear)]] <- result_bSplines$eta_pred
+      output[[paste0("eta_pred_PL_", collinear)]] <- result_PL$eta_pred
     }
   }
   return(output)
 }
-replicate_times = 50
+replicate_times = 1
 
 simulated_results = replicate(replicate_times, simulation_bayint_survival())
 
