@@ -1,6 +1,6 @@
 # assumptions: all data are right censored data with the observed window being [0, obs_window]
 # Construct stan data structure for baseline hazard of exponential and weibull.
-stan_data_Constructer_PL <- function (training_dataset, testing_dataset = NULL, havingInt = FALSE){
+stan_data_Constructer_PL <- function (training_dataset, testing_dataset = NULL, havingInt = TRUE){
   
   #----------------------------
   # Prepare data for model fitting
