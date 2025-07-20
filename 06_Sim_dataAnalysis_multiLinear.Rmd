@@ -37,7 +37,7 @@ simulation_bayint_survival <- function(
   withPrediction = FALSE,
   collinearity = c(0, 0.3, 0.7, 1),
   event_prop = 0.75,
-  n_samples = 200,
+  n_samples = 300,
   n_features = 10
 ) {
   output <- list()
@@ -79,7 +79,7 @@ simulation_bayint_survival <- function(
     stan_data_bSplines <- stan_data_Constructer_BSpline(training_dataset, testing_dataset, obs_window = 5)
 
     # Fit Bayesian models
-    model_fit_bSplines <- Bayesian_Survival_model(stan_data_bSplines, baseline_modelling = "bSplines", shrinkage = TRUE, withPrediction = withPrediction)
+    # model_fit_bSplines <- Bayesian_Survival_model(stan_data_bSplines, baseline_modelling = "bSplines", shrinkage = TRUE, withPrediction = withPrediction)
     model_fit_PL <- Bayesian_Survival_model(stan_data_PL, baseline_modelling = "none", shrinkage = TRUE, withPrediction = withPrediction)
 
     # Diagnostics
