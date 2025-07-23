@@ -79,7 +79,7 @@ simulation_bayint_survival <- function(
     stan_data_bSplines <- stan_data_Constructer_BSpline(training_dataset, testing_dataset, obs_window = 5)
 
     # Fit Bayesian models
-    # model_fit_bSplines <- Bayesian_Survival_model(stan_data_bSplines, baseline_modelling = "bSplines", shrinkage = TRUE, withPrediction = withPrediction)
+    model_fit_bSplines <- Bayesian_Survival_model(stan_data_bSplines, baseline_modelling = "bSplines", shrinkage = TRUE, withPrediction = withPrediction)
     model_fit_PL <- Bayesian_Survival_model(stan_data_PL, baseline_modelling = "none", shrinkage = TRUE, withPrediction = withPrediction)
 
     # Diagnostics
@@ -227,7 +227,7 @@ for (i in 1:replicate_times){
   Beta_est_bSplines_0[i, ] <- simulated_results[,i]$Beta_bSplines_0
   Beta_est_bSplines_0.3[i, ] <- simulated_results[,i]$Beta_bSplines_0.3
   Beta_est_bSplines_0.7[i, ] <- simulated_results[,i]$Beta_bSplines_0.7
-  Beta_est_bSplines_1[i, ] <- simulated_results[,i]$baseline_bSplines_1
+  Beta_est_bSplines_1[i, ] <- simulated_results[,i]$Beta_bSplines_1
   
   Beta_est_PL_0[i, ] <-  simulated_results[,i]$Beta_PL_0
   Beta_est_PL_0.3[i, ] <-  simulated_results[,i]$Beta_PL_0.3
@@ -261,11 +261,11 @@ for (i in 1:replicate_times){
   
 
   FDR_bSplines_0[i] <- sum(Selection_bSplines_0 & !variableSelection_reference) / sum(Selection_bSplines_0)
-  FDR_bSplines_0.3[i] <- sum(Selection_bSplines_0.3 & !variableSelection_reference) / sum(Selection_bSplines_600)
-  FDR_bSplines_0.7[i] <- sum(Selection_bSplines_0.7 & !variableSelection_reference) / sum(Selection_bSplines_1000)
-  FDR_bSplines_1[i] <- sum(Selection_bSplines_1 & !variableSelection_reference) / sum(Selection_bSplines_1000)
+  FDR_bSplines_0.3[i] <- sum(Selection_bSplines_0.3 & !variableSelection_reference) / sum(Selection_bSplines_0.3)
+  FDR_bSplines_0.7[i] <- sum(Selection_bSplines_0.7 & !variableSelection_reference) / sum(Selection_bSplines_0.7)
+  FDR_bSplines_1[i] <- sum(Selection_bSplines_1 & !variableSelection_reference) / sum(Selection_bSplines_1)
   
-  FDR_PL_0[i] <- sum(Selection_PL_0 & !variableSelection_reference) / sum(Selection_PL_00)
+  FDR_PL_0[i] <- sum(Selection_PL_0 & !variableSelection_reference) / sum(Selection_PL_0)
   FDR_PL_0.3[i] <- sum(Selection_PL_0.3 & !variableSelection_reference) / sum(Selection_PL_0.3)
   FDR_PL_0.7[i] <- sum(Selection_PL_0.7 & !variableSelection_reference) / sum(Selection_PL_0.7)
   FDR_PL_1[i] <- sum(Selection_PL_1 & !variableSelection_reference) / sum(Selection_PL_1)
@@ -396,7 +396,7 @@ legend("top", legend = c("bSplines_0", "bSplines_0.3", "bSplines_0.7", "bSplines
 
 # Subfigure 4 Type I error
 
-FDR_list = list(bSplines_0 = FDR_bSplines_0, bSplines_0.3 = FDR_bSplines_0.3, bSplines_0.7 = FDR_bSplines_0.7, bSplines_1 = bSplines_1, PL_0 = FDR_PL_0, PL_0.3 = FDR_PL_0.3, PL_0.7 = FDR_PL_0.7, PL_1 = PL_1)
+FDR_list = list(bSplines_0 = FDR_bSplines_0, bSplines_0.3 = FDR_bSplines_0.3, bSplines_0.7 = FDR_bSplines_0.7, bSplines_1 = FDR_bSplines_1, PL_0 = FDR_PL_0, PL_0.3 = FDR_PL_0.3, PL_0.7 = FDR_PL_0.7, PL_1 = FDR_PL_1)
 boxplot(FDR_list, names = c("bSplines_0", "bSplines_0.3", "bSplines_0.7", "bSplines_1", "PL_0", "PL_0.3", "PL_0.7", "PL_1"), col = c("#641e16", "#c0392b", "#f2d7d5", "#f2d7d5", "#145a32", "#229954", "#a2d9ce",  "#a2d9ce"), main = "FDR", xlab = "", ylab = "FDR")
 
 # Subfigure 5 Type II error
