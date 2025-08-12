@@ -102,8 +102,7 @@ abline(h = 0.5, col = "red", lty = 2)
 sum(!names(strafied_Data_DBD) %in% c("time", "status"))
 ```
 ## Step 4: Verify the existence of interaction effects
-```{r, echo = TRUE}
-# Step 1: simplified model results
+```{r, echo=TRUE}
 strafied_Data_DBD_int <- includingInter(strafied_Data_DBD)
 strafied_Data_DBD_int <- subset(strafied_Data_DBD_int, select = -c(id))
 Data_DBD_bSplines_noInt <- stan_data_Constructer_BSpline(
@@ -114,72 +113,72 @@ Data_DBD_bSplines_noInt <- stan_data_Constructer_BSpline(
     havingInt = FALSE
   )
 
-bSplines_model_noInt <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_noInt,
-                                                baseline_modelling = "bSplines", 
-                                                shrinkage = TRUE, 
-                                                withPrediction = FALSE, 
-                                                havingInt = FALSE)
-
-
-Data_DBD_PL_noInt <- stan_data_Constructer_PL(
-    training_dataset = strafied_Data_DBD_int,
-    testing_dataset = NULL,
-     havingInt = FALSE
-  )
-
-ph_model_noInt <- Bayesian_Survival_model(stan_data = Data_DBD_PL_noInt, 
-                                          baseline_modelling = "none", 
-                                          shrinkage = TRUE, 
-                                          withPrediction = FALSE, 
-                                          havingInt = FALSE)
-
-bSplines_model_noInt_results = Bayesian_Survival_result_Extract(bayesian_model_fit = bSplines_model_noInt, model_type = "bSplines", criteria = c("DesignCoefficients", "variableSelection"))
-bSplines_model_noInt_beta = bSplines_model_noInt_results$Beta_bayesian_est[, "mean"]
-bSplines_model_noInt_variableSelection = bSplines_model_noInt_results$variableSelection
-
-PL_model_noInt_results = Bayesian_Survival_result_Extract(bayesian_model_fit = ph_model_noInt, model_type = "none", criteria = c("DesignCoefficients", "variableSelection"))
-PL_noInt_beta = PL_model_noInt_results$Beta_bayesian_est[, "mean"]
-PL_noInt_variableSelection = PL_model_noInt_results$variableSelection
-
-
-## STEP 1: visualize the cofficients and see the differences
-par(mfrow = c(2, 1))
-plot(bSplines_model_noInt_beta, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, xaxt = "n")
-# Add background rectangles
-for (i in 1:length(bSplines_model_noInt_variableSelection)) {
-  if (bSplines_model_noInt_variableSelection[i]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
-  }
-}
-lines(bSplines_model_noInt_beta, type = "o", col = "blue", pch = 16)
-#axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
-axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
-abline(a = 0, b =0, col = "red")
-
-
-plot(PL_noInt_beta, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "", pch = 16, xaxt = "n")
-# Add background rectangles
-for (i in 1:length(PL_noInt_variableSelection)) {
-  if (PL_noInt_variableSelection[i]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
-  }
-}
-lines(PL_noInt_beta, type = "o", col = "darkgreen", pch = 16)
-abline(a = 0, b =0, col = "red")
-
-# STEP 2: Calculate the collinearity of data
-clean_data <- model.matrix(~. -1, data = strafied_Data_DBD)
-X <- scale(clean_data)
-kappa(X)
-
-clean_data2 <- model.matrix(~.-1, data = strafied_Data_DBD_int)
-X2 <- scale(clean_data2)
-kappa(X2)
+# bSplines_model_noInt <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_noInt,
+#                                                 baseline_modelling = "bSplines", 
+#                                                 shrinkage = TRUE, 
+#                                                 withPrediction = FALSE, 
+#                                                 havingInt = FALSE)
+# 
+# 
+# Data_DBD_PL_noInt <- stan_data_Constructer_PL(
+#     training_dataset = strafied_Data_DBD_int,
+#     testing_dataset = NULL,
+#      havingInt = FALSE
+#   )
+# 
+# ph_model_noInt <- Bayesian_Survival_model(stan_data = Data_DBD_PL_noInt, 
+#                                           baseline_modelling = "none", 
+#                                           shrinkage = TRUE, 
+#                                           withPrediction = FALSE, 
+#                                           havingInt = FALSE)
+# 
+# bSplines_model_noInt_results = Bayesian_Survival_result_Extract(bayesian_model_fit = bSplines_model_noInt, model_type = "bSplines", criteria = c("DesignCoefficients", "variableSelection"))
+# bSplines_model_noInt_beta = bSplines_model_noInt_results$Beta_bayesian_est[, "mean"]
+# bSplines_model_noInt_variableSelection = bSplines_model_noInt_results$variableSelection
+# 
+# PL_model_noInt_results = Bayesian_Survival_result_Extract(bayesian_model_fit = ph_model_noInt, model_type = "none", criteria = c("DesignCoefficients", "variableSelection"))
+# PL_noInt_beta = PL_model_noInt_results$Beta_bayesian_est[, "mean"]
+# PL_noInt_variableSelection = PL_model_noInt_results$variableSelection
+# 
+# 
+# ## STEP 1: visualize the cofficients and see the differences
+# par(mfrow = c(2, 1))
+# plot(bSplines_model_noInt_beta, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, xaxt = "n")
+# # Add background rectangles
+# for (i in 1:length(bSplines_model_noInt_variableSelection)) {
+#   if (bSplines_model_noInt_variableSelection[i]) {
+#     rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+#   }
+# }
+# lines(bSplines_model_noInt_beta, type = "o", col = "blue", pch = 16)
+# #axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
+# axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
+# abline(a = 0, b =0, col = "red")
+# 
+# 
+# plot(PL_noInt_beta, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "", pch = 16, xaxt = "n")
+# # Add background rectangles
+# for (i in 1:length(PL_noInt_variableSelection)) {
+#   if (PL_noInt_variableSelection[i]) {
+#     rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
+#   }
+# }
+# lines(PL_noInt_beta, type = "o", col = "darkgreen", pch = 16)
+# abline(a = 0, b =0, col = "red")
+# 
+# # STEP 2: Calculate the collinearity of data
+# clean_data <- model.matrix(~. -1, data = strafied_Data_DBD)
+# X <- scale(clean_data)
+# kappa(X)
+# 
+# clean_data2 <- model.matrix(~.-1, data = strafied_Data_DBD_int)
+# X2 <- scale(clean_data2)
+# kappa(X2)
 
 # STEP 3:
 Data_DBD_bSplines_Int <- stan_data_Constructer_BSpline(
     training_dataset = strafied_Data_DBD_int,
-    testing_dataset = NULL,
+    testing_dataset = strafied_Data_DBD_int,
     obs_window = 3415,
     log_lik_saving = TRUE,
     havingInt = TRUE
@@ -188,13 +187,13 @@ Data_DBD_bSplines_Int <- stan_data_Constructer_BSpline(
 bSplines_model_Int <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_Int,
                                                 baseline_modelling = "bSplines", 
                                                 shrinkage = TRUE, 
-                                                withPrediction = FALSE, 
+                                                withPrediction = TRUE, 
                                                 havingInt = TRUE)
 
 
 Data_DBD_PL_Int <- stan_data_Constructer_PL(
     training_dataset = strafied_Data_DBD_int,
-    testing_dataset = NULL,
+    testing_dataset = strafied_Data_DBD_int,
     havingInt = TRUE
   )
 
@@ -202,7 +201,7 @@ ph_model_Int <- Bayesian_Survival_model(
   stan_data = Data_DBD_PL_Int,
   baseline_modelling = "none",
   shrinkage = TRUE,
-  withPrediction = FALSE,
+  withPrediction = TRUE,
   havingInt = TRUE,
   niter = 10000,
   nwarmup = 2000,
@@ -210,13 +209,20 @@ ph_model_Int <- Bayesian_Survival_model(
   chains = 4
 )
 
-bSplines_model_Int_results = Bayesian_Survival_result_Extract(bayesian_model_fit = bSplines_model_Int, model_type = "bSplines", criteria = c("DesignCoefficients", "variableSelection"))
+bSplines_model_Int_results = Bayesian_Survival_result_Extract(bayesian_model_fit = bSplines_model_Int, model_type = "bSplines", criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb"))
 bSplines_model_Int_beta = bSplines_model_Int_results$Beta_bayesian_est[, "mean"]
 bSplines_model_Int_variableSelection = bSplines_model_Int_results$variableSelection
+bSplines_model_Int_Prediction = bSplines_model_Int_results$eta_pred
 
-PL_model_Int_results = Bayesian_Survival_result_Extract(bayesian_model_fit = ph_model_Int, model_type = "none", criteria = c("DesignCoefficients", "variableSelection"))
+PL_model_Int_results = Bayesian_Survival_result_Extract(bayesian_model_fit = ph_model_Int, model_type = "none", criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb"))
 PL_Int_beta = PL_model_Int_results$Beta_bayesian_est[, "mean"]
 PL_Int_variableSelection = PL_model_Int_results$variableSelection
+PL_Int_Prediction =  PL_model_Int_results$eta_pred
+
+
+CI_index_PL <- rcorr.cens(-PL_Int_Prediction, Surv(strafied_Data_DBD_int$obstime, strafied_Data_DBD_int$status))["C Index"]
+CI_index_bSplines <- rcorr.cens(-bSplines_model_Int_Prediction, Surv(strafied_Data_DBD_int$obstime, strafied_Data_DBD_int$status))["C Index"]
+c(CI_index_bSplines, CI_index_PL)
 ```
 
 ```{r, echo=TRUE}
