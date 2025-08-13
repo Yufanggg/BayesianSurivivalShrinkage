@@ -105,8 +105,9 @@ sum(!names(strafied_Data_DBD) %in% c("time", "status"))
 ```{r, echo=TRUE}
 strafied_Data_DBD_int <- includingInter(strafied_Data_DBD)
 strafied_Data_DBD_int <- subset(strafied_Data_DBD_int, select = -c(id))
+```
 
-
+```{r, echo=TRUE}
 # STEP 1: 5-FOLD CROSS-VALIDATION 
 set.seed(123456)
 # Number of folds
@@ -219,7 +220,7 @@ for (i in seq_along(folds)){
       Surv(testing_data$obstime, testing_data$status))["C Index"]
 }
 
-cbind(mean(CI_index_PL, CI_index_bSplines))
+cbind(mean(CI_index_PL), mean(CI_index_bSplines))
 save.image(file = "./Data/03_results_DBD_Step1.RData")
 ```
 
@@ -234,13 +235,11 @@ Data_DBD_bSplines_Int_full <- stan_data_Constructer_BSpline(
   log_lik_saving = TRUE,
   havingInt = TRUE
 )
-bSplines_model_Int_full <- Bayesian_Survival_model(
-  stan_data = Data_DBD_bSplines_Int_full,
-  baseline_modelling = "bSplines",
-  shrinkage = TRUE,
-  withPrediction = TRUE,
-  havingInt = TRUE
-)
+bSplines_model_Int_full <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_Int_full,
+                                                baseline_modelling = "bSplines",
+                                                shrinkage = TRUE,
+                                                withPrediction = FALSE,
+                                                havingInt = TRUE)
 
 # Extract the model result
 bSplines_model_Int_results_full = Bayesian_Survival_result_Extract(
@@ -250,6 +249,29 @@ bSplines_model_Int_results_full = Bayesian_Survival_result_Extract(
 bSplines_model_Int_full_coef <- bSplines_model_Int_results$Beta_bayesian_est[, "mean"]
 
 
+
+Data_DBD_PL_Int_full <- stan_data_Constructer_PL(training_dataset = Data_DBD_bSplines_Int_full,
+                                            testing_dataset = NULL,
+                                            havingInt = TRUE)
+
+PL_model_Int_full <- Bayesian_Survival_model(stan_data = Data_DBD_PL_Int_full,
+                                        baseline_modelling = "none",
+                                        shrinkage = TRUE,
+                                        withPrediction = FALSE,
+                                        havingInt = TRUE,
+                                        niter = 10000,
+                                        nwarmup = 2000,
+                                        thin = 10,
+                                        chains = 4
+                                        )
+# Extract the model result
+PL_model_Int_results_full = Bayesian_Survival_result_Extract(
+  bayesian_model_fit = PL_model_Int_full,
+  model_type = "bSplines",
+  criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb"))
+PL_model_Int_full_coef <- strafied_Data_DBD_int$Beta_bayesian_est[, "mean"]
+  
+
 # Initialize residuals
 schoenfeld_res_bSpline <- rep(NA, length(strafied_Data_DBD_int$status))
 schoenfeld_res_PL<- rep(NA, length(strafied_Data_DBD_int$status))
@@ -257,20 +279,24 @@ schoenfeld_res_PL<- rep(NA, length(strafied_Data_DBD_int$status))
 # Loop through each event time
 for (i in which(strafied_Data_DBD_int$status == 1)) {
   t_i <- strafied_Data_DBD_int$time[i]
-  x_i <- strafied_Data_DBD_int[i, -c("time", "status")]
+  x_i <- strafied_Data_DBD_int_full[i, -c("time", "status")]
   
   # Risk set: those still at risk at time t_i
   risk_set <- which(strafied_Data_DBD_int$time >= t_i)
+  X_risk <- X[risk_set, ]
   
   # Compute weights for expected value
-  weights_bSpline <- exp(bSplines_model_Int_full_coef %*% X[risk_set])
+  weights_bSpline <- exp(X_risk %*% bSplines_model_Int_full_coef)
+  weights_PL <- exp(X_risk %*% PL_model_Int_full_coef)
+
   
   # Expected covariate values
-  expected_x_bSpline <- colSums(X_risk * weights) / sum(weights)
-  
-  
+  expected_x_bSpline <- colSums(X_risk * weights_bSpline) / sum(weights_bSpline)
+  expected_x_PL <- colSums(X_risk * weights_PL) / sum(weights_PL)
+
   # Schoenfeld residuals
-  schoenfeld_res_bSpline[i, ] <- x_i - expected_x
+  schoenfeld_res_bSpline[i, ] <- x_i - expected_x_bSpline
+  schoenfeld_res_PL[i, ] <-  x_i - expected_x_PL
 }
 
 
@@ -301,7 +327,7 @@ bSplines_model_Int_noise <- Bayesian_Survival_model(
   stan_data = Data_DBD_bSplines_Int_noise,
   baseline_modelling = "bSplines",
   shrinkage = TRUE,
-  withPrediction = TRUE,
+  withPrediction = FALSE,
   havingInt = TRUE
 )
 
@@ -324,7 +350,7 @@ PL_model_Int_noise <- Bayesian_Survival_model(
   stan_data = Data_DBD_PL_Int_noise,
   baseline_modelling = "none",
   shrinkage = TRUE,
-  withPrediction = TRUE,
+  withPrediction = FALSE,
   havingInt = TRUE,
   niter = 10000,
   nwarmup = 2000,
