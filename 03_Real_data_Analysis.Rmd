@@ -220,6 +220,7 @@ for (i in seq_along(folds)){
 }
 
 cbind(mean(CI_index_PL, CI_index_bSplines))
+save.image(file = "./Data/03_results_DBD_Step1.RData")
 ```
 
 ```{r, echo=TRUE}
@@ -279,6 +280,7 @@ schoenfeld_res_PL[!is.na(schoenfeld_res_PL[,1]), ]
 
 plot(schoenfeld_res_bSpline[!is.na(schoenfeld_res_bSpline[,1]), ])
 line(schoenfeld_res_PL[!is.na(schoenfeld_res_PL[,1]), ])
+save.image(file = "./Data/03_results_DBD_Step2.RData")
 ```
 
 ```{r, echo=TRUE}
@@ -364,6 +366,7 @@ for (i in 1:length(PL_Int_noise_variableSelection)) {
 }
 lines(PL_Int_noise_coef, type = "o", col = "darkgreen", pch = 16)
 abline(a = 0, b =0, col = "red")
+save.image(file = "./Data/03_results_DBD_Step3.RData")
 ```
 
 
