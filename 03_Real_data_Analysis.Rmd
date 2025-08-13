@@ -105,110 +105,123 @@ sum(!names(strafied_Data_DBD) %in% c("time", "status"))
 ```{r, echo=TRUE}
 strafied_Data_DBD_int <- includingInter(strafied_Data_DBD)
 strafied_Data_DBD_int <- subset(strafied_Data_DBD_int, select = -c(id))
-Data_DBD_bSplines_noInt <- stan_data_Constructer_BSpline(
-    training_dataset = strafied_Data_DBD_int,
-    testing_dataset = NULL,
-    obs_window = 3415,
-    log_lik_saving = TRUE,
-    havingInt = FALSE
-  )
 
-# bSplines_model_noInt <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_noInt,
-#                                                 baseline_modelling = "bSplines", 
-#                                                 shrinkage = TRUE, 
-#                                                 withPrediction = FALSE, 
-#                                                 havingInt = FALSE)
-# 
-# 
-# Data_DBD_PL_noInt <- stan_data_Constructer_PL(
-#     training_dataset = strafied_Data_DBD_int,
-#     testing_dataset = NULL,
-#      havingInt = FALSE
-#   )
-# 
-# ph_model_noInt <- Bayesian_Survival_model(stan_data = Data_DBD_PL_noInt, 
-#                                           baseline_modelling = "none", 
-#                                           shrinkage = TRUE, 
-#                                           withPrediction = FALSE, 
-#                                           havingInt = FALSE)
-# 
-# bSplines_model_noInt_results = Bayesian_Survival_result_Extract(bayesian_model_fit = bSplines_model_noInt, model_type = "bSplines", criteria = c("DesignCoefficients", "variableSelection"))
-# bSplines_model_noInt_beta = bSplines_model_noInt_results$Beta_bayesian_est[, "mean"]
-# bSplines_model_noInt_variableSelection = bSplines_model_noInt_results$variableSelection
-# 
-# PL_model_noInt_results = Bayesian_Survival_result_Extract(bayesian_model_fit = ph_model_noInt, model_type = "none", criteria = c("DesignCoefficients", "variableSelection"))
-# PL_noInt_beta = PL_model_noInt_results$Beta_bayesian_est[, "mean"]
-# PL_noInt_variableSelection = PL_model_noInt_results$variableSelection
-# 
-# 
-# ## STEP 1: visualize the cofficients and see the differences
-# par(mfrow = c(2, 1))
-# plot(bSplines_model_noInt_beta, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, xaxt = "n")
-# # Add background rectangles
-# for (i in 1:length(bSplines_model_noInt_variableSelection)) {
-#   if (bSplines_model_noInt_variableSelection[i]) {
-#     rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
-#   }
-# }
-# lines(bSplines_model_noInt_beta, type = "o", col = "blue", pch = 16)
-# #axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
-# axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
-# abline(a = 0, b =0, col = "red")
-# 
-# 
-# plot(PL_noInt_beta, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "", pch = 16, xaxt = "n")
-# # Add background rectangles
-# for (i in 1:length(PL_noInt_variableSelection)) {
-#   if (PL_noInt_variableSelection[i]) {
-#     rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
-#   }
-# }
-# lines(PL_noInt_beta, type = "o", col = "darkgreen", pch = 16)
-# abline(a = 0, b =0, col = "red")
-# 
-# # STEP 2: Calculate the collinearity of data
-# clean_data <- model.matrix(~. -1, data = strafied_Data_DBD)
-# X <- scale(clean_data)
-# kappa(X)
-# 
-# clean_data2 <- model.matrix(~.-1, data = strafied_Data_DBD_int)
-# X2 <- scale(clean_data2)
-# kappa(X2)
 
-# STEP 3:
-Data_DBD_bSplines_Int <- stan_data_Constructer_BSpline(
-    training_dataset = strafied_Data_DBD_int,
-    testing_dataset = strafied_Data_DBD_int,
+
+
+
+# Number of folds
+k <- 5
+
+# Assuming p is the number of coefficients
+p <- 91
+
+# Preallocate matrices/vectors
+bSplines_model_Int_beta <- matrix(NA, nrow = k, ncol = p)
+bSplines_model_Int_variableSelection <- matrix(NA, nrow = k, ncol = p)
+bSplines_model_Int_Prediction <- vector("list", k)
+
+PL_Int_beta <- matrix(NA, nrow = k, ncol = p)
+PL_Int_variableSelection <- matrix(NA, nrow = k, ncol = p)
+PL_Int_Prediction <- vector("list", k)
+
+
+# Create 5-fold cross-validation indices
+folds <- createFolds(1:nrow(strafied_Data_DBD_int), k = k, list = TRUE, returnTrain = FALSE)
+CI_index_PL <- rep(NA, 5)
+CI_index_bSplines <- rep(NA, 5)
+
+# Cross validation (5-fold)
+for (i in 1:k){
+  testing_indices <- folds[[i]]
+  testing_data <- strafied_Data_DBD_int[testing_indices, ]
+  training_data <- strafied_Data_DBD_int[-testing_indices,]
+  
+  cat("Fold", i, "\n")
+  cat("Training set size:", nrow(training_data), "\n")
+  cat("Test set size:", nrow(testing_data), "\n\n")
+
+  # insert your model training and evaluation code here
+  #-----------MODEL 1: bSpline model----------
+  Data_DBD_bSplines_Int <- stan_data_Constructer_BSpline(
+    training_dataset = training_data,
+    testing_dataset = testing_data,
     obs_window = 3415,
     log_lik_saving = TRUE,
     havingInt = TRUE
   )
-
-bSplines_model_Int <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_Int,
-                                                baseline_modelling = "bSplines", 
-                                                shrinkage = TRUE, 
-                                                withPrediction = TRUE, 
+  bSplines_model_Int <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_Int,
+                                                baseline_modelling = "bSplines",
+                                                shrinkage = TRUE,
+                                                withPrediction = TRUE,
                                                 havingInt = TRUE)
-
-
-Data_DBD_PL_Int <- stan_data_Constructer_PL(
-    training_dataset = strafied_Data_DBD_int,
-    testing_dataset = strafied_Data_DBD_int,
+  
+  #-----------MODEL 2: PL model----------
+  Data_DBD_PL_Int <- stan_data_Constructer_PL(
+    training_dataset = training_data,
+    testing_dataset = testing_data,
     havingInt = TRUE
   )
+  
+  PL_model_Int <- Bayesian_Survival_model(
+    stan_data = Data_DBD_PL_Int,
+    baseline_modelling = "none",
+    shrinkage = TRUE,
+    withPrediction = TRUE,
+    havingInt = TRUE,
+    niter = 10000,
+    nwarmup = 2000,
+    thin = 10,
+    chains = 4
+  )
+  
+  
+  # Extract the model result
+  bSplines_model_Int_results = Bayesian_Survival_result_Extract(
+    bayesian_model_fit = bSplines_model_Int,
+    model_type = "bSplines",
+    criteria = c(
+      "DesignCoefficients",
+      "variableSelection",
+      "Prediction_SurvivalProb"
+    )
+  )
+  
+  
+  bSplines_model_Int_beta[i,] <-
+    bSplines_model_Int_results$Beta_bayesian_est[, "mean"]
+  bSplines_model_Int_variableSelection[i,] <-
+    bSplines_model_Int_results$variableSelection
+  bSplines_model_Int_Prediction[[i]] <-
+    bSplines_model_Int_results$eta_pred
+  
+  PL_model_Int_results = Bayesian_Survival_result_Extract(
+    bayesian_model_fit = PL_model_Int,
+    model_type = "none",
+    criteria = c(
+      "DesignCoefficients",
+      "variableSelection",
+      "Prediction_SurvivalProb"
+    )
+  )
+  
+  PL_Int_beta[i,] <- PL_model_Int_results$Beta_bayesian_est[, "mean"]
+  PL_Int_variableSelection[i,] <-
+    PL_model_Int_results$variableSelection
+  PL_Int_Prediction[[i]] <- PL_model_Int_results$eta_pred
+  
+  
+  #c-INDEX
+  a <- PL_Int_Prediction[[i]]; b <- bSplines_model_Int_Prediction[[i]]
+  CI_index_PL[i] <- rcorr.cens(-a,
+      Surv(testing_data$obstime, testing_data$status))["C Index"]
+  CI_index_bSplines[i] <- rcorr.cens(-b,
+      Surv(testing_data$obstime, testing_data$status))["C Index"]
+}
 
-ph_model_Int <- Bayesian_Survival_model(
-  stan_data = Data_DBD_PL_Int,
-  baseline_modelling = "none",
-  shrinkage = TRUE,
-  withPrediction = TRUE,
-  havingInt = TRUE,
-  niter = 10000,
-  nwarmup = 2000,
-  thin = 10,
-  chains = 4
-)
+```
 
+```{r, echo=TRUE}
 bSplines_model_Int_results = Bayesian_Survival_result_Extract(bayesian_model_fit = bSplines_model_Int, model_type = "bSplines", criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb"))
 bSplines_model_Int_beta = bSplines_model_Int_results$Beta_bayesian_est[, "mean"]
 bSplines_model_Int_variableSelection = bSplines_model_Int_results$variableSelection
@@ -219,10 +232,27 @@ PL_Int_beta = PL_model_Int_results$Beta_bayesian_est[, "mean"]
 PL_Int_variableSelection = PL_model_Int_results$variableSelection
 PL_Int_Prediction =  PL_model_Int_results$eta_pred
 
+CI_index_PL <- rep(NA, 5)
+CI_index_bSplines <- rep(NA, 5)
+for (i in 1:5) {
+  CI_index_PL[i] <-
+    rcorr.cens(
+      -PL_Int_Prediction[[i]],
+      Surv(
+        strafied_Data_DBD_int$obstime,
+        strafied_Data_DBD_int$status
+      )
+    )["C Index"]
+  CI_index_bSplines[i] <-
+    rcorr.cens(
+      -bSplines_model_Int_Prediction[[i]],
+      Surv(
+        strafied_Data_DBD_int$obstime,
+        strafied_Data_DBD_int$status
+      )
+    )["C Index"]
+}
 
-CI_index_PL <- rcorr.cens(-PL_Int_Prediction, Surv(strafied_Data_DBD_int$obstime, strafied_Data_DBD_int$status))["C Index"]
-CI_index_bSplines <- rcorr.cens(-bSplines_model_Int_Prediction, Surv(strafied_Data_DBD_int$obstime, strafied_Data_DBD_int$status))["C Index"]
-c(CI_index_bSplines, CI_index_PL)
 ```
 
 ```{r, echo=TRUE}
