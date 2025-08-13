@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 source("./function_file/stan_constructor.R")
 
@@ -23,7 +23,7 @@ install_and_load <- function(packages) {
 }
 
 # List of required packages
-required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret", "corrplot","ggplot2", "loo", "survival")
+required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret", "corrplot","ggplot2", "loo", "survival", "caret")
 # Install and/or load packages
 install_and_load(required_packages)
 ```
@@ -107,9 +107,8 @@ strafied_Data_DBD_int <- includingInter(strafied_Data_DBD)
 strafied_Data_DBD_int <- subset(strafied_Data_DBD_int, select = -c(id))
 
 
-
-
-
+# STEP 1: 5-FOLD CROSS-VALIDATION 
+set.seed(123456)
 # Number of folds
 k <- 5
 
@@ -127,12 +126,13 @@ PL_Int_Prediction <- vector("list", k)
 
 
 # Create 5-fold cross-validation indices
-folds <- createFolds(1:nrow(strafied_Data_DBD_int), k = k, list = TRUE, returnTrain = FALSE)
+
+folds <- createFolds(strafied_Data_DBD_int$status, k = 5, list = TRUE, returnTrain = FALSE)
 CI_index_PL <- rep(NA, 5)
 CI_index_bSplines <- rep(NA, 5)
 
 # Cross validation (5-fold)
-for (i in 1:k){
+for (i in seq_along(folds)){
   testing_indices <- folds[[i]]
   testing_data <- strafied_Data_DBD_int[testing_indices, ]
   training_data <- strafied_Data_DBD_int[-testing_indices,]
@@ -219,6 +219,8 @@ for (i in 1:k){
       Surv(testing_data$obstime, testing_data$status))["C Index"]
 }
 
+
+# STEP 2: 
 ```
 
 ```{r, echo=TRUE}
