@@ -250,7 +250,7 @@ bSplines_model_Int_full_coef <- bSplines_model_Int_results$Beta_bayesian_est[, "
 
 
 
-Data_DBD_PL_Int_full <- stan_data_Constructer_PL(training_dataset = Data_DBD_bSplines_Int_full,
+Data_DBD_PL_Int_full <- stan_data_Constructer_PL(training_dataset = strafied_Data_DBD_int,
                                             testing_dataset = NULL,
                                             havingInt = TRUE)
 
@@ -269,25 +269,27 @@ PL_model_Int_results_full = Bayesian_Survival_result_Extract(
   bayesian_model_fit = PL_model_Int_full,
   model_type = "bSplines",
   criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb"))
-PL_model_Int_full_coef <- strafied_Data_DBD_int$Beta_bayesian_est[, "mean"]
+PL_model_Int_full_coef <- PL_model_Int_results_full$Beta_bayesian_est[, "mean"]
   
 
 # Initialize residuals
-schoenfeld_res_bSpline <- rep(NA, length(strafied_Data_DBD_int$status))
-schoenfeld_res_PL<- rep(NA, length(strafied_Data_DBD_int$status))
+schoenfeld_res_bSpline <- matrix(NA, nrow = length(strafied_Data_DBD_int$status), ncol = 91)
+schoenfeld_res_PL<- matrix(NA, nrow = length(strafied_Data_DBD_int$status), ncol = 91)
 
 # Loop through each event time
-for (i in which(strafied_Data_DBD_int$status == 1)) {
-  t_i <- strafied_Data_DBD_int$time[i]
-  x_i <- strafied_Data_DBD_int_full[i, -c("time", "status")]
+for (i in 1:length(strafied_Data_DBD_int$status == 1)) {
+  
+  t_i <- strafied_Data_DBD_int$obstime[i]
+  x_i <- strafied_Data_DBD_int[i, !(names(strafied_Data_DBD_int) %in% c("obstime", "status"))]
+
   
   # Risk set: those still at risk at time t_i
-  risk_set <- which(strafied_Data_DBD_int$time >= t_i)
-  X_risk <- X[risk_set, ]
+  risk_set <- which(strafied_Data_DBD_int$obstime >= t_i)
+  X_risk <- strafied_Data_DBD_int[risk_set, !(names(strafied_Data_DBD_int) %in% c("obstime", "status"))]
   
   # Compute weights for expected value
-  weights_bSpline <- exp(X_risk %*% bSplines_model_Int_full_coef)
-  weights_PL <- exp(X_risk %*% PL_model_Int_full_coef)
+  weights_bSpline <- exp(as.matrix(X_risk) %*% as.vector(bSplines_model_Int_full_coef))
+  weights_PL <- exp(as.matrix(X_risk) %*% as.vector(PL_model_Int_full_coef))
 
   
   # Expected covariate values
@@ -295,17 +297,17 @@ for (i in which(strafied_Data_DBD_int$status == 1)) {
   expected_x_PL <- colSums(X_risk * weights_PL) / sum(weights_PL)
 
   # Schoenfeld residuals
-  schoenfeld_res_bSpline[i, ] <- x_i - expected_x_bSpline
-  schoenfeld_res_PL[i, ] <-  x_i - expected_x_PL
+  schoenfeld_res_bSpline[i, ] <- as.vector(x_i - expected_x_bSpline)
+  schoenfeld_res_PL[i, ] <-   as.vector(x_i - expected_x_PL)
 }
 
 
-# View residuals for events
-schoenfeld_res_bSpline[!is.na(schoenfeld_res_bSpline[,1]), ]
-schoenfeld_res_PL[!is.na(schoenfeld_res_PL[,1]), ]
-
-plot(schoenfeld_res_bSpline[!is.na(schoenfeld_res_bSpline[,1]), ])
-line(schoenfeld_res_PL[!is.na(schoenfeld_res_PL[,1]), ])
+# # View residuals for events
+# schoenfeld_res_bSpline[!is.na(schoenfeld_res_bSpline[,1]), ]
+# schoenfeld_res_PL[!is.na(schoenfeld_res_PL[,1]), ]
+# 
+# plot(schoenfeld_res_bSpline[!is.na(schoenfeld_res_bSpline[,1]), ])
+# line(schoenfeld_res_PL[!is.na(schoenfeld_res_PL[,1]), ])
 save.image(file = "./Data/03_results_DBD_Step2.RData")
 ```
 
@@ -398,39 +400,7 @@ save.image(file = "./Data/03_results_DBD_Step3.RData")
 
 
 
-```{r, echo=TRUE}
-bSplines_model_Int_results = Bayesian_Survival_result_Extract(bayesian_model_fit = bSplines_model_Int, model_type = "bSplines", criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb"))
-bSplines_model_Int_beta = bSplines_model_Int_results$Beta_bayesian_est[, "mean"]
-bSplines_model_Int_variableSelection = bSplines_model_Int_results$variableSelection
-bSplines_model_Int_Prediction = bSplines_model_Int_results$eta_pred
 
-PL_model_Int_results = Bayesian_Survival_result_Extract(bayesian_model_fit = ph_model_Int, model_type = "none", criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb"))
-PL_Int_beta = PL_model_Int_results$Beta_bayesian_est[, "mean"]
-PL_Int_variableSelection = PL_model_Int_results$variableSelection
-PL_Int_Prediction =  PL_model_Int_results$eta_pred
-
-CI_index_PL <- rep(NA, 5)
-CI_index_bSplines <- rep(NA, 5)
-for (i in 1:5) {
-  CI_index_PL[i] <-
-    rcorr.cens(
-      -PL_Int_Prediction[[i]],
-      Surv(
-        strafied_Data_DBD_int$obstime,
-        strafied_Data_DBD_int$status
-      )
-    )["C Index"]
-  CI_index_bSplines[i] <-
-    rcorr.cens(
-      -bSplines_model_Int_Prediction[[i]],
-      Surv(
-        strafied_Data_DBD_int$obstime,
-        strafied_Data_DBD_int$status
-      )
-    )["C Index"]
-}
-
-```
 
 ```{r, echo=TRUE}
 #Build up b-Spline models in the absence of interaction effects

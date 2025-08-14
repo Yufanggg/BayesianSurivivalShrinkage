@@ -151,7 +151,7 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
 
 
 # Generate a simulate dateset
-DataGenerator <- function(n_samples, n_features, multicolinearity = 0.3) {
+DataGenerator <- function(n_samples, n_features, multicolinearity = 0.3, TimeVarying = FALSE) {
   sim_data <- list()
   
   # generate design matrix in the format of dataframe
@@ -199,30 +199,55 @@ DataGenerator <- function(n_samples, n_features, multicolinearity = 0.3) {
   names(Beta) = names(design_matrix)
   sim_data$Beta = Beta
   
+  if (TimeVarying == FALSE) {
+    # Generate simulated survival data
+    survival_data <- simsurv::simsurv(
+      dist = "weibull",
+      lambdas = 2,
+      # scale
+      gammas = 10,
+      # shape for weibull
+      betas = Beta,
+      x = design_matrix,
+      mixture = FALSE,
+      maxt = 5  # Maximum follow-up time
+    )
+    
+    # survival_data <- survival_data |>
+    #   mutate(
+    #     censtime = runif(n_samples, 0.5, 5),
+    #     status = as.numeric(eventtime <= censtime),
+    #     obstime = pmin(round(eventtime, 4), censtime)
+    #   )
+    # survival_data <- survival_data[, c("status", "obstime")]
+    
+    dataset <- cbind(survival_data, design_matrix)
+    sim_data$dataset <- dataset
+  } else {
+    # define a time-varying effec function
+    Beta_timevarying <- function(t) {
+      -0.5 + 0.3 * log(t + 1e-5)  # avoid log(0)
+    }
+    
+    survival_data <- simsurv::simsurv(
+      dist = "weibull",
+      lambdas = 2,
+      # scale
+      gammas = 10,
+      # shape for weibull
+      betas = Beta,
+      tde = c(Var1 = -0.5),
+      tdefunction = function(t) log(t + 1e-5),  # time transformation,
+      x = design_matrix,
+      mixture = FALSE,
+      maxt = 5  # Maximum follow-up time
+    )
+    dataset <- cbind(survival_data, design_matrix)
+    sim_data$dataset <- dataset
+    
+  }
   
-  # Generate simulated survival data
-  survival_data <- simsurv::simsurv(
-    dist = "weibull",
-    lambdas = 2,
-    # scale
-    gammas = 10,
-    # shape for weibull
-    betas = Beta,
-    x = design_matrix,
-    mixture = FALSE,
-    maxt = 5  # Maximum follow-up time
-  )
   
-  # survival_data <- survival_data |>
-  #   mutate(
-  #     censtime = runif(n_samples, 0.5, 5),
-  #     status = as.numeric(eventtime <= censtime),
-  #     obstime = pmin(round(eventtime, 4), censtime)
-  #   )
-  # survival_data <- survival_data[, c("status", "obstime")]
-  
-  dataset <- cbind(survival_data, design_matrix)
-  sim_data$dataset <- dataset
   
   return(sim_data)
 }
