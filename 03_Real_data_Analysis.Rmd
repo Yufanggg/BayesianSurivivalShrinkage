@@ -251,8 +251,8 @@ bSplines_model_Int_full_coef <- bSplines_model_Int_results$Beta_bayesian_est[, "
 
 
 Data_DBD_PL_Int_full <- stan_data_Constructer_PL(training_dataset = strafied_Data_DBD_int,
-                                            testing_dataset = NULL,
-                                            havingInt = TRUE)
+                                                 testing_dataset = NULL,
+                                                 havingInt = TRUE)
 
 PL_model_Int_full <- Bayesian_Survival_model(stan_data = Data_DBD_PL_Int_full,
                                         baseline_modelling = "none",
@@ -269,7 +269,9 @@ PL_model_Int_results_full = Bayesian_Survival_result_Extract(
   bayesian_model_fit = PL_model_Int_full,
   model_type = "bSplines",
   criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb"))
+
 PL_model_Int_full_coef <- PL_model_Int_results_full$Beta_bayesian_est[, "mean"]
+
   
 
 # Initialize residuals
