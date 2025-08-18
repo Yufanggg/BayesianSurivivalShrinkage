@@ -414,7 +414,7 @@ stan_data_Constructer_BSpline <- function (training_dataset, testing_dataset, ob
       
       nvars = nvars,
       
-      qnodes  = 15,
+      qnodes  = qnodes,
       
       
       Nevent       = sum(training_dataset$status == 1),
@@ -659,7 +659,7 @@ stan_data_Constructer_BSpline <- function (training_dataset, testing_dataset, ob
       #----- for model fitting --------
       nvars = nvars,
       
-      qnodes  = 15,
+      qnodes  = qnodes,
       
       
       Nevent       = sum(training_dataset$status == 1),
@@ -980,8 +980,7 @@ validate_positive_scalar <- function(x, not_greater_than = NULL) {
 get_quadpoints <- function(nodes = 15) {
   if (!is.numeric(nodes) || (length(nodes) > 1L)) {
     stop("'qnodes' should be a numeric vector of length 1.")
-  } else {
-    message("we set the number of nodes for GK quadrature method being 15.")
+  } else if (nodes == 15) {
     list(
       points = c(
         -0.991455371120812639207,
@@ -1015,8 +1014,53 @@ get_quadpoints <- function(nodes = 15) {
         0.1047900103222501838399,
         0.063092092629978553291,
         0.0229353220105292249637))      
-  } 
+  } else if (nodes == 11) {
+    list(
+      points = c(
+        -0.984085360094842464496,
+        -0.906179845938663992798,
+        -0.754166726570849220441,
+        -0.5384693101056830910363,
+        -0.2796304131617831934135,
+        0,
+        0.2796304131617831934135,
+        0.5384693101056830910363,
+        0.754166726570849220441,
+        0.906179845938663992798,
+        0.984085360094842464496),
+      weights = c(
+        0.042582036751081832865,
+        0.1152333166224733940246,
+        0.186800796556492657468,
+        0.2410403392286475866999,
+        0.272849801912558922341,
+        0.2829874178574912132043,
+        0.272849801912558922341,
+        0.241040339228647586701,
+        0.186800796556492657467,
+        0.115233316622473394025,
+        0.042582036751081832865))     
+  } else if (nodes == 7) {
+    list(
+      points = c(
+        -0.9604912687080202834235,
+        -0.7745966692414833770359,
+        -0.4342437493468025580021,
+        0,
+        0.4342437493468025580021,
+        0.7745966692414833770359,
+        0.9604912687080202834235),
+      weights = c(
+        0.1046562260264672651938,
+        0.268488089868333440729,
+        0.401397414775962222905,
+        0.450916538658474142345,
+        0.401397414775962222905,
+        0.268488089868333440729,
+        0.104656226026467265194))      
+  } else stop("'qnodes' must be either 7, 11 or 15.")  
 }
+
 
 # Unlist the result from an lapply call
 #
