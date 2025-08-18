@@ -383,7 +383,7 @@ for (i in 1:length(bSplines_model_Int_noise_variableSelection)) {
 }
 lines(bSplines_model_Int_noise_coef, type = "o", col = "blue", pch = 16)
 #axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
-axis(1, at = 1:91, labels = names(strafied_Data_DBD_int_noise)[1:91], las = 2, cex.axis = 0.7)
+axis(1, at = 1:91, labels = c(names(strafied_Data_DBD_int_noise)[1:91], "noise1", "noise2"), las = 2, cex.axis = 0.7)
 abline(a = 0, b =0, col = "red")
 
 
