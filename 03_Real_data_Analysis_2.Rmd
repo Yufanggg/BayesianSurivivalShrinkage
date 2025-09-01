@@ -1,0 +1,315 @@
+---
+title: "03_Real_Data_Analysis"
+author: "Yufang Wang"
+date: "2025-03-18"
+output: pdf_document
+---
+
+# Step 1: Set up the environment
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+source("./function_file/Functions.R")
+source("./function_file/stan_constructor.R")
+
+install_and_load <- function(packages) {
+  for (pkg in packages) {
+    if (!require(pkg, character.only = TRUE)) {
+      install.packages(pkg, dependencies = TRUE)
+    }
+    library(pkg, character.only = TRUE) }
+  
+}
+
+# List of required packages
+required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret", "corrplot","ggplot2", "loo", "survival", "caret")
+# Install and/or load packages
+install_and_load(required_packages)
+```
+
+
+# Step 2: Organize and strafied the real-world data
+```{r, echo=TRUE}
+real_df <- readRDS("./Data/imputed_NOTR_DGF.rds")
+# sum(!complete.cases(real_df))
+# mean(real_df$status == "graftloss")
+# mean(real_df$status == "alive")
+# mean(real_df$status == "death")
+
+# # Reversed KM for follow-up analysis
+# fit <- survfit(Surv(real_df$time, real_df$status != "graftloss") ~ 1)
+# plot(fit)
+# abline(h = 0.5, col = "red", lty = 2)
+# 
+# str(real_df)
+real_df <- real_df[, !names(real_df) %in% "ID"]
+
+# set the factor variable being sum-to-zero encoded
+contrasts(real_df$Recipientsex) <- contr.sum(levels(real_df$Recipientsex))
+contrasts(real_df$Donorsex) <- contr.sum(levels(real_df$Donorsex))
+contrasts(real_df$Smoking) <- contr.sum(levels(real_df$Smoking))
+contrasts(real_df$InitialPrimaryDiseaseET_regroup) <- contr.sum(levels(real_df$InitialPrimaryDiseaseET_regroup))
+contrasts(real_df$Donorcauseofdeath_group) <- contr.sum(levels(real_df$Donorcauseofdeath_group))
+
+
+# center the numeric variables
+real_df$Recipientage <- scale(real_df$Recipientage)
+real_df$Dialysisdaysrenine <- scale(real_df$Dialysisdaysrenine)
+real_df$Donorage <- scale(real_df$Donorage)
+real_df$Lastcreatininemgdl <- scale(real_df$Lastcreatininemgdl)
+real_df$Warm_ischaemic_period_1 <- scale(real_df$Warm_ischaemic_period_1)
+real_df$Cold_ischaemic_period <- scale(real_df$Cold_ischaemic_period)
+real_df$HLA_mismatch <- scale(real_df$HLA_mismatch)
+real_df$DonorBMI <- scale(real_df$DonorBMI)
+real_df$Recipient_BMI <- scale(real_df$Recipient_BMI)
+#
+
+# print(colnames(real_df)[factorName])
+
+real_df <- real_df[, !(names(real_df) %in% "InitialOnmachineindicator")]
+real_df$Donorcauseofdeath_group <- ifelse(real_df$Donorcauseofdeath_group == "Cardiac", "Cardiac", "Others")
+real_df$Donorcauseofdeath_group <- factor(real_df$Donorcauseofdeath_group)
+contrasts(real_df$Donorcauseofdeath_group) <- contr.sum(levels(real_df$Donorcauseofdeath_group))
+
+real_df$InitialPrimaryDiseaseET_regroup <- ifelse(real_df$InitialPrimaryDiseaseET_regroup == "Diabetes Mellitus", "Diabetes", "Others")
+real_df$InitialPrimaryDiseaseET_regroup <- factor(real_df$InitialPrimaryDiseaseET_regroup)
+contrasts(real_df$InitialPrimaryDiseaseET_regroup) <- contr.sum(levels(real_df$InitialPrimaryDiseaseET_regroup))
+
+
+strafied_Data_DBD <- subset(subset(real_df, real_df$TypecadavericDBDDCD == "DBD"), select = -c(TypecadavericDBDDCD, Warm_ischaemic_period_1))
+
+strafied_Data_DCD <- subset(subset(real_df, real_df$TypecadavericDBDDCD == "DCD"), select = -c(TypecadavericDBDDCD))
+```
+
+# Section 1
+## Step 3: EDA for strafied data DBD
+```{r, echo=TRUE}
+str(strafied_Data_DBD)
+# Get the overall range for numeric columns
+numeric_data <- strafied_Data_DBD[sapply(strafied_Data_DBD, is.numeric)]
+apply(numeric_data, 2, range)
+
+# Get the levels for factor columns
+factor_data <- strafied_Data_DBD[sapply(strafied_Data_DBD, is.factor)]
+lapply(factor_data, levels)
+
+# # Reversed KM for follow-up analysis
+fit <- survfit(Surv(strafied_Data_DBD$time, strafied_Data_DBD$status != "graftloss") ~ 1)
+plot(fit)
+abline(h = 0.5, col = "red", lty = 2)
+
+sum(!names(strafied_Data_DBD) %in% c("time", "status"))
+```
+## Step 4: Verify the existence of interaction effects
+```{r, echo=TRUE}
+strafied_Data_DBD_int <- includingInter(strafied_Data_DBD)
+strafied_Data_DBD_int <- subset(strafied_Data_DBD_int, select = -c(id))
+```
+
+
+
+```{r, echo=TRUE}
+# Separate the dataset into two small datasets to see the stablility of the estimation of the models
+set.seed(123456)
+
+# Number of folds
+k <- 2
+
+# Number of repetitions
+n_repeats <- 50
+
+# Assuming p is the number of coefficients
+p <- 91
+
+# Preallocate lists to store results across repetitions
+bSplines_beta_list <- vector("list", n_repeats)
+bSplines_varSel_list <- vector("list", n_repeats)
+PL_beta_list <- vector("list", n_repeats)
+PL_varSel_list <- vector("list", n_repeats)
+
+for (r in 1:n_repeats) {
+  cat("Repetition", r, "\n")
+  
+  # Generate new folds for each repetition
+  folds <- createFolds(strafied_Data_DBD_int$status, k = k, list = TRUE)
+  
+  # Preallocate matrices for this repetition
+  bSplines_model_subset_beta <- matrix(NA, nrow = k, ncol = p)
+  bSplines_model_subset_variableSelection <- matrix(NA, nrow = k, ncol = p)
+  PL_subset_beta <- matrix(NA, nrow = k, ncol = p)
+  PL_subset_variableSelection <- matrix(NA, nrow = k, ncol = p)
+  
+  for (i in seq_along(folds)) {
+    indices <- folds[[i]]
+    model_dataset <- strafied_Data_DBD_int[indices, ]
+    
+    cat("Fold", i, "\n")
+    cat("Dataset size:", nrow(model_dataset), "\n")
+    
+    # MODEL 1: bSplines
+    Data_DBD_bSplines_subset <- stan_data_Constructer_BSpline(
+      training_dataset = model_dataset,
+      testing_dataset = NULL,
+      obs_window = 3415,
+      log_lik_saving = TRUE,
+      havingInt = TRUE
+    )
+    
+    bSplines_model_subset <- Bayesian_Survival_model(
+      stan_data = Data_DBD_bSplines_subset,
+      baseline_modelling = "bSplines",
+      shrinkage = TRUE,
+      withPrediction = FALSE,
+      havingInt = TRUE
+    )
+    
+    # MODEL 2: Piecewise Linear (PL)
+    Data_DBD_PL_subset <- stan_data_Constructer_PL(
+      training_dataset = model_dataset,
+      testing_dataset = NULL,
+      havingInt = TRUE
+    )
+    
+    PL_model_subset <- Bayesian_Survival_model(
+      stan_data = Data_DBD_PL_subset,
+      baseline_modelling = "none",
+      shrinkage = TRUE,
+      withPrediction = FALSE,
+      havingInt = TRUE,
+      niter = 10000,
+      nwarmup = 2000,
+      thin = 10,
+      chains = 4
+    )
+    
+    # Extract results
+    bSplines_results <- Bayesian_Survival_result_Extract(
+      bayesian_model_fit = bSplines_model_subset,
+      model_type = "bSplines",
+      criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb")
+    )
+    
+    bSplines_model_subset_beta[i, ] <- bSplines_results$Beta_bayesian_est[, "mean"]
+    bSplines_model_subset_variableSelection[i, ] <- bSplines_results$variableSelection
+    
+    PL_results <- Bayesian_Survival_result_Extract(
+      bayesian_model_fit = PL_model_subset,
+      model_type = "none",
+      criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb")
+    )
+    
+    PL_subset_beta[i, ] <- PL_results$Beta_bayesian_est[, "mean"]
+    PL_subset_variableSelection[i, ] <- PL_results$variableSelection
+  }
+  
+  # Store results for this repetition
+  bSplines_beta_list[[r]] <- bSplines_model_subset_beta
+  bSplines_varSel_list[[r]] <- bSplines_model_subset_variableSelection
+  PL_beta_list[[r]] <- PL_subset_beta
+  PL_varSel_list[[r]] <- PL_subset_variableSelection
+}
+
+save.image(file = "./Data/03_results_DBD_step5.RData")
+# Visualize the model results
+par(mfrow = c(1,2))
+plot(bSplines_model_subset_beta[1,], type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, xaxt = "n")
+# Add background rectangles
+for (i in 1:length(bSplines_model_subset_variableSelection[1,])) {
+  if (bSplines_model_subset_variableSelection[1, i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+
+for (i in 1:length(bSplines_model_subset_variableSelection[2,])) {
+  if (bSplines_model_subset_variableSelection[1, i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "pink", border = NA)
+  }
+}
+
+lines(bSplines_model_subset_beta[1,], type = "o", col = "blue", pch = 16)
+lines(bSplines_model_subset_beta[2,], type = "o", col = "red", pch = 16)
+#axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
+axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
+abline(a = 0, b =0, col = "black")
+
+
+
+plot(PL_subset_beta[1,], type = "o", col = "darkgreen", xlab = "", ylab = "Beta", main = "", pch = 16, xaxt = "n")
+# Add background rectangles
+for (i in 1:length(PL_subset_variableSelection[1,])) {
+  if (PL_subset_variableSelection[1, i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
+  }
+}
+for (i in 1:length(PL_subset_variableSelection[1,])) {
+  if (PL_subset_variableSelection[2,i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "yellow", border = NA)
+  }
+}
+lines(PL_subset_beta[1,], type = "o", col = "darkgreen", pch = 16)
+lines(PL_subset_beta[2,], type = "o", col = "orange", pch = 16)
+axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
+abline(a = 0, b =0, col = "black")
+save.image(file = "./Data/03_results_DBD_step5.RData")
+```
+
+
+# Section 2: Data analysis for DCD
+## STEP 1: estimate the Betas for DCD
+```{r, echo=TRUE}
+obs_window = 3415 #max(df_using$time_tx_date_max2)
+strafied_Data_DCD_int <- includingInter(strafied_Data_DCD)
+
+
+stan_data_bSpline_DCD <- stan_data_Constructer_BSpline(
+      training_dataset = strafied_Data_DCD_int,
+      testing_dataset = NULL,
+      obs_window = 3415
+    )
+
+stan_data_PH_DCD <- stan_data_Constructer_PH(
+      training_dataset = strafied_Data_DCD_int,
+      testing_dataset = NULL
+    )
+
+model_fit_bSpline_DCD <- Bayesian_Survival_model(stan_data = stan_data_bSpline_DCD, baseline_modelling = "bSplines", withPrediction = FALSE, shrinkage = TRUE)
+
+model_fit_PH_DCD <- Bayesian_Survival_model(stan_data = stan_data_PH_DCD, baseline_modelling = "none", withPrediction = FALSE, shrinkage = TRUE)
+
+#model diagnotics
+diagnostics_bSpline_DCD <- summary(model_fit_bSpline_DCD)$summary[, c("Rhat", "n_eff")]
+diagnostics_PH_DCD <- summary(model_fit_PH_DCD)$summary[, c("Rhat", "n_eff")]
+print(diagnostics_bSpline_DCD)
+print(diagnostics_PH_DCD)
+
+#extract the info from the bayesian model fit
+model_result_bSpline_DCD <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSpline_DCD, model_type = "none", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
+
+model_result_PH_DCD <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_PH_DCD, model_type = "none", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
+
+mean_beta_DCD = model_result_bSpline_DCD$Beta_bayesian_est[, "mean"]
+variableSelection_DCD = model_result_bSpline_DCD$variableSelection
+
+mean_beta_DCD_PH = model_result_PH_DCD$Beta_bayesian_est[, "mean"]
+variableSelection_DCD_PH = model_result_PH_DCD$variableSelection
+
+#cross_val_metric_DBD <- cross_validation(whole_dataset = strafied_Data_DBD_int, baseline_modelling = "bSplines", num_folds = 5, obs_window = 3415)
+save.image(file = "./Data/03_results_DCD.RData")
+```
+## STEP 2: visualize DCD results
+```{r, echo=TRUE}
+load(file = "./Data/03_results_DCD.RData")
+plot(beta_bSplines_withInt, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, ylim = c(-10, 10), xaxt = "n")
+# Add background rectangles
+for (i in 1:length(variableSelection_DBD_bSplines_model_withInt)) {
+  if (variableSelection_DBD_bSplines_model_withInt[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+lines(beta_bSplines_withInt, type = "o", col = "blue", pch = 16)
+# lines(beta_bSplines_withInt, type = "o", col = "lightgreen", pch = 16)
+axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
+```
+
+
