@@ -268,8 +268,8 @@ for (i in seq_along(folds)){
   bSplines_model_variableSelection[i,] <- bSplines_model_results$variableSelection
   #-----------MODEL 2: Cox regression ----------
   cox_regression <- coxph(Surv(as.numeric(obstime), status) ~., data = training_data)
-  combined_Data_int_noise_cox_regression_result <- summary(cox_regression)
-combined_Data_int_noise_cox_regression_result_coef <- as.matrix(combined_Data_int_noise_cox_regression_result$coefficients[, "coef"])
+  cox_regression_result <- summary(cox_regression)
+  cox_regression_result_coef <- as.matrix(combined_Data_int_noise_cox_regression_result$coefficients[, "coef"])
 combined_Data_int_noise_cox_regression_result_variableSelection <- as.matrix((combined_Data_int_noise_cox_regression_result$coefficients[, "Pr(>|z|)"] *110) < 0.05)
   
   
