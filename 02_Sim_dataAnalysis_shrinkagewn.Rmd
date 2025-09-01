@@ -366,9 +366,9 @@ boxplot(FDR_list, names = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplin
 Power_list = list(bSplines_withShrinkag = 1 - FNR_bSplines_withShrinkag, bSplines_noShrinkag = 1 - FNR_bSplines_noShrinkag,  PL_withShrinkage = 1 - FNR_PL_withShrinkage, PL_noShrinkag = 1 - FNR_PL_noShrinkag)
 boxplot(Power_list, names = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), main = "Power", xlab = "", ylab = "Power", ylim = c(0, 1))
 
-
 # # Subfigure 7 C index
 C_index_list = list(bSplines_withShrinkag = C_index_bSplines_withShrinkag, bSplines_noShrinkag = C_index_bSplines_noShrinkag, PL_withShrinkage = C_index_PL_withShrinkage, PL_noShrinkag = C_index_PL_noShrinkag)
 boxplot(C_index_list, names = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), main = "C index", xlab = "", ylab = "C index", ylim = c(0, 1))
+abline(h = 0.5, col = "red", lty = 2)
 ```
 
