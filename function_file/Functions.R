@@ -320,30 +320,12 @@ Bayesian_Survival_result_Extract <- function(bayesian_model_fit, model_type,
                                              criteria = c("DesignCoefficients",
                                                           "Prediction_SurvivalProb",
                                                           "variableSelection",
-                                                          "baseline")) {
+                                                          "baseline"), uncertainty = FALSE) {
   # Ensure the Output object is available
   Output <- summary(bayesian_model_fit)$summary
   
   # Initialize the result list
   model_result <- list()
-  
-  if ("DesignCoefficients" %in% criteria) {
-    Beta_bayesian_est <- Output[grep("^Beta", rownames(Output)), "mean", drop = FALSE]
-    model_result$Beta_bayesian_est <- Beta_bayesian_est
-  }
-  
-  if ("Prediction_SurvivalProb" %in% criteria) {
-    if (model_type != "none"){
-      eta_pred <- Output[grep("^eta_new", rownames(Output)), "50%", drop = FALSE]
-      model_result$eta_pred <- eta_pred
-      sp <- Output[grep("^survival_prob", rownames(Output)), "50%", drop = FALSE]
-      model_result$sp <- sp
-    } else {
-      eta_pred <- Output[grep("^eta_new", rownames(Output)), "50%", drop = FALSE]
-      model_result$eta_pred <- eta_pred
-    }
-    
-  }
   
   if ("variableSelection" %in% criteria) {
     Beta_bayesian_est_LB <- Output[grep("^Beta", rownames(Output)), "2.5%", drop = FALSE]
@@ -353,19 +335,93 @@ Bayesian_Survival_result_Extract <- function(bayesian_model_fit, model_type,
     model_result$variableSelection <- !includes_zero
   }
   
-  if ("baseline" %in% criteria) {
-    if (model_type == "exponential") {
-      lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
-      model_result$baselinePara <- lambda
-    } else if (model_type == "weibull") {
-      lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
-      shape <- Output[grep("^shape", rownames(Output)), "50%", drop = FALSE]
-      model_result$baselinePara <- c(lambda, shape)
-    } else if (model_type == "bSplines") {
-      coefs <- Output[grep("^coefs", rownames(Output)), "mean", drop = FALSE]
-      model_result$baselinePara = coefs
-    } else {
-      # No actions for 
+  if (uncertainty == FALSE){
+    if ("DesignCoefficients" %in% criteria) {
+      Beta_bayesian_est <- Output[grep("^Beta", rownames(Output)), "mean", drop = FALSE]
+      model_result$Beta_bayesian_est <- Beta_bayesian_est
+    }
+    
+    if ("Prediction_SurvivalProb" %in% criteria) {
+      if (model_type != "none"){
+        eta_pred <- Output[grep("^eta_new", rownames(Output)), "50%", drop = FALSE]
+        model_result$eta_pred <- eta_pred
+        sp <- Output[grep("^survival_prob", rownames(Output)), "50%", drop = FALSE]
+        model_result$sp <- sp
+      } else {
+        eta_pred <- Output[grep("^eta_new", rownames(Output)), "50%", drop = FALSE]
+        model_result$eta_pred <- eta_pred
+      }
+      
+    }
+    
+    if ("baseline" %in% criteria) {
+      if (model_type == "exponential") {
+        lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
+        model_result$baselinePara <- lambda
+      } else if (model_type == "weibull") {
+        lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
+        shape <- Output[grep("^shape", rownames(Output)), "50%", drop = FALSE]
+        model_result$baselinePara <- c(lambda, shape)
+      } else if (model_type == "bSplines") {
+        coefs <- Output[grep("^coefs", rownames(Output)), "mean", drop = FALSE]
+        model_result$baselinePara = coefs
+      } else {
+        # No actions for 
+      }
+    }
+  } else {
+    
+    if ("DesignCoefficients" %in% criteria) {
+      Beta_bayesian_est <- Output[grep("^Beta", rownames(Output)), "mean", drop = FALSE]
+      model_result$Beta_bayesian_est <- Beta_bayesian_est
+      
+      model_result$Beta_bayesian_estLB <- Output[grep("^Beta", rownames(Output)), "2.5%%", drop = FALSE]
+      model_result$Beta_bayesian_estUB <- Output[grep("^Beta", rownames(Output)), "97.5%", drop = FALSE]
+    }
+    
+    if ("Prediction_SurvivalProb" %in% criteria) {
+      eta_pred <- Output[grep("^eta_new", rownames(Output)), "50%", drop = FALSE]
+      model_result$eta_pred <- eta_pred
+      
+      model_result$eta_predLB <- Output[grep("^eta_new", rownames(Output)), "2.5%%", drop = FALSE]
+      model_result$eta_predUB <- Output[grep("^eta_new", rownames(Output)), "97.5%", drop = FALSE]
+      
+      if (model_type != "none"){
+        sp <- Output[grep("^survival_prob", rownames(Output)), "50%", drop = FALSE]
+        model_result$sp <- sp
+        
+        model_result$spLB <- Output[grep("^survival_prob", rownames(Output)), "2.5%%", drop = FALSE]
+        model_result$spUB <- Output[grep("^survival_prob", rownames(Output)), "97.5%", drop = FALSE]
+      }
+      
+    }
+    
+    if ("baseline" %in% criteria) {
+      if (model_type == "exponential") {
+        lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
+        lambdaLB <- Output[grep("^lambda", rownames(Output)), "2.5%", drop = FALSE]
+        lambdaUB <- Output[grep("^lambda", rownames(Output)), "97.5%", drop = FALSE]
+        
+        model_result$baselinePara <- list(lambda, lambdaLB, lambdaUB)
+      } else if (model_type == "weibull") {
+        lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
+        lambdaLB <- Output[grep("^lambda", rownames(Output)), "2.5%", drop = FALSE]
+        lambdaUB <- Output[grep("^lambda", rownames(Output)), "97.5%", drop = FALSE]
+        
+        shape <- Output[grep("^shape", rownames(Output)), "50%", drop = FALSE]
+        shapeLB <- Output[grep("^shape", rownames(Output)), "2.5%", drop = FALSE]
+        shapeUB <- Output[grep("^shape", rownames(Output)), "97.5%", drop = FALSE]
+        
+        model_result$baselinePara <- list(lambda, shape, lambdaLB, lambdaUB, shapeLB, shapeUB)
+      } else if (model_type == "bSplines") {
+        coefs <- Output[grep("^coefs", rownames(Output)), "mean", drop = FALSE]
+        coefsLB <- Output[grep("^coefs", rownames(Output)), "2.5%", drop = FALSE]
+        coefsUB <- Output[grep("^coefs", rownames(Output)), "97.5%", drop = FALSE]
+        
+        model_result$baselinePara = list(coefs, coefsLB, coefsUB)
+      } else {
+        # No actions for 
+      }
     }
   }
   
