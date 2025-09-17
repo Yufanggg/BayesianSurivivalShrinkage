@@ -122,8 +122,6 @@ for (cvars in categorical_vars){
 ```
 
 # Section 1: include all variables and see whether or not it is possible for the get the model converenge
-
-## Step 4: Verify the existence of interaction effects
 ```{r, echo=TRUE}
 combined_Data_int <- includingInter(combined_Data)
 combined_Data_int <- subset(combined_Data_int, select = -c(id))
@@ -175,7 +173,7 @@ combined_Data_int_noise_bSpline_model <- Bayesian_Survival_model(
 combined_Data_int_noise_bSpline_model_result = Bayesian_Survival_result_Extract(
   bayesian_model_fit = combined_Data_int_noise_bSpline_model,
   model_type = "bSplines",
-  criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb"))
+  criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb", "baseline"))
 combined_Data_int_noise_bSpline_model_result_coef <- combined_Data_int_noise_bSpline_model_result$Beta_bayesian_est[, "mean"]
 combined_Data_int_noise_bSpline_model_result_variableSelection <- combined_Data_int_noise_bSpline_model_result$variableSelection
 
@@ -241,7 +239,7 @@ combined_Data_int_noise_bSpline_model_Simple <- Bayesian_Survival_model(
 combined_Data_int_noise_bSpline_model_Simple_result = Bayesian_Survival_result_Extract(
   bayesian_model_fit = combined_Data_int_noise_bSpline_model_Simple,
   model_type = "bSplines",
-  criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb"))
+  criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb", "baseline"))
 combined_Data_int_noise_bSpline_model_Simple_result_coef <- combined_Data_int_noise_bSpline_model_Simple_result$Beta_bayesian_est[, "mean"]
 combined_Data_int_noise_bSpline_model_Simple_result_variableSelection <- combined_Data_int_noise_bSpline_model_Simple_result$variableSelection
 
@@ -359,178 +357,18 @@ for (i in 1:length(combined_Data_int_noise_PL_model_Simple_result_variableSelect
 lines(combined_Data_int_noise_PL_model_Simple_result_coef, type = "o", col = "darkgreen", pch = 16)
 axis(1, at = 1:48, labels = name_label_Simple, las = 2, cex.axis = 0.7)
 abline(a = 0, b =0, col = "red")
-```
-
-# Cross validation, 10-folds
-```{r, echo=TRUE}
-set.seed(123456)
-
-# Number of folds
-k <- 10
 
 
-# Assuming p is the number of coefficients
-p <- 105
+# Plot the baselinehazard function
+baseline <- combined_Data_int_noise_bSpline$basis
+baselineCoef <- combined_Data_int_noise_bSpline_model_result$baselinePara
 
-# Preallocate lists to store results across repetitions
-folds <- createFolds(combined_Data_int$status, k = k, list = TRUE)
+basline_Simple <- combined_Data_int_noise_bSpline_Simple$basis
+baselineCoefCoef <- combined_Data_int_noise_bSpline_model_Simple_result$baselinePara
 
-
-bSplines_model_C_INDEX_Simple = bSplines_model_C_INDEX = rep(NA, k)
-coxRegression_C_INDEX_Simple = coxRegression_C_INDEX = rep(NA, k)
-PL_C_INDEX_Simple = PL_C_INDEX = rep(NA, k)
-
-
-for (i in seq_along(folds)) {
-  cat("Repetition", i, "\n")
-  
-  indices <- folds[[i]]
-  training_dataset <- combined_Data_int[-indices,]
-  testing_dataset <- combined_Data_int[indices,]
-  
-  
-  training_dataset_Simple <- combined_Data_Simple_int[-indices,]
-  testing_dataset2_Simple <- combined_Data_Simple_int[indices,]
-  
-  cat("Fold", i, "\n")
-  cat("Dataset size:", nrow(training_dataset), "\n")
-
-  
-  # Model 1.1 b-Splines model-------
-  Data_bSplines <- stan_data_Constructer_BSpline(
-      training_dataset = training_dataset,
-      testing_dataset = testing_dataset,
-      obs_window = 3415,
-      log_lik_saving = FALSE,
-      havingInt = TRUE
-    )
-  bSplines_model <-
-      Bayesian_Survival_model(
-        stan_data = Data_bSplines,
-        baseline_modelling = "bSplines",
-        shrinkage = TRUE,
-        withPrediction = TRUE,
-        havingInt = TRUE,
-        niter = 10000,
-        nwarmup = 2000,
-        thin = 10,
-        chains = 1
-      )
-  # Extract the model result
-  bSplines_model_results = Bayesian_Survival_result_Extract(
-      bayesian_model_fit = bSplines_model,
-      model_type = "bSplines",
-      criteria = c("Prediction_SurvivalProb")
-    )
-  bSplines_model_Prediction_SurvivalProb <- as.vector(bSplines_model_results$eta_pred)
-  bSplines_model_C_INDEX[i] <- rcorr.cens(-bSplines_model_Prediction_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
-  
-  # Model 2.1 b-Splines model for simplifed data -------
-  Data_bSplines_Simple <- stan_data_Constructer_BSpline(
-      training_dataset = training_dataset_Simple,
-      testing_dataset = testing_dataset2_Simple,
-      obs_window = 3415,
-      log_lik_saving = FALSE,
-      havingInt = TRUE
-    )
-  bSplines_model_Simple <-
-      Bayesian_Survival_model(
-        stan_data = Data_bSplines_Simple,
-        baseline_modelling = "bSplines",
-        shrinkage = TRUE,
-        withPrediction = TRUE,
-        havingInt = TRUE,
-        niter = 10000,
-        nwarmup = 2000,
-        thin = 10,
-        chains = 1
-      )
-   # Extract the model result
-  bSplines_model_results_Simple = Bayesian_Survival_result_Extract(
-      bayesian_model_fit = bSplines_model_Simple,
-      model_type = "bSplines",
-      criteria = c("Prediction_SurvivalProb")
-    )
-  bSplines_model_Prediction_SurvivalProb_Simple <- bSplines_model_results_Simple$eta_pred
-  bSplines_model_C_INDEX_Simple[i] <- rcorr.cens(-bSplines_model_Prediction_SurvivalProb_Simple, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
-
-    #-----------MODEL 1.2: Cox regression ----------
-    cox_regression <- coxph(Surv(as.numeric(obstime), status) ~ ., data = training_dataset)
-    coxRegression_SurvivalProb <- predict(cox_regression, newdata = testing_dataset, type = "lp")
-    coxRegression_C_INDEX[i] <- rcorr.cens(-coxRegression_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
-    
-    #-----------MODEL 2.2: Cox regression ----------
-    cox_regression_Simple <- coxph(Surv(as.numeric(obstime), status) ~ ., data = training_dataset_Simple)
-    coxRegression_SurvivalProb_Simple <- predict(cox_regression_Simple, newdata = testing_dataset2_Simple, type = "lp")
-    coxRegression_C_INDEX_Simple[i] <- rcorr.cens(-coxRegression_SurvivalProb_Simple, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
-    
-    #-----------MODEL 1.3: PL model----------
-    Data_PL <- stan_data_Constructer_PL(
-      training_dataset = training_dataset,
-      testing_dataset = testing_dataset,
-      havingInt = TRUE
-    )
-    
-    PL_model <- Bayesian_Survival_model(
-      stan_data = Data_PL,
-      baseline_modelling = "none",
-      shrinkage = TRUE,
-      withPrediction = TRUE,
-      havingInt = TRUE,
-      niter = 10000,
-      nwarmup = 2000,
-      thin = 10,
-      chains = 1
-    )
-    PL_results = Bayesian_Survival_result_Extract(
-      bayesian_model_fit = PL_model,
-      model_type = "none",
-      criteria = c("Prediction_SurvivalProb")
-    )
-    PL_Prediction_SurvivalProb <- PL_results$eta_pred
-    PL_C_INDEX[i] <- rcorr.cens(-PL_Prediction_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
-    
-    #-----------MODEL 2.3: PL model----------
-    Data_PL_Simple <- stan_data_Constructer_PL(
-      training_dataset = training_dataset_Simple,
-      testing_dataset = testing_dataset2_Simple,
-      havingInt = TRUE
-    )
-    
-    PL_model_Simple <- Bayesian_Survival_model(
-      stan_data = Data_PL_Simple,
-      baseline_modelling = "none",
-      shrinkage = TRUE,
-      withPrediction = TRUE,
-      havingInt = TRUE,
-      niter = 10000,
-      nwarmup = 2000,
-      thin = 10,
-      chains = 1
-    )
-    PL_results_Simple = Bayesian_Survival_result_Extract(
-      bayesian_model_fit = PL_model_Simple,
-      model_type = "none",
-      criteria = c("Prediction_SurvivalProb")
-    )
-    PL_Prediction_SurvivalProb_Simple <- PL_results_Simple$eta_pred
-    PL_C_INDEX_Simple[i] <- rcorr.cens(-PL_Prediction_SurvivalProb_Simple, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
-}
-
-save.image(file = "./Data/03_results_combined_Step4_includSimplifiedData.RData")
-```
-
-
-```{r, echo=TRUE}
-load(file = "./Data/03_results_combined_Step4_includSimplifiedData.RData")
-par(mfrow = c(1, 2))
-
-C_index <- list(bSplines = bSplines_model_C_INDEX, CoxRegression = coxRegression_C_INDEX,  PL = PL_C_INDEX)
-boxplot(C_index, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index", xlab = "", ylab = "C-index", ylim = c(0, 1))
-
-
-C_index_Simplified <- list(bSplines = bSplines_model_C_INDEX_Simple, CoxRegression = coxRegression_C_INDEX_Simple, PL = PL_C_INDEX_Simple)
-boxplot(C_index_Simplified, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index", xlab = "", ylab = "C-index", ylim = c(0, 1))
+plot(exp(baseline %*% baselineCoef), col = "blue")
+lines(exp(baseline %*% baselineCoef, col = "red"))
+axis(1, at = 1:310, labels = combined_Data_int_noise_bSpline_Simple[combined_Data_int_noise_bSpline_Simple$status==1, "obstime"], las = 2, cex.axis = 0.7)
 ```
 
 
@@ -540,7 +378,7 @@ boxplot(C_index_Simplified, names = c("BayesianBSplines", "CoxRegression", "Baye
 set.seed(123456)
 
 # Number of folds
-k <- 2 
+k <- 2
 
 # Number of repetitions
 n_repeats <- 10
@@ -557,13 +395,6 @@ PL_varSel_list <- vector("list", n_repeats)
 cox_beta_list <- vector("list", n_repeats)
 cox_varSel_list <- vector("list", n_repeats)
 
-bSplines_beta_list2 <- vector("list", n_repeats)
-bSplines_varSel_list2 <- vector("list", n_repeats)
-PL_beta_list2 <- vector("list", n_repeats)
-PL_varSel_list2 <- vector("list", n_repeats)
-cox_beta_list2 <- vector("list", n_repeats)
-cox_varSel_list2 <- vector("list", n_repeats)
-
 bSplines_beta_list_Simple <- vector("list", n_repeats)
 bSplines_varSel_list_Simple <- vector("list", n_repeats)
 PL_beta_list_Simple <- vector("list", n_repeats)
@@ -571,18 +402,20 @@ PL_varSel_list_Simple <- vector("list", n_repeats)
 cox_beta_list_Simple <- vector("list", n_repeats)
 cox_varSel_list_Simple <- vector("list", n_repeats)
 
-bSplines_beta_list2_Simple <- vector("list", n_repeats)
-bSplines_varSel_list2_Simple <- vector("list", n_repeats)
-PL_beta_list2_Simple <- vector("list", n_repeats)
-PL_varSel_list2_Simple <- vector("list", n_repeats)
-cox_beta_list2_Simple <- vector("list", n_repeats)
-cox_varSel_list2_Simple <- vector("list", n_repeats)
+bSplines_model_C_INDEX_Simple = bSplines_model_C_INDEX = matrix(NA, nrow = n_repeats, ncol = k)
+coxRegression_C_INDEX_Simple = coxRegression_C_INDEX = matrix(NA, nrow = n_repeats, ncol = k)
+PL_C_INDEX_Simple = PL_C_INDEX =  matrix(NA, nrow = n_repeats, ncol = k)
+
+FOLDS <- list()
+
 
 for (r in 1:n_repeats) {
   cat("Repetition", r, "\n")
   
   # Generate new folds for each repetition
   folds <- createFolds(combined_Data_int$status, k = k, list = TRUE)
+  
+  FOLDS <- c(FOLDS, folds)
   
   # Preallocate matrices for this repetition
   bSplines_model_beta <- matrix(NA, nrow = k, ncol = p)
@@ -591,14 +424,7 @@ for (r in 1:n_repeats) {
   PL_variableSelection <- matrix(NA, nrow = k, ncol = p)
   cox_beta <- matrix(NA, nrow = k, ncol = p)
   cox_variableSelection <- matrix(NA, nrow = k, ncol = p)
-  
-  
-  bSplines_model_beta2 <- matrix(NA, nrow = k, ncol = p)
-  bSplines_model_variableSelection2 <- matrix(NA, nrow = k, ncol = p)
-  PL_beta2 <- matrix(NA, nrow = k, ncol = p)
-  PL_variableSelection2 <- matrix(NA, nrow = k, ncol = p)
-  cox_beta2 <- matrix(NA, nrow = k, ncol = p)
-  cox_variableSelection2 <- matrix(NA, nrow = k, ncol = p)
+
   
   #---------- For simplified dataset---------------
   bSplines_model_beta_Simple <- matrix(NA, nrow = k, ncol = p1)
@@ -608,22 +434,16 @@ for (r in 1:n_repeats) {
   cox_beta_Simple <- matrix(NA, nrow = k, ncol = p1)
   cox_variableSelection_Simple <- matrix(NA, nrow = k, ncol = p1)
   
-  
-  bSplines_model_beta2_Simple <- matrix(NA, nrow = k, ncol = p1)
-  bSplines_model_variableSelection2_Simple <- matrix(NA, nrow = k, ncol = p1)
-  PL_beta2_Simple <- matrix(NA, nrow = k, ncol = p1)
-  PL_variableSelection2_Simple <- matrix(NA, nrow = k, ncol = p1)
-  cox_beta2_Simple <- matrix(NA, nrow = k, ncol = p1)
-  cox_variableSelection2_Simple <- matrix(NA, nrow = k, ncol = p1)
+
   
   
   for (i in seq_along(folds)) {
     indices <- folds[[i]]
     training_dataset <- combined_Data_int[-indices,]
-    training_dataset2 <- combined_Data_int[indices,]
+    testing_dataset <- combined_Data_int[indices,]
     
     training_dataset_Simple <- combined_Data_Simple_int[-indices,]
-    training_dataset2_Simple <- combined_Data_Simple_int[indices,]
+    testing_dataset_Simple <- combined_Data_Simple_int[indices,]
     
     cat("Fold", i, "\n")
     cat("Dataset size:", nrow(training_dataset), "\n")
@@ -632,7 +452,7 @@ for (r in 1:n_repeats) {
     #-----------MODEL 1.1: bSpline model----------
     Data_bSplines <- stan_data_Constructer_BSpline(
       training_dataset = training_dataset,
-      testing_dataset = NULL,
+      testing_dataset = testing_dataset,
       obs_window = 3415,
       log_lik_saving = FALSE,
       havingInt = TRUE
@@ -642,7 +462,7 @@ for (r in 1:n_repeats) {
         stan_data = Data_bSplines,
         baseline_modelling = "bSplines",
         shrinkage = TRUE,
-        withPrediction = FALSE,
+        withPrediction = TRUE,
         havingInt = TRUE,
         niter = 10000,
         nwarmup = 2000,
@@ -650,74 +470,7 @@ for (r in 1:n_repeats) {
         chains = 1
       )
     
-    Data_bSplines2 <- stan_data_Constructer_BSpline(
-      training_dataset = training_dataset2,
-      testing_dataset = NULL,
-      obs_window = 3415,
-      log_lik_saving = FALSE,
-      havingInt = TRUE
-    )
-    bSplines_model2 <-
-      Bayesian_Survival_model(
-        stan_data = Data_bSplines2,
-        baseline_modelling = "bSplines",
-        shrinkage = TRUE,
-        withPrediction = FALSE,
-        havingInt = TRUE,
-        niter = 10000,
-        nwarmup = 2000,
-        thin = 10,
-        chains = 1
-      )
-    
-    
-    #-----------MODEL 1.2: Cox regression ----------
-    cox_regression <- coxph(Surv(as.numeric(obstime), status) ~ ., data = training_dataset)
-    cox_regression_result <- summary(cox_regression)
-    
-    cox_regression2 <- coxph(Surv(as.numeric(obstime), status) ~ ., data = training_dataset2)
-    cox_regression_result2 <- summary(cox_regression2)
-   
-    
-    #-----------MODEL 1.3: PL model----------
-    Data_PL <- stan_data_Constructer_PL(
-      training_dataset = training_dataset,
-      testing_dataset = NULL,
-      havingInt = TRUE
-    )
-    
-    PL_model <- Bayesian_Survival_model(
-      stan_data = Data_PL,
-      baseline_modelling = "none",
-      shrinkage = TRUE,
-      withPrediction = FALSE,
-      havingInt = TRUE,
-      niter = 10000,
-      nwarmup = 2000,
-      thin = 10,
-      chains = 1
-    )
-    
-    Data_PL2 <- stan_data_Constructer_PL(
-      training_dataset = training_dataset2,
-      testing_dataset = NULL,
-      havingInt = TRUE
-    )
-    
-    PL_model2 <- Bayesian_Survival_model(
-      stan_data = Data_PL2,
-      baseline_modelling = "none",
-      shrinkage = TRUE,
-      withPrediction = FALSE,
-      havingInt = TRUE,
-      niter = 10000,
-      nwarmup = 2000,
-      thin = 10,
-      chains = 1
-    )
-    
-    
-    # Extract the model result
+     # Extract the model result
     bSplines_model_results = Bayesian_Survival_result_Extract(
       bayesian_model_fit = bSplines_model,
       model_type = "bSplines",
@@ -731,26 +484,38 @@ for (r in 1:n_repeats) {
     bSplines_model_beta[i, ] <- bSplines_model_results$Beta_bayesian_est[, "mean"]
     bSplines_model_variableSelection[i, ] <- bSplines_model_results$variableSelection
     
+     bSplines_model_Prediction_SurvivalProb <- as.vector(bSplines_model_results$eta_pred)
+     bSplines_model_C_INDEX[r, i] <- rcorr.cens(-bSplines_model_Prediction_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
     
-    bSplines_model_results2 = Bayesian_Survival_result_Extract(
-      bayesian_model_fit = bSplines_model2,
-      model_type = "bSplines",
-      criteria = c(
-        "DesignCoefficients",
-        "variableSelection",
-        "Prediction_SurvivalProb"
-      )
-    )
-    
-    bSplines_model_beta2[i, ] <- bSplines_model_results2$Beta_bayesian_est[, "mean"]
-    bSplines_model_variableSelection2[i, ] <- bSplines_model_results2$variableSelection
-    
+    #-----------MODEL 1.2: Cox regression ----------
+    cox_regression <- coxph(Surv(as.numeric(obstime), status) ~ ., data = training_dataset)
+    cox_regression_result <- summary(cox_regression)
     
     cox_beta[i,] <- as.vector(cox_regression_result$coefficients[, "coef"])
     cox_variableSelection[i,] <- as.vector((cox_regression_result$coefficients[, "Pr(>|z|)"] * p) < 0.05)
     
-    cox_beta2[i,] <- as.vector(cox_regression_result2$coefficients[, "coef"])
-    cox_variableSelection2[i,] <- as.vector((cox_regression_result2$coefficients[, "Pr(>|z|)"] * p ) < 0.05)
+    coxRegression_SurvivalProb <- predict(cox_regression, newdata = testing_dataset, type = "lp")
+    coxRegression_C_INDEX[r, i] <- rcorr.cens(-coxRegression_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
+    
+    #-----------MODEL 1.3: PL model----------
+    Data_PL <- stan_data_Constructer_PL(
+      training_dataset = training_dataset,
+      testing_dataset = testing_dataset,
+      havingInt = TRUE
+    )
+    
+    PL_model <- Bayesian_Survival_model(
+      stan_data = Data_PL,
+      baseline_modelling = "none",
+      shrinkage = TRUE,
+      withPrediction = TRUE,
+      havingInt = TRUE,
+      niter = 10000,
+      nwarmup = 2000,
+      thin = 10,
+      chains = 1
+    )
+
     
     PL_results = Bayesian_Survival_result_Extract(
     bayesian_model_fit = PL_model,
@@ -764,27 +529,15 @@ for (r in 1:n_repeats) {
     PL_beta[i, ] <- PL_results$Beta_bayesian_est[, "mean"]
     PL_variableSelection[i, ] <- PL_results$variableSelection
     
-    PL_results2 = Bayesian_Survival_result_Extract(
-    bayesian_model_fit = PL_model2,
-    model_type = "none",
-    criteria = c(
-      "DesignCoefficients",
-      "variableSelection",
-      "Prediction_SurvivalProb"
-    )
-  )
-    
-    PL_beta2[i, ] <- PL_results2$Beta_bayesian_est[, "mean"]
-    PL_variableSelection2[i, ] <- PL_results2$variableSelection
-    
-    
+    PL_Prediction_SurvivalProb <- PL_results$eta_pred
+    PL_C_INDEX[r, i] <- rcorr.cens(-PL_Prediction_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
     ###---------------------------------------------------------
     ###-------------for simplified dataset----------------------
     ###---------------------------------------------------------
     #-----------MODEL 2.1: bSpline model----------
     Data_bSplines_Simple <- stan_data_Constructer_BSpline(
       training_dataset = training_dataset_Simple,
-      testing_dataset = NULL,
+      testing_dataset = testing_dataset_Simple,
       obs_window = 3415,
       log_lik_saving = FALSE,
       havingInt = TRUE
@@ -794,7 +547,7 @@ for (r in 1:n_repeats) {
         stan_data = Data_bSplines_Simple,
         baseline_modelling = "bSplines",
         shrinkage = TRUE,
-        withPrediction = FALSE,
+        withPrediction = TRUE,
         havingInt = TRUE,
         niter = 10000,
         nwarmup = 2000,
@@ -802,74 +555,6 @@ for (r in 1:n_repeats) {
         chains = 1
       )
     
-    Data_bSplines2_Simple <- stan_data_Constructer_BSpline(
-      training_dataset = training_dataset2_Simple,
-      testing_dataset = NULL,
-      obs_window = 3415,
-      log_lik_saving = FALSE,
-      havingInt = TRUE
-    )
-    bSplines_model2_Simple <-
-      Bayesian_Survival_model(
-        stan_data = Data_bSplines2_Simple,
-        baseline_modelling = "bSplines",
-        shrinkage = TRUE,
-        withPrediction = FALSE,
-        havingInt = TRUE,
-        niter = 10000,
-        nwarmup = 2000,
-        thin = 10,
-        chains = 1
-      )
-    
-    
-    #-----------MODEL 1.2: Cox regression ----------
-    cox_regression_Simple <- coxph(Surv(as.numeric(obstime), status) ~ ., data = training_dataset_Simple)
-    cox_regression_result_Simple <- summary(cox_regression_Simple)
-    
-    cox_regression2_Simple <- coxph(Surv(as.numeric(obstime), status) ~ ., data = training_dataset2_Simple)
-    cox_regression_result2_Simple <- summary(cox_regression2_Simple)
-   
-    
-    #-----------MODEL 1.3: PL model----------
-    Data_PL_Simple <- stan_data_Constructer_PL(
-      training_dataset = training_dataset_Simple,
-      testing_dataset = NULL,
-      havingInt = TRUE
-    )
-    
-    PL_model_Simple <- Bayesian_Survival_model(
-      stan_data = Data_PL_Simple,
-      baseline_modelling = "none",
-      shrinkage = TRUE,
-      withPrediction = FALSE,
-      havingInt = TRUE,
-      niter = 10000,
-      nwarmup = 2000,
-      thin = 10,
-      chains = 1
-    )
-    
-    Data_PL2_Simple <- stan_data_Constructer_PL(
-      training_dataset = training_dataset2_Simple,
-      testing_dataset = NULL,
-      havingInt = TRUE
-    )
-    
-    PL_model2_Simple <- Bayesian_Survival_model(
-      stan_data = Data_PL2_Simple,
-      baseline_modelling = "none",
-      shrinkage = TRUE,
-      withPrediction = FALSE,
-      havingInt = TRUE,
-      niter = 10000,
-      nwarmup = 2000,
-      thin = 10,
-      chains = 1
-    )
-    
-    
-    # Extract the model result
     bSplines_model_results_Simple = Bayesian_Survival_result_Extract(
       bayesian_model_fit = bSplines_model_Simple,
       model_type = "bSplines",
@@ -879,31 +564,40 @@ for (r in 1:n_repeats) {
         "Prediction_SurvivalProb"
       )
     )
-    
     bSplines_model_beta_Simple[i, ] <- bSplines_model_results_Simple$Beta_bayesian_est[, "mean"]
     bSplines_model_variableSelection_Simple[i, ] <- bSplines_model_results_Simple$variableSelection
+    bSplines_model_Prediction_SurvivalProb_Simple <- bSplines_model_results_Simple$eta_pred
+    bSplines_model_C_INDEX_Simple[r, i] <- rcorr.cens(-bSplines_model_Prediction_SurvivalProb_Simple, Surv(testing_dataset_Simple$obstime, testing_dataset_Simple$status))["C Index"] 
     
-    
-    bSplines_model_results2_Simple = Bayesian_Survival_result_Extract(
-      bayesian_model_fit = bSplines_model2_Simple,
-      model_type = "bSplines",
-      criteria = c(
-        "DesignCoefficients",
-        "variableSelection",
-        "Prediction_SurvivalProb"
-      )
-    )
-    
-    bSplines_model_beta2_Simple[i, ] <- bSplines_model_results2_Simple$Beta_bayesian_est[, "mean"]
-    bSplines_model_variableSelection2_Simple[i, ] <- bSplines_model_results2_Simple$variableSelection
-    
+    #-----------MODEL 1.2: Cox regression ----------
+    cox_regression_Simple <- coxph(Surv(as.numeric(obstime), status) ~ ., data = training_dataset_Simple)
+    cox_regression_result_Simple <- summary(cox_regression_Simple)
     
     cox_beta_Simple[i,] <- as.vector(cox_regression_result_Simple$coefficients[, "coef"])
     cox_variableSelection_Simple[i,] <- as.vector((cox_regression_result_Simple$coefficients[, "Pr(>|z|)"] * p1) < 0.05)
+    coxRegression_SurvivalProb_Simple <- predict(cox_regression_Simple, newdata = testing_dataset_Simple, type = "lp")
+    coxRegression_C_INDEX_Simple[r, i] <- rcorr.cens(-coxRegression_SurvivalProb_Simple, Surv(testing_dataset_Simple$obstime, testing_dataset_Simple$status))["C Index"] 
     
-    cox_beta2_Simple[i,] <- as.vector(cox_regression_result2_Simple$coefficients[, "coef"])
-    cox_variableSelection2_Simple[i,] <- as.vector((cox_regression_result2_Simple$coefficients[, "Pr(>|z|)"] * p1) < 0.05)
+    #-----------MODEL 1.3: PL model----------
+    Data_PL_Simple <- stan_data_Constructer_PL(
+      training_dataset = training_dataset_Simple,
+      testing_dataset = testing_dataset_Simple,
+      havingInt = TRUE
+    )
     
+    PL_model_Simple <- Bayesian_Survival_model(
+      stan_data = Data_PL_Simple,
+      baseline_modelling = "none",
+      shrinkage = TRUE,
+      withPrediction = TRUE,
+      havingInt = TRUE,
+      niter = 10000,
+      nwarmup = 2000,
+      thin = 10,
+      chains = 1
+    )
+    
+    # Extract the model result
     PL_results_Simple = Bayesian_Survival_result_Extract(
     bayesian_model_fit = PL_model_Simple,
     model_type = "none",
@@ -915,19 +609,8 @@ for (r in 1:n_repeats) {
   )
     PL_beta_Simple[i, ] <- PL_results_Simple$Beta_bayesian_est[, "mean"]
     PL_variableSelection_Simple[i, ] <- PL_results_Simple$variableSelection
-    
-    PL_results2_Simple = Bayesian_Survival_result_Extract(
-    bayesian_model_fit = PL_model2_Simple,
-    model_type = "none",
-    criteria = c(
-      "DesignCoefficients",
-      "variableSelection",
-      "Prediction_SurvivalProb"
-    )
-  )
-    
-    PL_beta2_Simple[i, ] <- PL_results2_Simple$Beta_bayesian_est[, "mean"]
-    PL_variableSelection2_Simple[i, ] <- PL_results2_Simple$variableSelection
+    PL_Prediction_SurvivalProb_Simple <- PL_results_Simple$eta_pred
+    PL_C_INDEX_Simple[r, i] <- rcorr.cens(-PL_Prediction_SurvivalProb_Simple, Surv(testing_dataset_Simple$obstime, testing_dataset_Simple$status))["C Index"] 
   }
   
   # Store results for this repetition
@@ -938,13 +621,6 @@ for (r in 1:n_repeats) {
   cox_beta_list[[r]] <- cox_beta
   cox_varSel_list[[r]] <- cox_variableSelection
   
-  bSplines_beta_list2[[r]] <- bSplines_model_beta2
-  bSplines_varSel_list2[[r]] <- bSplines_model_variableSelection2
-  PL_beta_list2[[r]] <- PL_beta2
-  PL_varSel_list2[[r]] <- PL_variableSelection2
-  cox_beta_list2[[r]] <- cox_beta2
-  cox_varSel_list2[[r]] <- cox_variableSelection2
-  
   
   # Store results for this repetition --- simplified dataset
   bSplines_beta_list_Simple[[r]] <- bSplines_model_beta_Simple
@@ -953,13 +629,7 @@ for (r in 1:n_repeats) {
   PL_varSel_list_Simple[[r]] <- PL_variableSelection_Simple
   cox_beta_list_Simple[[r]] <- cox_beta_Simple
   cox_varSel_list_Simple[[r]] <- cox_variableSelection_Simple
-  
-  bSplines_beta_list2_Simple[[r]] <- bSplines_model_beta2_Simple
-  bSplines_varSel_list2_Simple[[r]] <- bSplines_model_variableSelection2_Simple
-  PL_beta_list2_Simple[[r]] <- PL_beta2_Simple
-  PL_varSel_list2_Simple[[r]] <- PL_variableSelection2_Simple
-  cox_beta_list2_Simple[[r]] <- cox_beta2_Simple
-  cox_varSel_list2_Simple[[r]] <- cox_variableSelection2_Simple
+
 }
 
 save.image(file = "./Data/03_results_combined_Step5_includSimplifiedData.RData")
@@ -967,56 +637,68 @@ save.image(file = "./Data/03_results_combined_Step5_includSimplifiedData.RData")
 
 
 ```{r, echo=TRUE}
+load(file = "./Data/03_results_combined_Step5_includSimplifiedData.RData")
+par(mfrow = c(1, 2))
+
+C_index <- list(bSplines = bSplines_model_C_INDEX, CoxRegression = coxRegression_C_INDEX,  PL = PL_C_INDEX)
+boxplot(C_index, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for complex dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
+abline(h = 0.5, col = "gray", lty = 2)
+
+C_index_Simplified <- list(bSplines = bSplines_model_C_INDEX_Simple, CoxRegression = coxRegression_C_INDEX_Simple, PL = PL_C_INDEX_Simple)
+boxplot(C_index_Simplified, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for simplifed dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
+abline(h = 0.5, col = "gray", lty = 2)
+```
+
+
+```{r, echo=TRUE}
 # Visualize the model results
-par(mfrow = c(3, 2))
-plot(bSplines_model_subset_beta[1,], type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, xaxt = "n")
-# Add background rectangles
-for (i in 1:length(bSplines_model_subset_variableSelection[1,])) {
-  if (bSplines_model_subset_variableSelection[i]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+load(file = "./Data/03_results_combined_Step5_includSimplifiedData.RData")
+
+# Define labels
+name_label <- names(training_dataset)[1:105]
+name_label_Simple <- names(training_dataset_Simple)[1:45]
+
+# General plotting function
+plot_beta_estimates <- function(beta_list, labels, title, n_features) {
+  plot(beta_list[[1]][1,], type = "l", col = "blue", ylim = c(-1, 1), #range(unlist(beta_list)),
+       xlab = "", ylab = "Value", main = title, xaxt = "n")
+  
+  for (i in 2:10) {
+    lines(beta_list[[i]][1,], col = "blue")
   }
-}
-lines(bSplines_model_subset_beta[1,], type = "o", col = "blue", pch = 16)
-#axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
-axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
-abline(a = 0, b =0, col = "red")
-
-
-plot(bSplines_model_subset_beta[2,], type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, xaxt = "n")
-# Add background rectangles
-for (i in 1:length(bSplines_model_subset_variableSelection[2,])) {
-  if (bSplines_model_subset_variableSelection[i]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  
+  for (i in 1:10) {
+    lines(beta_list[[i]][2,], col = "red")
   }
+  
+  #axis(1, at = 1:n_features, labels = labels, las = 2, cex.axis = 0.7)
+  abline(h = 0, col = "red")
 }
-lines(bSplines_model_subset_beta[2,], type = "o", col = "blue", pch = 16)
-#axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
-axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
-abline(a = 0, b =0, col = "red")
+
+# Set layout for 3 rows and 2 columns
+par(mfrow = c(4, 2), mar = c(2, 2, 2, 1), oma = c(0, 0, 2, 0))
+
+C_index <- list(bSplines = bSplines_model_C_INDEX, CoxRegression = coxRegression_C_INDEX,  PL = PL_C_INDEX)
+boxplot(C_index, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for complex dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
+abline(h = 0.5, col = "gray", lty = 2)
 
 
+C_index_Simplified <- list(bSplines = bSplines_model_C_INDEX_Simple, CoxRegression = coxRegression_C_INDEX_Simple, PL = PL_C_INDEX_Simple)
+boxplot(C_index_Simplified, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for simplifed dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
+abline(h = 0.5, col = "gray", lty = 2)
 
-plot(PL_subset_beta[1,], type = "o", col = "darkgreen", xlab = "", ylab = "Beta", main = "", pch = 16, xaxt = "n")
-# Add background rectangles
-for (i in 1:length(PL_subset_variableSelection[1,])) {
-  if (PL_subset_variableSelection[1,]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
-  }
-}
-lines(PL_subset_beta[1,], type = "o", col = "darkgreen", pch = 16)
-axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
-abline(a = 0, b =0, col = "red")
+# B-splines
+plot_beta_estimates(bSplines_beta_list, name_label, "Estimated Betas (B-splines) for complex dataset", 105)
+plot_beta_estimates(bSplines_beta_list_Simple, name_label_Simple, "Estimated Betas (B-splines) for Simplified dataset)", 45)
 
-plot(PL_subset_beta[2,], type = "o", col = "darkgreen", xlab = "", ylab = "Beta", main = "", pch = 16, xaxt = "n")
-# Add background rectangles
-for (i in 1:length(PL_subset_variableSelection[2,])) {
-  if (PL_subset_variableSelection[2,]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
-  }
-}
-lines(PL_subset_beta[2,], type = "o", col = "darkgreen", pch = 16)
-axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
-abline(a = 0, b =0, col = "red")
+# Cox regression
+plot_beta_estimates(cox_beta_list, name_label, "Estimated Betas (Cox Regression) for complex dataset", 105)
+plot_beta_estimates(cox_beta_list_Simple, name_label_Simple, "Estimated Betas (Cox Regression) for Simplified dataset)", 45)
+
+# Bayesian PL
+plot_beta_estimates(PL_beta_list, name_label, "Estimated Betas (Bayesian PL) for complex dataset", 105)
+plot_beta_estimates(PL_beta_list_Simple, name_label_Simple, "Estimated Betas (Bayesian PL) for Simplified dataset)", 45)
+
 ```
 
 
