@@ -1,0 +1,252 @@
+---
+title: "03_Real_Data_Analysis"
+author: "Yufang Wang"
+date: "2025-03-18"
+output: pdf_document
+---
+
+# Step 1: Set up the environment
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+source("./function_file/Functions.R")
+source("./function_file/stan_constructor.R")
+
+install_and_load <- function(packages) {
+  for (pkg in packages) {
+    if (!require(pkg, character.only = TRUE)) {
+      install.packages(pkg, dependencies = TRUE)
+    }
+    library(pkg, character.only = TRUE) }
+  
+}
+
+# List of required packages
+required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret", "corrplot","ggplot2", "loo", "survival", "caret")
+# Install and/or load packages
+install_and_load(required_packages)
+```
+
+
+# Step 2: Organize and strafied the real-world data
+```{r, echo=TRUE}
+real_df <- readRDS("./Data/imputed_NOTR_DGF.rds")
+# sum(!complete.cases(real_df))
+# mean(real_df$status == "graftloss")
+# mean(real_df$status == "alive")
+# mean(real_df$status == "death")
+
+# # Reversed KM for follow-up analysis
+# fit <- survfit(Surv(real_df$time, real_df$status != "graftloss") ~ 1)
+# plot(fit)
+# abline(h = 0.5, col = "red", lty = 2)
+# 
+# str(real_df)
+real_df <- real_df[, !names(real_df) %in% "ID"]
+
+# set the factor variable being sum-to-zero encoded
+contrasts(real_df$Recipientsex) <- contr.sum(levels(real_df$Recipientsex))
+contrasts(real_df$Donorsex) <- contr.sum(levels(real_df$Donorsex))
+contrasts(real_df$Smoking) <- contr.sum(levels(real_df$Smoking))
+contrasts(real_df$InitialPrimaryDiseaseET_regroup) <- contr.sum(levels(real_df$InitialPrimaryDiseaseET_regroup))
+contrasts(real_df$Donorcauseofdeath_group) <- contr.sum(levels(real_df$Donorcauseofdeath_group))
+
+
+# center the numeric variables
+real_df$Recipientage <- scale(real_df$Recipientage)
+real_df$Dialysisdaysrenine <- scale(real_df$Dialysisdaysrenine)
+real_df$Donorage <- scale(real_df$Donorage)
+real_df$Lastcreatininemgdl <- scale(real_df$Lastcreatininemgdl)
+real_df$Warm_ischaemic_period_1 <- scale(real_df$Warm_ischaemic_period_1)
+real_df$Cold_ischaemic_period <- scale(real_df$Cold_ischaemic_period)
+real_df$HLA_mismatch <- scale(real_df$HLA_mismatch)
+real_df$DonorBMI <- scale(real_df$DonorBMI)
+real_df$Recipient_BMI <- scale(real_df$Recipient_BMI)
+#
+
+# print(colnames(real_df)[factorName])
+
+real_df <- real_df[, !(names(real_df) %in% "InitialOnmachineindicator")]
+real_df$Donorcauseofdeath_group <- ifelse(real_df$Donorcauseofdeath_group == "Cardiac", "Cardiac", "Others")
+real_df$Donorcauseofdeath_group <- factor(real_df$Donorcauseofdeath_group)
+contrasts(real_df$Donorcauseofdeath_group) <- contr.sum(levels(real_df$Donorcauseofdeath_group))
+
+real_df$InitialPrimaryDiseaseET_regroup <- ifelse(real_df$InitialPrimaryDiseaseET_regroup == "Diabetes Mellitus", "Diabetes", "Others")
+real_df$InitialPrimaryDiseaseET_regroup <- factor(real_df$InitialPrimaryDiseaseET_regroup)
+contrasts(real_df$InitialPrimaryDiseaseET_regroup) <- contr.sum(levels(real_df$InitialPrimaryDiseaseET_regroup))
+
+real_df_simple <- subset(real_df, select = -c(Smoking, Donorcauseofdeath_group, Dialysisdaysrenine, Recipientsex, Recipient_BMI))
+```
+
+# Descriptive data analysis
+```{r, echo=TRUE}
+
+```
+
+```{r, echo=TRUE}
+real_df_simple <- subset(real_df, select = -c(Smoking, Donorcauseofdeath_group, Dialysisdaysrenine, Recipientsex, Recipient_BMI))
+# set the factor variable being sum-to-zero encoded
+contrasts(real_df_simple$Donorsex) <- contr.sum(levels(real_df_simple$Donorsex))
+contrasts(real_df_simple$TypecadavericDBDDCD) <- contr.sum(levels(real_df_simple$TypecadavericDBDDCD))
+contrasts(real_df_simple$InitialPrimaryDiseaseET_regroup) <- contr.sum(levels(real_df_simple$InitialPrimaryDiseaseET_regroup))
+
+# center the numeric variables
+real_df_simple$Recipientage <- scale(real_df_simple$Recipientage)
+real_df_simple$Donorage <- scale(real_df_simple$Donorage)
+real_df_simple$Lastcreatininemgdl <- scale(real_df_simple$Lastcreatininemgdl)
+real_df_simple$Cold_ischaemic_period <- scale(real_df_simple$Cold_ischaemic_period)
+real_df_simple$HLA_mismatch <- scale(real_df_simple$HLA_mismatch)
+real_df_simple$DonorBMI <- scale(real_df_simple$DonorBMI)
+
+real_df_simple_DBD <- subset(real_df_simple, TypecadavericDBDDCD == "DBD")
+real_df_simple_DBD <- subset(real_df_simple, select = -TypecadavericDBDDCD)
+real_df_simple_DCD <- subset(real_df_simple, TypecadavericDBDDCD == "DCD")
+real_df_simple_DCD <- subset(real_df_simple, select = -TypecadavericDBDDCD)
+```
+
+# Check whether or not each level have sufficient events
+```{r, echo=TRUE}
+# Identify categorical variables
+categorical_vars <- names(real_df_simple_DBD)[sapply(real_df_simple_DBD, function(x) is.factor(x) || is.character(x))]
+
+# Print the categorical variables
+print(categorical_vars)
+
+for (cvars in categorical_vars){
+  if (cvars != "status"){
+    print(table(real_df_simple_DBD[[cvars]], real_df_simple_DBD$status))
+  }
+}
+
+print("**************************************")
+categorical_vars <- names(real_df_simple_DCD)[sapply(real_df_simple_DCD, function(x) is.factor(x) || is.character(x))]
+
+# Print the categorical variables
+print(categorical_vars)
+
+for (cvars in categorical_vars){
+  if (cvars != "status"){
+    print(table(real_df_simple_DCD[[cvars]], real_df_simple_DCD$status))
+  }
+}
+```
+
+# Section 1: analyze data for the DBD group
+```{r, echo=TRUE}
+real_df_simple_DBD_noise <- real_df_simple_DBD
+real_df_simple_DBD_noise$noise1 <- rnorm(nrow(real_df_simple_DBD_noise))
+real_df_simple_DBD_noise$noise2 <- rnorm(nrow(real_df_simple_DBD_noise), 1, 2)
+real_df_simple_DBD_noise$noise3 <- rnorm(nrow(real_df_simple_DBD_noise), 3, 4)
+
+
+#-----------MODEL 1.3: PL model----------
+real_df_simple_DBD_noise_PL <- stan_data_Constructer_PL(
+  training_dataset = real_df_simple_DBD_noise,
+  testing_dataset = NULL,
+  havingInt = TRUE
+)
+
+real_df_simple_DBD_noise_PL_model <- Bayesian_Survival_model(
+  stan_data = real_df_simple_DBD_noise_PL,
+  baseline_modelling = "none",
+  shrinkage = TRUE,
+  withPrediction = FALSE,
+  havingInt = TRUE,
+  niter = 10000,
+  nwarmup = 2000,
+  thin = 10,
+  chains = 1
+)
+
+real_df_simple_DBD_noise_PL_model_result = Bayesian_Survival_result_Extract(
+  bayesian_model_fit = real_df_simple_DBD_noise_PL_model,
+  model_type = "none",
+  criteria = c("DesignCoefficients",
+    "variableSelection",
+    "Prediction_SurvivalProb"
+  )
+)
+real_df_simple_DBD_noise_PL_model_result_coef <- real_df_simple_DBD_noise_PL_model_result$Beta_bayesian_est[, "mean"]
+real_df_simple_DBD_noise_PL_model_result_variableSelection <- real_df_simple_DBD_noise_PL_model_result$variableSelection
+
+save.image(file = "./Data/03_results_Step5_DBD.RData")
+```
+
+```{r, echo=TRUE}
+load(file = "./Data/03_results_Step5_DBD.RData")
+name_label = c(names(real_df_simple_DBD_noise)[1:45], "noise1", "noise2", "noise3")
+
+
+plot(real_df_simple_DBD_noise_PL_model_result_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, ylim = c(-3, 3), xaxt = "n")
+# Add background rectangles
+for (i in 1:length(real_df_simple_DBD_noise_PL_model_result_variableSelection)) {
+  if (real_df_simple_DBD_noise_PL_model_result_variableSelection[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+lines(real_df_simple_DBD_noise_PL_model_result_coef, type = "o", col = "blue", pch = 16)
+#axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
+axis(1, at = 1:48, labels = name_label, las = 2, cex.axis = 0.7)
+abline(a = 0, b =0, col = "red")
+```
+
+# Section 1: analyze data for the DCD group
+```{r, echo=TRUE}
+real_df_simple_DCD_noise <- real_df_simple_DCD
+real_df_simple_DCD_noise$noise1 <- rnorm(nrow(real_df_simple_DCD_noise))
+real_df_simple_DCD_noise$noise2 <- rnorm(nrow(real_df_simple_DCD_noise), 1, 2)
+real_df_simple_DCD_noise$noise3 <- rnorm(nrow(real_df_simple_DCD_noise), 3, 4)
+
+
+#-----------MODEL 1.3: PL model----------
+real_df_simple_DCD_noise_PL <- stan_data_Constructer_PL(
+  training_dataset = real_df_simple_DCD_noise,
+  testing_dataset = NULL,
+  havingInt = TRUE
+)
+
+real_df_simple_DCD_noise_PL_model <- Bayesian_Survival_model(
+  stan_data = real_df_simple_DCD_noise_PL,
+  baseline_modelling = "none",
+  shrinkage = TRUE,
+  withPrediction = FALSE,
+  havingInt = TRUE,
+  niter = 10000,
+  nwarmup = 2000,
+  thin = 10,
+  chains = 1
+)
+
+real_df_simple_DCD_noise_PL_model_result = Bayesian_Survival_result_Extract(
+  bayesian_model_fit = real_df_simple_DCD_noise_PL_model,
+  model_type = "none",
+  criteria = c("DesignCoefficients",
+    "variableSelection",
+    "Prediction_SurvivalProb"
+  )
+)
+real_df_simple_DCD_noise_PL_model_result_coef <- real_df_simple_DCD_noise_PL_model_result$Beta_bayesian_est[, "mean"]
+real_df_simple_DCD_noise_PL_model_result_variableSelection <- real_df_simple_DCD_noise_PL_model_result$variableSelection
+
+save.image(file = "./Data/03_results_Step5_DCD.RData")
+```
+
+```{r, echo=TRUE}
+load(file = "./Data/03_results_Step5_DCD.RData")
+name_label = c(names(real_df_simple_DCD_noise)[1:45], "noise1", "noise2", "noise3")
+
+
+plot(real_df_simple_DCD_noise_PL_model_result_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, ylim = c(-3, 3), xaxt = "n")
+# Add background rectangles
+for (i in 1:length(real_df_simple_DCD_noise_PL_model_result_variableSelection)) {
+  if (real_df_simple_DCD_noise_PL_model_result_variableSelection[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+lines(real_df_simple_DCD_noise_PL_model_result_coef, type = "o", col = "blue", pch = 16)
+#axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
+axis(1, at = 1:48, labels = name_label, las = 2, cex.axis = 0.7)
+abline(a = 0, b =0, col = "red")
+```
+
