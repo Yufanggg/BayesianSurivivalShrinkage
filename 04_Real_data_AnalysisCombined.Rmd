@@ -649,7 +649,6 @@ boxplot(C_index_Simplified, names = c("BayesianBSplines", "CoxRegression", "Baye
 abline(h = 0.5, col = "gray", lty = 2)
 ```
 
-
 ```{r, echo=TRUE}
 # Visualize the model results
 load(file = "./Data/03_results_combined_Step5_includSimplifiedData.RData")
@@ -698,7 +697,80 @@ plot_beta_estimates(cox_beta_list_Simple, name_label_Simple, "Estimated Betas (C
 # Bayesian PL
 plot_beta_estimates(PL_beta_list, name_label, "Estimated Betas (Bayesian PL) for complex dataset", 105)
 plot_beta_estimates(PL_beta_list_Simple, name_label_Simple, "Estimated Betas (Bayesian PL) for Simplified dataset)", 45)
-
 ```
 
+# Scatter plot
+```{r, echo=TRUE}
+load(file = "./Data/03_results_combined_Step5_includSimplifiedData.RData")
+plot_beta_estimates_scatter <- function(beta_list, labels, title, n_features, randomList) {
+  #par(mfrow = c(1, 4), mar = c(2, 2, 2, 1), oma = c(0, 0, 0, 0))
+  
+  # plot(beta_list[[1]][1,], beta_list[[1]][2,], type = "p", col = 1, ylim = c(-1, 1), xlim = c(-1, 1), pch = 16,#range(unlist(beta_list)),
+  #      xlab = "subset 1", ylab = "subset 2", main = title)
+  for (i in randomList) {
+    plot(beta_list[[i]][1,], beta_list[[i]][2,], type = "p", col = "blue", pch = 16,#range(unlist(beta_list)),
+       xlab = "subset 1", ylab = "subset 2", main = title)
+    abline(a = 0, b = 0.5, col = "grey", lty = 2) # add the reference line
+    
+    # add the reference line
+    model <- lm(beta_list[[i]][1,] ~ beta_list[[i]][2,])
+    abline(model, col = "red")
+    
+    # add the Pearson cofficient
+    r <- cor(beta_list[[i]][1,], beta_list[[i]][2,])
+    legend("topright", legend = paste("r =", round(r, 2)), bty = "n", text.col = "red")
+  }
+}
 
+randomList <- sample(1:10, 4, replace = FALSE)
+
+pdf("Estimated_Betas_bSpline.pdf", width = 12, height = 8)
+par(mfrow = c(2, 4), mar = c(3, 3, 4, 1), oma = c(0, 0, 0, 0))
+# B-splines
+plot_beta_estimates_scatter(bSplines_beta_list, name_label, "Estimated Betas (B-splines) for complex dataset", 105, randomList)
+plot_beta_estimates_scatter(bSplines_beta_list_Simple, name_label_Simple, "Estimated Betas (B-splines) for Simplified dataset)", 45, randomList)
+dev.off()
+
+# Cox regression
+pdf("Estimated_Betas_CoxRegression.pdf", width = 12, height = 8)
+par(mfrow = c(2, 4), mar = c(3, 3, 4, 1), oma = c(0, 0, 0, 0))
+plot_beta_estimates_scatter(cox_beta_list, name_label, "Estimated Betas (Cox Regression) for complex dataset", 105, randomList)
+plot_beta_estimates_scatter(cox_beta_list_Simple, name_label_Simple, "Estimated Betas (Cox Regression) for Simplified dataset)", 45, randomList)
+dev.off()
+
+# Bayesian PL
+pdf("Estimated_Betas_PL.pdf", width = 12, height = 8)
+par(mfrow = c(2, 4), mar = c(3, 3, 4, 1), oma = c(0, 0, 0, 0))
+plot_beta_estimates_scatter(PL_beta_list, name_label, "Estimated Betas (Bayesian PL) for complex dataset", 105, randomList)
+plot_beta_estimates_scatter(PL_beta_list_Simple, name_label_Simple, "Estimated Betas (Bayesian PL) for Simplified dataset)", 45, randomList)
+dev.off()
+```
+
+# Variable selection
+```{r, echo=TRUE}
+load(file = "./Data/03_results_combined_Step5_includSimplifiedData.RData")
+plot_beta_estimates_variables <- function(beta_list, labels, title, n_features) {
+  par(mfrow = c(5, 2), mar = c(2, 2, 2, 1), oma = c(0, 0, 0, 0))
+  
+  plot(beta_list[[1]][1,], beta_list[[1]][2,], type = "p", col = 1, ylim = c(-1, 1), xlim = c(-1, 1), pch = 16)#range(unlist(beta_list)),
+  #      xlab = "subset 1", ylab = "subset 2", main = title)
+  for (i in 1:10) {
+    plot(beta_list[[i]][1,], beta_list[[i]][2,], type = "p", col = "blue", ylim = c(-1, 1), xlim = c(-1, 1), pch = 16,#range(unlist(beta_list)),
+       xlab = "subset 1", ylab = "subset 2", main = title)
+    abline(a = 0, b = 0.5, col = "red")
+  }
+}
+
+par(mfrow = c(1, 3), mar = c(2, 2, 2, 1), oma = c(0, 0, 0, 0))
+# B-splines
+plot_beta_estimates_scatter(bSplines_beta_list, name_label, "Estimated Betas (B-splines) for complex dataset", 105)
+plot_beta_estimates_scatter(bSplines_beta_list_Simple, name_label_Simple, "Estimated Betas (B-splines) for Simplified dataset)", 45)
+
+# Cox regression
+plot_beta_estimates_scatter(cox_beta_list, name_label, "Estimated Betas (Cox Regression) for complex dataset", 105)
+plot_beta_estimates_scatter(cox_beta_list_Simple, name_label_Simple, "Estimated Betas (Cox Regression) for Simplified dataset)", 45)
+
+# Bayesian PL
+plot_beta_estimates_scatter(PL_beta_list, name_label, "Estimated Betas (Bayesian PL) for complex dataset", 105)
+plot_beta_estimates_scatter(PL_beta_list_Simple, name_label_Simple, "Estimated Betas (Bayesian PL) for Simplified dataset)", 45)
+```
