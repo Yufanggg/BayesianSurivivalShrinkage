@@ -718,13 +718,13 @@ plot_beta_estimates_scatter <- function(beta_list, labels, title, n_features, ra
     
     # add the Pearson cofficient
     r <- cor(beta_list[[i]][1,], beta_list[[i]][2,])
-    legend("topright", legend = paste("r =", round(r, 2)), bty = "n", text.col = "red")
+    legend("topleft", legend = paste("r =", round(r, 2)), bty = "n", text.col = "red")
   }
 }
 
 randomList <- sample(1:10, 4, replace = FALSE)
 
-pdf("Estimated_Betas_bSpline.pdf", width = 12, height = 8)
+pdf("./Image/Estimated_Betas_bSpline.pdf", width = 12, height = 8)
 par(mfrow = c(2, 4), mar = c(3, 3, 4, 1), oma = c(0, 0, 0, 0))
 # B-splines
 plot_beta_estimates_scatter(bSplines_beta_list, name_label, "Estimated Betas (B-splines) for complex dataset", 105, randomList)
@@ -732,14 +732,14 @@ plot_beta_estimates_scatter(bSplines_beta_list_Simple, name_label_Simple, "Estim
 dev.off()
 
 # Cox regression
-pdf("Estimated_Betas_CoxRegression.pdf", width = 12, height = 8)
+pdf("./Image/Estimated_Betas_CoxRegression.pdf", width = 12, height = 8)
 par(mfrow = c(2, 4), mar = c(3, 3, 4, 1), oma = c(0, 0, 0, 0))
 plot_beta_estimates_scatter(cox_beta_list, name_label, "Estimated Betas (Cox Regression) for complex dataset", 105, randomList)
 plot_beta_estimates_scatter(cox_beta_list_Simple, name_label_Simple, "Estimated Betas (Cox Regression) for Simplified dataset)", 45, randomList)
 dev.off()
 
 # Bayesian PL
-pdf("Estimated_Betas_PL.pdf", width = 12, height = 8)
+pdf("./ImageEstimated_Betas_PL.pdf", width = 12, height = 8)
 par(mfrow = c(2, 4), mar = c(3, 3, 4, 1), oma = c(0, 0, 0, 0))
 plot_beta_estimates_scatter(PL_beta_list, name_label, "Estimated Betas (Bayesian PL) for complex dataset", 105, randomList)
 plot_beta_estimates_scatter(PL_beta_list_Simple, name_label_Simple, "Estimated Betas (Bayesian PL) for Simplified dataset)", 45, randomList)
