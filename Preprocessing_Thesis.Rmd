@@ -19,7 +19,7 @@ library(mstate)
 library(ggplot2)
 library(corrplot)
 library(doParallel)
-setwd("G:/MasterThesis/Code/") #G:/MasterThesis/Code/   C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/") #G:/MasterThesis/Code/   C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/
 ```
 
 ```{r, echo=FALSE}
