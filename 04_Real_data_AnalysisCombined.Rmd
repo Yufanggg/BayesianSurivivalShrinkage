@@ -82,8 +82,29 @@ combined_Data <- subset(real_df, select = -Warm_ischaemic_period_1)
 
 # Descriptive data analysis
 ```{r, echo=TRUE}
+library(dplyr)
+combined_Data_encoded <- subset(combined_Data, select = -c(time, status)) %>%
+  mutate(across(where(is.factor), as.character)) %>%
+  mutate(across(where(is.character), ~ as.factor(.))) %>%
+  model.matrix(~ . - 1, data = .) %>%
+  as.data.frame() %>%
+  mutate(across(everything(), ~ ifelse(. == 0, -1, .)))
+
+# Step 3: Calculate correlation matrix
+cor_matrix <- cor(combined_Data_encoded)
+
+# Step 4: View the correlation matrix
+print(cor_matrix)
+
+# Optional: Visualize with a heatmap
+library(corrplot)
+corrplot(cor_matrix, method = "color", tl.cex = 0.7, type = "lower")
+```
+```{r, echo=TRUE}
+
 
 ```
+
 
 ```{r, echo=TRUE}
 real_df_simple <- subset(real_df, select = -c(Smoking, Donorcauseofdeath_group, Dialysisdaysrenine, Recipientsex, Recipient_BMI, Warm_ischaemic_period_1))
@@ -116,328 +137,59 @@ print(categorical_vars)
 
 for (cvars in categorical_vars){
   if (cvars != "status"){
-    print(table(combined_Data[[cvars]], combined_Data$status))
+    print(cvars)
+    print(table(combined_Data$status == "graftloss", combined_Data[[cvars]]))
   }
 }
 ```
 
 # Section 1: include all variables and see whether or not it is possible for the get the model converenge
+
+## Step 4: Verify the existence of interaction effects
 ```{r, echo=TRUE}
 combined_Data_int <- includingInter(combined_Data)
-combined_Data_int <- subset(combined_Data_int, select = -c(id))
+# combined_Data_int <- subset(combined_Data_int, select = -c(id))
 
 combined_Data_Simple_int <- includingInter(combined_Data_Simple)
-combined_Data_Simple_int <- subset(combined_Data_Simple_int, select = -c(id))
+#combined_Data_Simple_int <- subset(combined_Data_Simple_int, select = -c(id))
 ```
-
-```{r, echo=TRUE}
-# STEP 3:  add noise variable
-combined_Data_int_noise <- combined_Data_int
-combined_Data_int_noise$noise1 <- rnorm(nrow(combined_Data_int_noise))
-combined_Data_int_noise$noise2 <- rnorm(nrow(combined_Data_int_noise), 1, 2)
-combined_Data_int_noise$noise3 <- rnorm(nrow(combined_Data_int_noise), 3, 4)
-
-combined_Data_Simple_int_noise <- combined_Data_Simple_int
-combined_Data_Simple_int_noise$noise1 <- rnorm(nrow(combined_Data_Simple_int_noise))
-combined_Data_Simple_int_noise$noise2 <- rnorm(nrow(combined_Data_Simple_int_noise), 1, 2)
-combined_Data_Simple_int_noise$noise3 <- rnorm(nrow(combined_Data_Simple_int_noise), 3, 4)
-
-#-----------MODEL 1.1: Cox regression--------
-cox_regression <- coxph(Surv(as.numeric(obstime), status) ~., data = combined_Data_int_noise)
-combined_Data_int_noise_cox_regression_result <- summary(cox_regression)
-combined_Data_int_noise_cox_regression_result_coef <- as.matrix(combined_Data_int_noise_cox_regression_result$coefficients[, "coef"])
-combined_Data_int_noise_cox_regression_result_variableSelection <- as.matrix((combined_Data_int_noise_cox_regression_result$coefficients[, "Pr(>|z|)"] *105) < 0.05)
-
-
-#-----------MODEL 1.2: bSpline model----------
-combined_Data_int_noise_bSpline <- stan_data_Constructer_BSpline(
-  training_dataset = combined_Data_int_noise,
-  testing_dataset = NULL,
-  obs_window = 3415,
-  log_lik_saving = TRUE,
-  havingInt = TRUE
-)
-combined_Data_int_noise_bSpline_model <- Bayesian_Survival_model(
-  stan_data = combined_Data_int_noise_bSpline,
-  baseline_modelling = "bSplines",
-  shrinkage = TRUE,
-  withPrediction = FALSE,
-  havingInt = TRUE,
-  niter = 10000,
-  nwarmup = 2000,
-  thin = 10,
-  chains = 1
-)
-
-# Extract the model result
-combined_Data_int_noise_bSpline_model_result = Bayesian_Survival_result_Extract(
-  bayesian_model_fit = combined_Data_int_noise_bSpline_model,
-  model_type = "bSplines",
-  criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb", "baseline"))
-combined_Data_int_noise_bSpline_model_result_coef <- combined_Data_int_noise_bSpline_model_result$Beta_bayesian_est[, "mean"]
-combined_Data_int_noise_bSpline_model_result_variableSelection <- combined_Data_int_noise_bSpline_model_result$variableSelection
-
-#-----------MODEL 1.3: PL model----------
-combined_Data_int_noise_PL <- stan_data_Constructer_PL(
-  training_dataset = combined_Data_int_noise,
-  testing_dataset = NULL,
-  havingInt = TRUE
-)
-
-combined_Data_int_noise_PL_model <- Bayesian_Survival_model(
-  stan_data = combined_Data_int_noise_PL,
-  baseline_modelling = "none",
-  shrinkage = TRUE,
-  withPrediction = FALSE,
-  havingInt = TRUE,
-  niter = 10000,
-  nwarmup = 2000,
-  thin = 10,
-  chains = 1
-)
-
-combined_Data_int_noise_PL_model_result = Bayesian_Survival_result_Extract(
-  bayesian_model_fit = combined_Data_int_noise_PL_model,
-  model_type = "none",
-  criteria = c("DesignCoefficients",
-    "variableSelection",
-    "Prediction_SurvivalProb"
-  )
-)
-combined_Data_int_noise_PL_model_result_coef <- combined_Data_int_noise_PL_model_result$Beta_bayesian_est[, "mean"]
-combined_Data_int_noise_PL_model_result_variableSelection <- combined_Data_int_noise_PL_model_result$variableSelection
-
-
-#-----------MODEL 2.1: Cox regression--------
-cox_regression_Simple <- coxph(Surv(as.numeric(obstime), status) ~., data = combined_Data_Simple_int_noise)
-combined_Data_int_noise_cox_regression_Simple_result <- summary(cox_regression_Simple)
-combined_Data_int_noise_cox_regression_Simple_result_coef <- as.matrix(combined_Data_int_noise_cox_regression_Simple_result$coefficients[, "coef"])
-combined_Data_int_noise_cox_regression_Simple_result_variableSelection <- as.matrix((combined_Data_int_noise_cox_regression_Simple_result$coefficients[, "Pr(>|z|)"] *48) < 0.05)
-
-
-#-----------MODEL 2.2: bSpline model----------
-combined_Data_int_noise_bSpline_Simple <- stan_data_Constructer_BSpline(
-  training_dataset = combined_Data_Simple_int_noise,
-  testing_dataset = NULL,
-  obs_window = 3415,
-  log_lik_saving = TRUE,
-  havingInt = TRUE
-)
-combined_Data_int_noise_bSpline_model_Simple <- Bayesian_Survival_model(
-  stan_data = combined_Data_int_noise_bSpline_Simple,
-  baseline_modelling = "bSplines",
-  shrinkage = TRUE,
-  withPrediction = FALSE,
-  havingInt = TRUE,
-  niter = 10000,
-  nwarmup = 2000,
-  thin = 10,
-  chains = 1
-)
-
-# Extract the model result
-combined_Data_int_noise_bSpline_model_Simple_result = Bayesian_Survival_result_Extract(
-  bayesian_model_fit = combined_Data_int_noise_bSpline_model_Simple,
-  model_type = "bSplines",
-  criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb", "baseline"))
-combined_Data_int_noise_bSpline_model_Simple_result_coef <- combined_Data_int_noise_bSpline_model_Simple_result$Beta_bayesian_est[, "mean"]
-combined_Data_int_noise_bSpline_model_Simple_result_variableSelection <- combined_Data_int_noise_bSpline_model_Simple_result$variableSelection
-
-#-----------MODEL 2.3: PL model----------
-combined_Data_int_noise_PL_Simple <- stan_data_Constructer_PL(
-  training_dataset = combined_Data_Simple_int_noise,
-  testing_dataset = NULL,
-  havingInt = TRUE
-)
-
-combined_Data_int_noise_PL_model_Simple <- Bayesian_Survival_model(
-  stan_data = combined_Data_int_noise_PL_Simple,
-  baseline_modelling = "none",
-  shrinkage = TRUE,
-  withPrediction = FALSE,
-  havingInt = TRUE,
-  niter = 10000,
-  nwarmup = 2000,
-  thin = 10,
-  chains = 1
-)
-
-combined_Data_int_noise_PL_model_Simple_result = Bayesian_Survival_result_Extract(
-  bayesian_model_fit = combined_Data_int_noise_PL_model_Simple,
-  model_type = "none",
-  criteria = c("DesignCoefficients",
-    "variableSelection",
-    "Prediction_SurvivalProb"
-  )
-)
-combined_Data_int_noise_PL_model_Simple_result_coef <- combined_Data_int_noise_PL_model_Simple_result$Beta_bayesian_est[, "mean"]
-combined_Data_int_noise_PL_model_Simple_result_variableSelection <- combined_Data_int_noise_PL_model_Simple_result$variableSelection
-
-save.image(file = "./Data/03_results_combined_Step3_includeSimpleData.RData")
-```
-
-```{r, echo=TRUE}
-load(file = "./Data/03_results_combined_Step3_includeSimpleData.RData")
-name_label = c(names(combined_Data_int_noise)[1:105], "noise1", "noise2", "noise3")
-
-
-par(mfrow = c(3, 1))
-plot(combined_Data_int_noise_bSpline_model_result_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, ylim = c(-3, 3), xaxt = "n")
-# Add background rectangles
-for (i in 1:length(combined_Data_int_noise_bSpline_model_result_variableSelection)) {
-  if (combined_Data_int_noise_bSpline_model_result_variableSelection[i]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
-  }
-}
-lines(combined_Data_int_noise_bSpline_model_result_coef, type = "o", col = "blue", pch = 16)
-#axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
-axis(1, at = 1:108, labels = name_label, las = 2, cex.axis = 0.7)
-abline(a = 0, b =0, col = "red")
-
-plot(combined_Data_int_noise_cox_regression_result_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "", pch = 16, ylim = c(-1, 1), xaxt = "n")
-# Add background rectangles
-for (i in 1:length(combined_Data_int_noise_cox_regression_result_variableSelection)) {
-  if (combined_Data_int_noise_cox_regression_result_variableSelection[i]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
-  }
-}
-lines(combined_Data_int_noise_cox_regression_result_coef, type = "o", col = "darkgreen", pch = 16)
-axis(1, at = 1:108, labels = name_label, las = 2, cex.axis = 0.7)
-abline(a = 0, b =0, col = "red")
-
-
-plot(combined_Data_int_noise_PL_model_result_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "", pch = 16, ylim = c(-1, 1), xaxt = "n")
-# Add background rectangles
-for (i in 1:length(combined_Data_int_noise_PL_model_result_variableSelection)) {
-  if (combined_Data_int_noise_PL_model_result_variableSelection[i]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
-  }
-}
-lines(combined_Data_int_noise_PL_model_result_coef, type = "o", col = "darkgreen", pch = 16)
-axis(1, at = 1:108, labels = name_label, las = 2, cex.axis = 0.7)
-abline(a = 0, b =0, col = "red")
-
-
-# -----------------------------   Figure 2   -----------------------------------------
-name_label_Simple = c(names(combined_Data_int_noise)[1:45], "noise1", "noise2", "noise3")
-
-
-par(mfrow = c(3, 1))
-plot(combined_Data_int_noise_bSpline_model_Simple_result_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, ylim = c(-2, 2), xaxt = "n")
-# Add background rectangles
-for (i in 1:length(combined_Data_int_noise_bSpline_model_Simple_result_variableSelection)) {
-  if (combined_Data_int_noise_bSpline_model_Simple_result_variableSelection[i]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
-  }
-}
-lines(combined_Data_int_noise_bSpline_model_Simple_result_coef, type = "o", col = "blue", pch = 16)
-#axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
-axis(1, at = 1:48, labels = name_label_Simple, las = 2, cex.axis = 0.7)
-abline(a = 0, b =0, col = "red")
-
-plot(combined_Data_int_noise_cox_regression_Simple_result_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "", pch = 16, ylim = c(-1, 1), xaxt = "n")
-# Add background rectangles
-for (i in 1:length(combined_Data_int_noise_cox_regression_Simple_result_variableSelection)) {
-  if (combined_Data_int_noise_cox_regression_Simple_result_variableSelection[i]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
-  }
-}
-lines(combined_Data_int_noise_cox_regression_Simple_result_coef, type = "o", col = "darkgreen", pch = 16)
-axis(1, at = 1:48, labels = name_label_Simple, las = 2, cex.axis = 0.7)
-abline(a = 0, b =0, col = "red")
-
-
-plot(combined_Data_int_noise_PL_model_Simple_result_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "", pch = 16, ylim = c(-1, 1), xaxt = "n")
-# Add background rectangles
-for (i in 1:length(combined_Data_int_noise_PL_model_Simple_result_variableSelection)) {
-  if (combined_Data_int_noise_PL_model_Simple_result_variableSelection[i]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
-  }
-}
-lines(combined_Data_int_noise_PL_model_Simple_result_coef, type = "o", col = "darkgreen", pch = 16)
-axis(1, at = 1:48, labels = name_label_Simple, las = 2, cex.axis = 0.7)
-abline(a = 0, b =0, col = "red")
-
-
-# Plot the baselinehazard function
-baseline <- combined_Data_int_noise_bSpline$basis
-baselineCoef <- combined_Data_int_noise_bSpline_model_result$baselinePara
-
-basline_Simple <- combined_Data_int_noise_bSpline_Simple$basis
-baselineCoefCoef <- combined_Data_int_noise_bSpline_model_Simple_result$baselinePara
-
-plot(exp(baseline %*% baselineCoef), col = "blue")
-lines(exp(baseline %*% baselineCoef, col = "red"))
-axis(1, at = 1:310, labels = combined_Data_int_noise_bSpline_Simple[combined_Data_int_noise_bSpline_Simple$status==1, "obstime"], las = 2, cex.axis = 0.7)
-```
-
-
+# Cross validation, 10-folds
 ```{r, echo=TRUE}
 # Step 4. separate the dataset randomly into two and compare the stability of the model across different sub dataset
 # Separate the dataset into two small datasets to see the stablility of the estimation of the models
 set.seed(123456)
 
 # Number of folds
-k <- 2
-
-# Number of repetitions
-n_repeats <- 10
+k <- 10
 
 # Assuming p is the number of coefficients
 p <- 105
 p1 <- 45
 
 # Preallocate lists to store results across repetitions
-bSplines_beta_list <- vector("list", n_repeats)
-bSplines_varSel_list <- vector("list", n_repeats)
-PL_beta_list <- vector("list", n_repeats)
-PL_varSel_list <- vector("list", n_repeats)
-cox_beta_list <- vector("list", n_repeats)
-cox_varSel_list <- vector("list", n_repeats)
+bSplines_model_C_INDEX_Simple = bSplines_model_C_INDEX = rep(NA, k)
+coxRegression_C_INDEX_Simple = coxRegression_C_INDEX = rep(NA, k)
+PL_C_INDEX_Simple = PL_C_INDEX = rep(NA, k)
 
-bSplines_beta_list_Simple <- vector("list", n_repeats)
-bSplines_varSel_list_Simple <- vector("list", n_repeats)
-PL_beta_list_Simple <- vector("list", n_repeats)
-PL_varSel_list_Simple <- vector("list", n_repeats)
-cox_beta_list_Simple <- vector("list", n_repeats)
-cox_varSel_list_Simple <- vector("list", n_repeats)
-
-bSplines_model_C_INDEX_Simple = bSplines_model_C_INDEX = matrix(NA, nrow = n_repeats, ncol = k)
-coxRegression_C_INDEX_Simple = coxRegression_C_INDEX = matrix(NA, nrow = n_repeats, ncol = k)
-PL_C_INDEX_Simple = PL_C_INDEX =  matrix(NA, nrow = n_repeats, ncol = k)
-
-FOLDS <- list()
-
-
-for (r in 1:n_repeats) {
-  cat("Repetition", r, "\n")
-  
-  # Generate new folds for each repetition
-  folds <- createFolds(combined_Data_int$status, k = k, list = TRUE)
-  
-  FOLDS <- c(FOLDS, folds)
-  
-  # Preallocate matrices for this repetition
-  bSplines_model_beta <- matrix(NA, nrow = k, ncol = p)
-  bSplines_model_variableSelection <- matrix(NA, nrow = k, ncol = p)
-  PL_beta <- matrix(NA, nrow = k, ncol = p)
-  PL_variableSelection <- matrix(NA, nrow = k, ncol = p)
-  cox_beta <- matrix(NA, nrow = k, ncol = p)
-  cox_variableSelection <- matrix(NA, nrow = k, ncol = p)
-
-  
-  #---------- For simplified dataset---------------
-  bSplines_model_beta_Simple <- matrix(NA, nrow = k, ncol = p1)
-  bSplines_model_variableSelection_Simple <- matrix(NA, nrow = k, ncol = p1)
-  PL_beta_Simple <- matrix(NA, nrow = k, ncol = p1)
-  PL_variableSelection_Simple <- matrix(NA, nrow = k, ncol = p1)
-  cox_beta_Simple <- matrix(NA, nrow = k, ncol = p1)
-  cox_variableSelection_Simple <- matrix(NA, nrow = k, ncol = p1)
-  
-
+bSplines_model_beta <- matrix(NA, nrow = k, ncol = p)
+bSplines_model_variableSelection <- matrix(NA, nrow = k, ncol = p)
+PL_beta <- matrix(NA, nrow = k, ncol = p)
+PL_variableSelection <- matrix(NA, nrow = k, ncol = p)
+cox_beta <- matrix(NA, nrow = k, ncol = p)
+cox_variableSelection <- matrix(NA, nrow = k, ncol = p)
   
   
-  for (i in seq_along(folds)) {
+bSplines_model_beta_Simple <- matrix(NA, nrow = k, ncol = p1)
+bSplines_model_variableSelection_Simple <- matrix(NA, nrow = k, ncol = p1)
+PL_beta_Simple <- matrix(NA, nrow = k, ncol = p1)
+PL_variableSelection_Simple <- matrix(NA, nrow = k, ncol = p1)
+cox_beta_Simple <- matrix(NA, nrow = k, ncol = p1)
+cox_variableSelection_Simple <- matrix(NA, nrow = k, ncol = p1)  
+ 
+
+folds <- createFolds(combined_Data_int$status, k = k, list = TRUE)
+
+for (i in seq_along(folds)) {
     indices <- folds[[i]]
     training_dataset <- combined_Data_int[-indices,]
     testing_dataset <- combined_Data_int[indices,]
@@ -470,7 +222,7 @@ for (r in 1:n_repeats) {
         chains = 1
       )
     
-     # Extract the model result
+    # Extract the model result
     bSplines_model_results = Bayesian_Survival_result_Extract(
       bayesian_model_fit = bSplines_model,
       model_type = "bSplines",
@@ -483,19 +235,19 @@ for (r in 1:n_repeats) {
     
     bSplines_model_beta[i, ] <- bSplines_model_results$Beta_bayesian_est[, "mean"]
     bSplines_model_variableSelection[i, ] <- bSplines_model_results$variableSelection
+    bSplines_model_Prediction_SurvivalProb <- as.vector(bSplines_model_results$eta_pred)
+    bSplines_model_C_INDEX[i] <- rcorr.cens(-bSplines_model_Prediction_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
     
-     bSplines_model_Prediction_SurvivalProb <- as.vector(bSplines_model_results$eta_pred)
-     bSplines_model_C_INDEX[r, i] <- rcorr.cens(-bSplines_model_Prediction_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
+    
     
     #-----------MODEL 1.2: Cox regression ----------
     cox_regression <- coxph(Surv(as.numeric(obstime), status) ~ ., data = training_dataset)
     cox_regression_result <- summary(cox_regression)
-    
+   
     cox_beta[i,] <- as.vector(cox_regression_result$coefficients[, "coef"])
     cox_variableSelection[i,] <- as.vector((cox_regression_result$coefficients[, "Pr(>|z|)"] * p) < 0.05)
-    
     coxRegression_SurvivalProb <- predict(cox_regression, newdata = testing_dataset, type = "lp")
-    coxRegression_C_INDEX[r, i] <- rcorr.cens(-coxRegression_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
+    coxRegression_C_INDEX[i] <- rcorr.cens(-coxRegression_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
     
     #-----------MODEL 1.3: PL model----------
     Data_PL <- stan_data_Constructer_PL(
@@ -515,7 +267,6 @@ for (r in 1:n_repeats) {
       thin = 10,
       chains = 1
     )
-
     
     PL_results = Bayesian_Survival_result_Extract(
     bayesian_model_fit = PL_model,
@@ -528,9 +279,12 @@ for (r in 1:n_repeats) {
   )
     PL_beta[i, ] <- PL_results$Beta_bayesian_est[, "mean"]
     PL_variableSelection[i, ] <- PL_results$variableSelection
-    
     PL_Prediction_SurvivalProb <- PL_results$eta_pred
-    PL_C_INDEX[r, i] <- rcorr.cens(-PL_Prediction_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
+    PL_C_INDEX[i] <- rcorr.cens(-PL_Prediction_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
+    
+    
+    
+    
     ###---------------------------------------------------------
     ###-------------for simplified dataset----------------------
     ###---------------------------------------------------------
@@ -555,6 +309,7 @@ for (r in 1:n_repeats) {
         chains = 1
       )
     
+    # Extract the model result
     bSplines_model_results_Simple = Bayesian_Survival_result_Extract(
       bayesian_model_fit = bSplines_model_Simple,
       model_type = "bSplines",
@@ -564,10 +319,13 @@ for (r in 1:n_repeats) {
         "Prediction_SurvivalProb"
       )
     )
+    
     bSplines_model_beta_Simple[i, ] <- bSplines_model_results_Simple$Beta_bayesian_est[, "mean"]
     bSplines_model_variableSelection_Simple[i, ] <- bSplines_model_results_Simple$variableSelection
     bSplines_model_Prediction_SurvivalProb_Simple <- bSplines_model_results_Simple$eta_pred
-    bSplines_model_C_INDEX_Simple[r, i] <- rcorr.cens(-bSplines_model_Prediction_SurvivalProb_Simple, Surv(testing_dataset_Simple$obstime, testing_dataset_Simple$status))["C Index"] 
+    bSplines_model_C_INDEX_Simple[i] <- rcorr.cens(-bSplines_model_Prediction_SurvivalProb_Simple, Surv(testing_dataset_Simple$obstime, testing_dataset_Simple$status))["C Index"] 
+    
+    
     
     #-----------MODEL 1.2: Cox regression ----------
     cox_regression_Simple <- coxph(Surv(as.numeric(obstime), status) ~ ., data = training_dataset_Simple)
@@ -576,7 +334,7 @@ for (r in 1:n_repeats) {
     cox_beta_Simple[i,] <- as.vector(cox_regression_result_Simple$coefficients[, "coef"])
     cox_variableSelection_Simple[i,] <- as.vector((cox_regression_result_Simple$coefficients[, "Pr(>|z|)"] * p1) < 0.05)
     coxRegression_SurvivalProb_Simple <- predict(cox_regression_Simple, newdata = testing_dataset_Simple, type = "lp")
-    coxRegression_C_INDEX_Simple[r, i] <- rcorr.cens(-coxRegression_SurvivalProb_Simple, Surv(testing_dataset_Simple$obstime, testing_dataset_Simple$status))["C Index"] 
+    coxRegression_C_INDEX_Simple[i] <- rcorr.cens(-coxRegression_SurvivalProb_Simple, Surv(testing_dataset_Simple$obstime, testing_dataset_Simple$status))["C Index"] 
     
     #-----------MODEL 1.3: PL model----------
     Data_PL_Simple <- stan_data_Constructer_PL(
@@ -597,180 +355,103 @@ for (r in 1:n_repeats) {
       chains = 1
     )
     
-    # Extract the model result
     PL_results_Simple = Bayesian_Survival_result_Extract(
-    bayesian_model_fit = PL_model_Simple,
-    model_type = "none",
-    criteria = c(
-      "DesignCoefficients",
-      "variableSelection",
-      "Prediction_SurvivalProb"
+      bayesian_model_fit = PL_model_Simple,
+      model_type = "none",
+      criteria = c(
+        "DesignCoefficients",
+        "variableSelection",
+        "Prediction_SurvivalProb"
+      )
     )
-  )
     PL_beta_Simple[i, ] <- PL_results_Simple$Beta_bayesian_est[, "mean"]
     PL_variableSelection_Simple[i, ] <- PL_results_Simple$variableSelection
     PL_Prediction_SurvivalProb_Simple <- PL_results_Simple$eta_pred
-    PL_C_INDEX_Simple[r, i] <- rcorr.cens(-PL_Prediction_SurvivalProb_Simple, Surv(testing_dataset_Simple$obstime, testing_dataset_Simple$status))["C Index"] 
-  }
-  
-  # Store results for this repetition
-  bSplines_beta_list[[r]] <- bSplines_model_beta
-  bSplines_varSel_list[[r]] <- bSplines_model_variableSelection
-  PL_beta_list[[r]] <- PL_beta
-  PL_varSel_list[[r]] <- PL_variableSelection
-  cox_beta_list[[r]] <- cox_beta
-  cox_varSel_list[[r]] <- cox_variableSelection
-  
-  
-  # Store results for this repetition --- simplified dataset
-  bSplines_beta_list_Simple[[r]] <- bSplines_model_beta_Simple
-  bSplines_varSel_list_Simple[[r]] <- bSplines_model_variableSelection_Simple
-  PL_beta_list_Simple[[r]] <- PL_beta_Simple
-  PL_varSel_list_Simple[[r]] <- PL_variableSelection_Simple
-  cox_beta_list_Simple[[r]] <- cox_beta_Simple
-  cox_varSel_list_Simple[[r]] <- cox_variableSelection_Simple
+    PL_C_INDEX_Simple[i] <-
+      rcorr.cens(
+        -PL_Prediction_SurvivalProb_Simple,
+        Surv(testing_dataset_Simple$obstime, testing_dataset_Simple$status)
+      )["C Index"] 
 
 }
 
-save.image(file = "./Data/03_results_combined_Step5_includSimplifiedData.RData")
+save.image(file = "./Data/03_results_combined_Step5_includSimplifiedDatanprediction.RData")
 ```
-
-
 ```{r, echo=TRUE}
-load(file = "./Data/03_results_combined_Step5_includSimplifiedData.RData")
+load(file = "./Data/03_results_combined_Step5_includSimplifiedDatanprediction.RData")
 par(mfrow = c(1, 2))
 
 C_index <- list(bSplines = bSplines_model_C_INDEX, CoxRegression = coxRegression_C_INDEX,  PL = PL_C_INDEX)
 boxplot(C_index, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for complex dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
-abline(h = 0.5, col = "gray", lty = 2)
+abline(h = 0.5, col = "grey", lty = 3)
 
 C_index_Simplified <- list(bSplines = bSplines_model_C_INDEX_Simple, CoxRegression = coxRegression_C_INDEX_Simple, PL = PL_C_INDEX_Simple)
-boxplot(C_index_Simplified, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for simplifed dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
-abline(h = 0.5, col = "gray", lty = 2)
+boxplot(C_index_Simplified, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for complex dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
+abline(h = 0.5, col = "grey", lty = 3)
 ```
+
 
 ```{r, echo=TRUE}
 # Visualize the model results
-load(file = "./Data/03_results_combined_Step5_includSimplifiedData.RData")
-
-# Define labels
-name_label <- names(training_dataset)[1:105]
-name_label_Simple <- names(training_dataset_Simple)[1:45]
-
-# General plotting function
-plot_beta_estimates <- function(beta_list, labels, title, n_features) {
-  plot(beta_list[[1]][1,], type = "l", col = "blue", ylim = c(-1, 1), #range(unlist(beta_list)),
-       xlab = "", ylab = "Value", main = title, xaxt = "n")
-  
-  for (i in 2:10) {
-    lines(beta_list[[i]][1,], col = "blue")
-  }
-  
-  for (i in 1:10) {
-    lines(beta_list[[i]][2,], col = "red")
-  }
-  
-  #axis(1, at = 1:n_features, labels = labels, las = 2, cex.axis = 0.7)
-  abline(h = 0, col = "red")
-}
-
-# Set layout for 3 rows and 2 columns
-par(mfrow = c(4, 2), mar = c(2, 2, 2, 1), oma = c(0, 0, 2, 0))
-
-C_index <- list(bSplines = bSplines_model_C_INDEX, CoxRegression = coxRegression_C_INDEX,  PL = PL_C_INDEX)
-boxplot(C_index, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for complex dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
-abline(h = 0.5, col = "gray", lty = 2)
+par(mfrow = c(3, 2), mar = c(2, 2, 2, 1), oma = c(0, 0, 0, 0))
+bSplines_model_beta_df <- as.data.frame(t(bSplines_model_beta))
+names(bSplines_model_beta_df) <- c("-fold 1", "-fold 2", "-fold 3", "-fold 4", "-fold 5", "-fold 6", "-fold 7", "-fold 8", "-fold 9", "-fold 10")
+bSplines_model_beta_cofficients <- cor(bSplines_model_beta_df)
+corrplot(bSplines_model_beta_cofficients, method = "color", tl.cex = 1.5, type = "lower", addCoef.col = "white", number.cex = 0.8)
+# Add a title to the plot
+title("Correlation Plot of BayesianbSpline estimated betas (complex dataset)")
 
 
-C_index_Simplified <- list(bSplines = bSplines_model_C_INDEX_Simple, CoxRegression = coxRegression_C_INDEX_Simple, PL = PL_C_INDEX_Simple)
-boxplot(C_index_Simplified, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for simplifed dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
-abline(h = 0.5, col = "gray", lty = 2)
+bSplines_model_beta_Simple_df <- as.data.frame(t(bSplines_model_beta_Simple))
+names(bSplines_model_beta_Simple_df) <- c("-fold 1", "-fold 2", "-fold 3", "-fold 4", "-fold 5", "-fold 6", "-fold 7", "-fold 8", "-fold 9", "-fold 10")
+bSplines_model_beta_Simple_cofficients <- cor(bSplines_model_beta_Simple_df)
+corrplot(cor(bSplines_model_beta_Simple_cofficients), method = "color", tl.cex = 1.5, type = "lower", addCoef.col = "white", number.cex = 0.8)
+# Add a title to the plot
+title("Correlation Plot of BayesianbSpline estimated betas (simplified dataset)")
 
-# B-splines
-plot_beta_estimates(bSplines_beta_list, name_label, "Estimated Betas (B-splines) for complex dataset", 105)
-plot_beta_estimates(bSplines_beta_list_Simple, name_label_Simple, "Estimated Betas (B-splines) for Simplified dataset)", 45)
 
-# Cox regression
-plot_beta_estimates(cox_beta_list, name_label, "Estimated Betas (Cox Regression) for complex dataset", 105)
-plot_beta_estimates(cox_beta_list_Simple, name_label_Simple, "Estimated Betas (Cox Regression) for Simplified dataset)", 45)
+cox_beta_df <- as.data.frame(t(cox_beta))
+names(cox_beta_df) <- c("-fold 1", "-fold 2", "-fold 3", "-fold 4", "-fold 5", "-fold 6", "-fold 7", "-fold 8", "-fold 9", "-fold 10")
+cox_beta_cofficients <- cor(cox_beta_df)
+corrplot(cox_beta_cofficients, method = "color", tl.cex = 1.5, type = "lower", addCoef.col = "white", number.cex = 0.8)
+title("Correlation Plot of cox regression estimated betas (complex dataset)")
 
-# Bayesian PL
-plot_beta_estimates(PL_beta_list, name_label, "Estimated Betas (Bayesian PL) for complex dataset", 105)
-plot_beta_estimates(PL_beta_list_Simple, name_label_Simple, "Estimated Betas (Bayesian PL) for Simplified dataset)", 45)
+
+cox_beta_Simple_df <- as.data.frame(t(cox_beta_Simple))
+names(cox_beta_Simple_df) <- c("-fold 1", "-fold 2", "-fold 3", "-fold 4", "-fold 5", "-fold 6", "-fold 7", "-fold 8", "-fold 9", "-fold 10")
+cox_beta_Simple_cofficients <- cor(cox_beta_Simple_df)
+corrplot(cox_beta_Simple_cofficients, method = "color", tl.cex = 1.5, type = "lower", addCoef.col = "white", number.cex = 0.8)
+title("Correlation Plot of cox regression estimated betas (simplified dataset)")
+
+PL_beta_df <- as.data.frame(t(PL_beta))
+names(PL_beta_df) <- c("-fold 1", "-fold 2", "-fold 3", "-fold 4", "-fold 5", "-fold 6", "-fold 7", "-fold 8", "-fold 9", "-fold 10")
+PL_beta_cofficients <- cor(PL_beta_df)
+corrplot(PL_beta_cofficients, method = "color", tl.cex = 1.5, type = "lower", addCoef.col = "white", number.cex = 0.8)
+title("Correlation Plot of Bayesian PL estimated betas (complex dataset)")
+
+
+PL_beta_Simple_df <- as.data.frame(t(PL_beta_Simple))
+names(PL_beta_Simple_df) <- c("-fold 1", "-fold 2", "-fold 3", "-fold 4", "-fold 5", "-fold 6", "-fold 7", "-fold 8", "-fold 9", "-fold 10")
+PL_beta_Simple_cofficients <- cor(PL_beta_Simple_df)
+corrplot(PL_beta_Simple_cofficients, method = "color", tl.cex = 1.5, type = "lower", addCoef.col = "white", number.cex = 0.8)
+title("Correlation Plot of cox regression estimated betas (simplified dataset)")
 ```
 
-# Scatter plot
 ```{r, echo=TRUE}
-load(file = "./Data/03_results_combined_Step5_includSimplifiedData.RData")
-plot_beta_estimates_scatter <- function(beta_list, labels, title, n_features, randomList) {
-  #par(mfrow = c(1, 4), mar = c(2, 2, 2, 1), oma = c(0, 0, 0, 0))
-  
-  # plot(beta_list[[1]][1,], beta_list[[1]][2,], type = "p", col = 1, ylim = c(-1, 1), xlim = c(-1, 1), pch = 16,#range(unlist(beta_list)),
-  #      xlab = "subset 1", ylab = "subset 2", main = title)
-  for (i in randomList) {
-    plot(beta_list[[i]][1,], beta_list[[i]][2,], type = "p", col = "blue", pch = 16,#range(unlist(beta_list)),
-       xlab = "subset 1", ylab = "subset 2", main = title)
-    abline(a = 0, b = 0.5, col = "grey", lty = 2) # add the reference line
-    
-    # add the reference line
-    model <- lm(beta_list[[i]][1,] ~ beta_list[[i]][2,])
-    abline(model, col = "red")
-    
-    # add the Pearson cofficient
-    r <- cor(beta_list[[i]][1,], beta_list[[i]][2,])
-    legend("topleft", legend = paste("r =", round(r, 2)), bty = "n", text.col = "red")
-  }
-}
+bSplines_model_beta_corVal <- bSplines_model_beta_cofficients[lower.tri(bSplines_model_beta_cofficients)]
+bSplines_model_beta_Simple_corVal <- bSplines_model_beta_Simple_cofficients[lower.tri(bSplines_model_beta_Simple_cofficients)]
 
-randomList <- sample(1:10, 4, replace = FALSE)
+cox_beta_corVal <- cox_beta_cofficients[lower.tri(cox_beta_cofficients)]
+cox_beta_Simple_corVal <- cox_beta_Simple_cofficients[lower.tri(cox_beta_Simple_cofficients)]
 
-pdf("./Image/Estimated_Betas_bSpline.pdf", width = 12, height = 8)
-par(mfrow = c(2, 4), mar = c(3, 3, 4, 1), oma = c(0, 0, 0, 0))
-# B-splines
-plot_beta_estimates_scatter(bSplines_beta_list, name_label, "Estimated Betas (B-splines) for complex dataset", 105, randomList)
-plot_beta_estimates_scatter(bSplines_beta_list_Simple, name_label_Simple, "Estimated Betas (B-splines) for Simplified dataset)", 45, randomList)
-dev.off()
+PL_beta_corVal <- PL_beta_cofficients[lower.tri(PL_beta_cofficients)] 
+PL_beta_Simple_corVal <- PL_beta_Simple_cofficients[lower.tri(PL_beta_Simple_cofficients)]
 
-# Cox regression
-pdf("./Image/Estimated_Betas_CoxRegression.pdf", width = 12, height = 8)
-par(mfrow = c(2, 4), mar = c(3, 3, 4, 1), oma = c(0, 0, 0, 0))
-plot_beta_estimates_scatter(cox_beta_list, name_label, "Estimated Betas (Cox Regression) for complex dataset", 105, randomList)
-plot_beta_estimates_scatter(cox_beta_list_Simple, name_label_Simple, "Estimated Betas (Cox Regression) for Simplified dataset)", 45, randomList)
-dev.off()
+beta <- list(bSplines = bSplines_model_beta_corVal, CoxRegression = cox_beta_corVal, PL = PL_beta_corVal)
+beta_Simplified <- list(bSplines = bSplines_model_beta_Simple_corVal, CoxRegression = cox_beta_Simple_corVal, PL = PL_beta_Simple_corVal)
 
-# Bayesian PL
-pdf("./ImageEstimated_Betas_PL.pdf", width = 12, height = 8)
-par(mfrow = c(2, 4), mar = c(3, 3, 4, 1), oma = c(0, 0, 0, 0))
-plot_beta_estimates_scatter(PL_beta_list, name_label, "Estimated Betas (Bayesian PL) for complex dataset", 105, randomList)
-plot_beta_estimates_scatter(PL_beta_list_Simple, name_label_Simple, "Estimated Betas (Bayesian PL) for Simplified dataset)", 45, randomList)
-dev.off()
-```
+par(mfrow = c(1, 2))
+boxplot(beta, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "correlation of estimated betas  for complex dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
 
-# Variable selection
-```{r, echo=TRUE}
-load(file = "./Data/03_results_combined_Step5_includSimplifiedData.RData")
-plot_beta_estimates_variables <- function(beta_list, labels, title, n_features) {
-  par(mfrow = c(5, 2), mar = c(2, 2, 2, 1), oma = c(0, 0, 0, 0))
-  
-  plot(beta_list[[1]][1,], beta_list[[1]][2,], type = "p", col = 1, ylim = c(-1, 1), xlim = c(-1, 1), pch = 16)#range(unlist(beta_list)),
-  #      xlab = "subset 1", ylab = "subset 2", main = title)
-  for (i in 1:10) {
-    plot(beta_list[[i]][1,], beta_list[[i]][2,], type = "p", col = "blue", ylim = c(-1, 1), xlim = c(-1, 1), pch = 16,#range(unlist(beta_list)),
-       xlab = "subset 1", ylab = "subset 2", main = title)
-    abline(a = 0, b = 0.5, col = "red")
-  }
-}
-
-par(mfrow = c(1, 3), mar = c(2, 2, 2, 1), oma = c(0, 0, 0, 0))
-# B-splines
-plot_beta_estimates_scatter(bSplines_beta_list, name_label, "Estimated Betas (B-splines) for complex dataset", 105)
-plot_beta_estimates_scatter(bSplines_beta_list_Simple, name_label_Simple, "Estimated Betas (B-splines) for Simplified dataset)", 45)
-
-# Cox regression
-plot_beta_estimates_scatter(cox_beta_list, name_label, "Estimated Betas (Cox Regression) for complex dataset", 105)
-plot_beta_estimates_scatter(cox_beta_list_Simple, name_label_Simple, "Estimated Betas (Cox Regression) for Simplified dataset)", 45)
-
-# Bayesian PL
-plot_beta_estimates_scatter(PL_beta_list, name_label, "Estimated Betas (Bayesian PL) for complex dataset", 105)
-plot_beta_estimates_scatter(PL_beta_list_Simple, name_label_Simple, "Estimated Betas (Bayesian PL) for Simplified dataset)", 45)
+boxplot(beta_Simplified, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for simplified dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
 ```

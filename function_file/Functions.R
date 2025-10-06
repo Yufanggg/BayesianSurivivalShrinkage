@@ -375,7 +375,7 @@ Bayesian_Survival_result_Extract <- function(bayesian_model_fit, model_type,
       Beta_bayesian_est <- Output[grep("^Beta", rownames(Output)), "mean", drop = FALSE]
       model_result$Beta_bayesian_est <- Beta_bayesian_est
       
-      model_result$Beta_bayesian_estLB <- Output[grep("^Beta", rownames(Output)), "2.5%%", drop = FALSE]
+      model_result$Beta_bayesian_estLB <- Output[grep("^Beta", rownames(Output)), "2.5%", drop = FALSE]
       model_result$Beta_bayesian_estUB <- Output[grep("^Beta", rownames(Output)), "97.5%", drop = FALSE]
     }
     
@@ -383,14 +383,14 @@ Bayesian_Survival_result_Extract <- function(bayesian_model_fit, model_type,
       eta_pred <- Output[grep("^eta_new", rownames(Output)), "50%", drop = FALSE]
       model_result$eta_pred <- eta_pred
       
-      model_result$eta_predLB <- Output[grep("^eta_new", rownames(Output)), "2.5%%", drop = FALSE]
+      model_result$eta_predLB <- Output[grep("^eta_new", rownames(Output)), "2.5%", drop = FALSE]
       model_result$eta_predUB <- Output[grep("^eta_new", rownames(Output)), "97.5%", drop = FALSE]
       
       if (model_type != "none"){
         sp <- Output[grep("^survival_prob", rownames(Output)), "50%", drop = FALSE]
         model_result$sp <- sp
         
-        model_result$spLB <- Output[grep("^survival_prob", rownames(Output)), "2.5%%", drop = FALSE]
+        model_result$spLB <- Output[grep("^survival_prob", rownames(Output)), "2.5%", drop = FALSE]
         model_result$spUB <- Output[grep("^survival_prob", rownames(Output)), "97.5%", drop = FALSE]
       }
       
@@ -639,7 +639,7 @@ includingInter <- function(dataframe_) {
   # exclude_columns <- interaction_terms[exclude_terms]
   # selected_columns <- setdiff(all_terms, exclude_columns)
   # interaction_df <- subset(interaction_df, select = selected_columns)
-  interaction_df$id = 1:nrow(dataframe_)#dataframe_$ID
+  #interaction_df$id = 1:nrow(dataframe_)#dataframe_$ID
   interaction_df$status = ifelse(dataframe_$status == "graftloss", 1, 0)
   interaction_df$obstime = dataframe_$time
   

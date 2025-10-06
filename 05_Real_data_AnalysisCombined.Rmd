@@ -100,9 +100,9 @@ real_df_simple$HLA_mismatch <- scale(real_df_simple$HLA_mismatch)
 real_df_simple$DonorBMI <- scale(real_df_simple$DonorBMI)
 
 real_df_simple_DBD <- subset(real_df_simple, TypecadavericDBDDCD == "DBD")
-real_df_simple_DBD <- subset(real_df_simple, select = -TypecadavericDBDDCD)
+real_df_simple_DBD <- subset(real_df_simple_DBD, select = -c(TypecadavericDBDDCD, Warm_ischaemic_period_1))
 real_df_simple_DCD <- subset(real_df_simple, TypecadavericDBDDCD == "DCD")
-real_df_simple_DCD <- subset(real_df_simple, select = -TypecadavericDBDDCD)
+real_df_simple_DCD <- subset(real_df_simple_DCD, select = -TypecadavericDBDDCD)
 ```
 
 # Check whether or not each level have sufficient events
@@ -115,7 +115,8 @@ print(categorical_vars)
 
 for (cvars in categorical_vars){
   if (cvars != "status"){
-    print(table(real_df_simple_DBD[[cvars]], real_df_simple_DBD$status))
+    print(cvars)
+    print(table(real_df_simple_DBD[[cvars]], real_df_simple_DBD$status == "graftloss"))
   }
 }
 
@@ -127,28 +128,80 @@ print(categorical_vars)
 
 for (cvars in categorical_vars){
   if (cvars != "status"){
-    print(table(real_df_simple_DCD[[cvars]], real_df_simple_DCD$status))
+    print(cvars)
+    print(table(real_df_simple_DCD[[cvars]], real_df_simple_DCD$status=="graftloss"))
   }
 }
 ```
 
 # Section 1: analyze data for the DBD group
+
+# Check whether or not each level have sufficient events
 ```{r, echo=TRUE}
-real_df_simple_DBD_noise <- real_df_simple_DBD
-real_df_simple_DBD_noise$noise1 <- rnorm(nrow(real_df_simple_DBD_noise))
-real_df_simple_DBD_noise$noise2 <- rnorm(nrow(real_df_simple_DBD_noise), 1, 2)
-real_df_simple_DBD_noise$noise3 <- rnorm(nrow(real_df_simple_DBD_noise), 3, 4)
+# Identify categorical variables
+categorical_vars <- names(real_df_simple_DBD)[sapply(real_df_simple_DBD, function(x) is.factor(x) || is.character(x))]
+
+# Print the categorical variables
+print(categorical_vars)
+
+for (cvars in categorical_vars){
+  if (cvars != "status"){
+    print(cvars)
+    print(table(real_df_simple_DBD$status == "graftloss", real_df_simple_DBD[[cvars]]))
+  }
+}
+```
+
+
+## Descriptive data analysis
+```{r, echo=TRUE}
+library(dplyr)
+real_df_simple_DBD_encode <- subset(real_df_simple_DBD, select = -c(time, status)) %>%
+  mutate(across(where(is.factor), as.character)) %>%
+  mutate(across(where(is.character), ~ as.factor(.))) %>%
+  model.matrix(~ . - 1, data = .) %>%
+  as.data.frame() %>%
+  mutate(across(everything(), ~ ifelse(. == 0, -1, .)))
+
+# Step 3: Calculate correlation matrix
+cor_matrix <- cor(real_df_simple_DBD_encode)
+
+# Step 4: View the correlation matrix
+print(cor_matrix)
+
+# Optional: Visualize with a heatmap
+library(corrplot)
+corrplot(cor_matrix, method = "color", tl.cex = 0.7, type = "lower")
+```
+
+# reversed KM for the DBD dataset
+```{r, echo=TRUE}
+library(survival)
+fit <- survfit(Surv(real_df_simple_DBD$time, real_df_simple_DBD$status != "graftloss") ~ 1)
+plot(fit, main = "Reverse Kaplan-Meier Plot for DBD dataset", xlab = "recurrence free survival time (in days)", ylab = "survival percentage")
+abline(h = 0.5, col = "red", lty = 2)
+median(fit)
+```
+
+## Section 1.1 analyze data for the DBD group
+```{r, echo=TRUE}
+real_df_simple_DBD_int <- includingInter(real_df_simple_DBD)
+# real_df_simple_DBD <- real_df_simple_DBD[, names(real_df_simple_DBD) != "time"]
+# real_df_simple_DBD_noise <- real_df_simple_DBD
+# real_df_simple_DBD_noise$noise1 <- rnorm(nrow(real_df_simple_DBD_noise))
+# real_df_simple_DBD_noise$noise2 <- rnorm(nrow(real_df_simple_DBD_noise), 1, 2)
+# real_df_simple_DBD_noise$noise3 <- rnorm(nrow(real_df_simple_DBD_noise), 3, 4)
 
 
 #-----------MODEL 1.3: PL model----------
-real_df_simple_DBD_noise_PL <- stan_data_Constructer_PL(
-  training_dataset = real_df_simple_DBD_noise,
+real_df_simple_DBD_int_PL <- stan_data_Constructer_PL(
+  training_dataset = real_df_simple_DBD_int,
   testing_dataset = NULL,
   havingInt = TRUE
 )
 
-real_df_simple_DBD_noise_PL_model <- Bayesian_Survival_model(
-  stan_data = real_df_simple_DBD_noise_PL,
+real_df_simple_DBD_PL_model <- Bayesian_Survival_model(
+  stan_data = real_df_simple_DBD_int_PL,
   baseline_modelling = "none",
   shrinkage = TRUE,
   withPrediction = FALSE,
@@ -159,55 +212,172 @@ real_df_simple_DBD_noise_PL_model <- Bayesian_Survival_model(
   chains = 1
 )
 
-real_df_simple_DBD_noise_PL_model_result = Bayesian_Survival_result_Extract(
-  bayesian_model_fit = real_df_simple_DBD_noise_PL_model,
+real_df_simple_DBD_PL_model_result = Bayesian_Survival_result_Extract(
+  bayesian_model_fit = real_df_simple_DBD_PL_model,
   model_type = "none",
   criteria = c("DesignCoefficients",
     "variableSelection",
     "Prediction_SurvivalProb"
-  )
+  ),
+  uncertainty = TRUE
 )
-real_df_simple_DBD_noise_PL_model_result_coef <- real_df_simple_DBD_noise_PL_model_result$Beta_bayesian_est[, "mean"]
-real_df_simple_DBD_noise_PL_model_result_variableSelection <- real_df_simple_DBD_noise_PL_model_result$variableSelection
+real_df_simple_DBD_PL_model_result_coef <- real_df_simple_DBD_PL_model_result$Beta_bayesian_est[, "mean"]
+real_df_simple_DBD_PL_model_result_coefLB <- real_df_simple_DBD_PL_model_result$Beta_bayesian_estLB
+real_df_simple_DBD_PL_model_result_coefUB <- real_df_simple_DBD_PL_model_result$Beta_bayesian_estUB
+real_df_simple_DBD_PL_model_result_variableSelection <- real_df_simple_DBD_PL_model_result$variableSelection
+
+
+
+#-----------MODEL 1.3: PL model no shrinkage----------
+real_df_simple_DBD_PL_model_noshrinkage <- Bayesian_Survival_model(
+  stan_data = real_df_simple_DBD_int_PL,
+  baseline_modelling = "none",
+  shrinkage = FALSE,
+  withPrediction = FALSE,
+  havingInt = TRUE,
+  niter = 10000,
+  nwarmup = 2000,
+  thin = 10,
+  chains = 1
+)
+
+real_df_simple_DBD_PL_model_result_noshrinkage = Bayesian_Survival_result_Extract(
+  bayesian_model_fit = real_df_simple_DBD_PL_model_noshrinkage,
+  model_type = "none",
+  criteria = c("DesignCoefficients",
+    "variableSelection",
+    "Prediction_SurvivalProb"
+  ),
+  uncertainty = TRUE
+)
+real_df_simple_DBD_PL_model_result_coef <- real_df_simple_DBD_PL_model_result$Beta_bayesian_est[, "mean"]
+real_df_simple_DBD_PL_model_result_coefLB <- real_df_simple_DBD_PL_model_result$Beta_bayesian_estLB
+real_df_simple_DBD_PL_model_result_coefUB <- real_df_simple_DBD_PL_model_result$Beta_bayesian_estUB
+real_df_simple_DBD_PL_model_result_variableSelection <- real_df_simple_DBD_PL_model_result$variableSelection
+
+
+real_df_simple_DBD_PL_model_result_coef_noshrinkage <- real_df_simple_DBD_PL_model_result_noshrinkage$Beta_bayesian_est[, "mean"]
+real_df_simple_DBD_PL_model_result_coefLB_noshrinkage <- real_df_simple_DBD_PL_model_result_noshrinkage$Beta_bayesian_estLB
+real_df_simple_DBD_PL_model_result_coefUB_noshrinkage <- real_df_simple_DBD_PL_model_result_noshrinkage$Beta_bayesian_estUB
+real_df_simple_DBD_PL_model_result_variableSelection_noshrinkage <- real_df_simple_DBD_PL_model_result_noshrinkage$variableSelection
 
 save.image(file = "./Data/03_results_Step5_DBD.RData")
 ```
 
 ```{r, echo=TRUE}
 load(file = "./Data/03_results_Step5_DBD.RData")
-name_label = c(names(real_df_simple_DBD_noise)[1:45], "noise1", "noise2", "noise3")
+# par(mfrow = c())
+# Define x-axis labels
+name_label <- names(real_df_simple_DBD_int)[1:36]
+par(mfrow = c(1, 2), mar = c(0, 0, 0, 0), oma = c(3, 23, 3, 1))
+# Plot beta coefficients
+plot(real_df_simple_DBD_PL_model_result_coef, 1:36, type = "n", 
+     col = "blue", pch = 16,
+     xlab = "estimated beta", ylab = "",
+     main = "Beta estimation for DBD", yaxt = "n", xlim = c(-1, 1))
 
-
-plot(real_df_simple_DBD_noise_PL_model_result_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, ylim = c(-3, 3), xaxt = "n")
-# Add background rectangles
-for (i in 1:length(real_df_simple_DBD_noise_PL_model_result_variableSelection)) {
-  if (real_df_simple_DBD_noise_PL_model_result_variableSelection[i]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+for (i in 1:length(real_df_simple_DBD_PL_model_result_variableSelection)) {
+  if (real_df_simple_DBD_PL_model_result_variableSelection[i]) {
+    rect(-1.5, i - 0.5, 1.5, i + 0.5, col = "lightblue", border = NA)
+    # rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
   }
 }
-lines(real_df_simple_DBD_noise_PL_model_result_coef, type = "o", col = "blue", pch = 16)
-#axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
-axis(1, at = 1:48, labels = name_label, las = 2, cex.axis = 0.7)
-abline(a = 0, b =0, col = "red")
+# Plot beta coefficients
+points(real_df_simple_DBD_PL_model_result_coef, 1:36, col = "blue", pch = 16)
+# Add error bars
+segments(real_df_simple_DBD_PL_model_result_coefLB, 1:36, real_df_simple_DBD_PL_model_result_coefUB, 1:36, col = "blue")
+# Add reference line
+abline(v = 0, col = "red", lty = 2)
+
+
+# Add y-axis labels vertically
+axis(2, at = 1:36, labels = name_label, las = 2, cex.axis = 1.0)
+
+plot(real_df_simple_DBD_PL_model_result_coef_noshrinkage, 1:36, type = "n", 
+     col = "blue", pch = 16,
+     xlab = "estimated beta", ylab = "",
+     main = "Beta estimation for DBD (no shrinkage)", yaxt = "n", xlim = c(-1, 1))
+
+for (i in 1:length(real_df_simple_DBD_PL_model_result_variableSelection_noshrinkage)) {
+  if (real_df_simple_DBD_PL_model_result_variableSelection_noshrinkage[i]) {
+    rect(-1.5, i - 0.5, 1.5, i + 0.5, col = "lightblue", border = NA)
+    # rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+# Plot beta coefficients
+points(real_df_simple_DBD_PL_model_result_coef_noshrinkage, 1:36, col = "blue", pch = 16)
+
+
+# Add error bars
+segments(real_df_simple_DBD_PL_model_result_coefLB_noshrinkage, 1:36, real_df_simple_DBD_PL_model_result_coefUB_noshrinkage, 1:36, col = "blue")
+
+
+# Add reference line
+abline(v = 0, col = "red", lty = 2)
 ```
 
 # Section 1: analyze data for the DCD group
 ```{r, echo=TRUE}
-real_df_simple_DCD_noise <- real_df_simple_DCD
-real_df_simple_DCD_noise$noise1 <- rnorm(nrow(real_df_simple_DCD_noise))
-real_df_simple_DCD_noise$noise2 <- rnorm(nrow(real_df_simple_DCD_noise), 1, 2)
-real_df_simple_DCD_noise$noise3 <- rnorm(nrow(real_df_simple_DCD_noise), 3, 4)
+library(survival)
+fit <- survfit(Surv(real_df_simple_DCD$time, real_df_simple_DCD$status != "graftloss") ~ 1)
+plot(fit, main = "Reverse Kaplan-Meier Plot for DCD dataset", xlab = "recurrence free survival time (in days)", ylab = "survival percentage")
+abline(h = 0.5, col = "red", lty = 2)
+median(fit)
+```
+# make the correlation plot
+```{r, echo=TRUE}
+library(dplyr)
+real_df_simple_DCD_encode <- subset(real_df_simple_DCD, select = -c(time, status)) %>%
+  mutate(across(where(is.factor), as.character)) %>%
+  mutate(across(where(is.character), ~ as.factor(.))) %>%
+  model.matrix(~ . - 1, data = .) %>%
+  as.data.frame() %>%
+  mutate(across(everything(), ~ ifelse(. == 0, -1, .)))
+
+# Step 3: Calculate correlation matrix
+cor_matrix_DCD <- cor(real_df_simple_DCD_encode)
+
+# Step 4: View the correlation matrix
+print(cor_matrix_DCD)
+
+# Optional: Visualize with a heatmap
+library(corrplot)
+corrplot(cor_matrix_DCD, method = "color", tl.cex = 0.7, type = "lower")
+```
+
+# Check whether or not each level have sufficient events
+```{r, echo=TRUE}
+# Identify categorical variables
+categorical_vars <- names(real_df_simple_DCD)[sapply(real_df_simple_DCD, function(x) is.factor(x) || is.character(x))]
+
+# Print the categorical variables
+print(categorical_vars)
+
+for (cvars in categorical_vars){
+  if (cvars != "status"){
+    print(cvars)
+    print(table(real_df_simple_DCD$status == "graftloss", real_df_simple_DCD[[cvars]]))
+  }
+}
+```
+
+```{r, echo=TRUE}
+real_df_simple_DCD_int <- includingInter(real_df_simple_DCD)
+# real_df_simple_DCD_noise <- real_df_simple_DCD
+# real_df_simple_DCD_noise$noise1 <- rnorm(nrow(real_df_simple_DCD_noise))
+# real_df_simple_DCD_noise$noise2 <- rnorm(nrow(real_df_simple_DCD_noise), 1, 2)
+# real_df_simple_DCD_noise$noise3 <- rnorm(nrow(real_df_simple_DCD_noise), 3, 4)
 
 
 #-----------MODEL 1.3: PL model----------
-real_df_simple_DCD_noise_PL <- stan_data_Constructer_PL(
-  training_dataset = real_df_simple_DCD_noise,
+real_df_simple_DCD_int_PL <- stan_data_Constructer_PL(
+  training_dataset = real_df_simple_DCD_int,
   testing_dataset = NULL,
   havingInt = TRUE
 )
 
-real_df_simple_DCD_noise_PL_model <- Bayesian_Survival_model(
-  stan_data = real_df_simple_DCD_noise_PL,
+real_df_simple_DCD_PL_model <- Bayesian_Survival_model(
+  stan_data = real_df_simple_DCD_int_PL,
   baseline_modelling = "none",
   shrinkage = TRUE,
   withPrediction = FALSE,
@@ -218,35 +388,344 @@ real_df_simple_DCD_noise_PL_model <- Bayesian_Survival_model(
   chains = 1
 )
 
-real_df_simple_DCD_noise_PL_model_result = Bayesian_Survival_result_Extract(
-  bayesian_model_fit = real_df_simple_DCD_noise_PL_model,
+real_df_simple_DCD_PL_model_result = Bayesian_Survival_result_Extract(
+  bayesian_model_fit = real_df_simple_DCD_PL_model,
   model_type = "none",
   criteria = c("DesignCoefficients",
     "variableSelection",
     "Prediction_SurvivalProb"
-  )
+  ),
+  uncertainty = TRUE
 )
-real_df_simple_DCD_noise_PL_model_result_coef <- real_df_simple_DCD_noise_PL_model_result$Beta_bayesian_est[, "mean"]
-real_df_simple_DCD_noise_PL_model_result_variableSelection <- real_df_simple_DCD_noise_PL_model_result$variableSelection
+real_df_simple_DCD_PL_model_result_coef <- real_df_simple_DCD_PL_model_result$Beta_bayesian_est[, "mean"]
+real_df_simple_DCD_PL_model_result_coefUB <- real_df_simple_DCD_PL_model_result$Beta_bayesian_estUB
+real_df_simple_DCD_PL_model_result_coefLB <- real_df_simple_DCD_PL_model_result$Beta_bayesian_estLB
+real_df_simple_DCD_PL_model_result_variableSelection <- real_df_simple_DCD_PL_model_result$variableSelection
+
+#-----------MODEL 1.3: PL model  no shrinkage ----------
+real_df_simple_DCD_PL_model_noshrinkage <- Bayesian_Survival_model(
+  stan_data = real_df_simple_DCD_int_PL,
+  baseline_modelling = "none",
+  shrinkage = FALSE,
+  withPrediction = FALSE,
+  havingInt = TRUE,
+  niter = 10000,
+  nwarmup = 2000,
+  thin = 10,
+  chains = 1
+)
+
+real_df_simple_DCD_PL_model_result_noshrinakge = Bayesian_Survival_result_Extract(
+  bayesian_model_fit = real_df_simple_DCD_PL_model_noshrinkage,
+  model_type = "none",
+  criteria = c("DesignCoefficients",
+    "variableSelection",
+    "Prediction_SurvivalProb"
+  ),
+  uncertainty = TRUE
+)
+real_df_simple_DCD_PL_model_result_coef_noshrinakge <- real_df_simple_DCD_PL_model_result_noshrinakge$Beta_bayesian_est[, "mean"]
+real_df_simple_DCD_PL_model_result_coefUB_noshrinakge <- real_df_simple_DCD_PL_model_result_noshrinakge$Beta_bayesian_estUB
+real_df_simple_DCD_PL_model_result_coefLB_noshrinakge <- real_df_simple_DCD_PL_model_result_noshrinakge$Beta_bayesian_estLB
+real_df_simple_DCD_PL_model_result_variableSelection_noshrinakge <- real_df_simple_DCD_PL_model_result_noshrinakge$variableSelection
 
 save.image(file = "./Data/03_results_Step5_DCD.RData")
 ```
 
+# Check the proportional hazard assumption via plotting Schoenfeld residuals
 ```{r, echo=TRUE}
 load(file = "./Data/03_results_Step5_DCD.RData")
-name_label = c(names(real_df_simple_DCD_noise)[1:45], "noise1", "noise2", "noise3")
+X <- real_df_simple_DCD_int[, !(names(real_df_simple_DCD_int) %in% c("status", "obstime"))]
+time <- real_df_simple_DCD$time
+status <- real_df_simple_DCD$status
+
+# sort data by time
+sorted_idx <- order(time)
+X <- X[sorted_idx,]
+time <- time[sorted_idx]
+status <- status[sorted_idx]
+
+# initialize residual matrix
+schoenfeld_res <- matrix(NA, nrow = sum(status == "graftloss"), ncol = ncol(X))
+colnames(schoenfeld_res) <- colnames(X)
+
+# Loop over event times
+event_idx <- which(status == "graftloss")
+for (i in seq_along(event_idx)){
+  idx <- event_idx[i]
+  t_i <- time[idx]
+  
+  # risk set: all individuals still at risk at time t_i
+  risk_set <- which(time >= t_i)
+  
+  # Linear predictor for Bayesian model with linked shrinkage prior
+  lp <- as.vector(as.matrix(X) %*% as.matrix(real_df_simple_DCD_PL_model_result_coef))
+  weights <- exp(lp[risk_set])
+  
+  # Expected covariate values (weighted average)
+  expected <- colSums(X[risk_set, ] * weights) / sum(weights)
+  
+  # Schoenfeld residual = observed - expected
+  schoenfeld_res[i, ] <- as.matrix(X)[idx, ] - expected
+}
 
 
-plot(real_df_simple_DCD_noise_PL_model_result_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, ylim = c(-3, 3), xaxt = "n")
-# Add background rectangles
-for (i in 1:length(real_df_simple_DCD_noise_PL_model_result_variableSelection)) {
-  if (real_df_simple_DCD_noise_PL_model_result_variableSelection[i]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+# Convert to data frame
+schoenfeld_res <- as.data.frame(schoenfeld_res)
+head(schoenfeld_res)
+
+event_time <- time[event_idx]
+plot(event_time, schoenfeld_res[, 1], col = 1, lty = 1, xlab = "event time", ylab = "schoenfeld residuals")
+for (r in 2:ncol(schoenfeld_res)){
+  lines(event_time, schoenfeld_res[,r], col = r, lty = 1)
+}
+abline(h = 0, lty = 5, col = "red")
+```
+
+```{r, echo=TRUE}
+load(file = "./Data/03_results_Step5_DCD.RData")
+name_label_DCD <- names(real_df_simple_DCD_int)[1:45]
+
+#--------------Second plot--------------
+par(mfrow = c(1, 2), mar = c(0, 0, 0, 0), oma = c(3, 24, 3, 1))
+# Plot beta coefficients
+plot(real_df_simple_DCD_PL_model_result_coef, 1:45, type = "n", 
+     col = "blue", pch = 16,
+     xlab = "estimated beta", ylab = "",
+     main = "Beta estimation for DCD", yaxt = "n", xlim = c(-1, 1))
+
+for (i in 1:length(real_df_simple_DCD_PL_model_result_variableSelection)) {
+  if (real_df_simple_DCD_PL_model_result_variableSelection[i]) {
+    rect(-1.5, i - 0.5, 1.5, i + 0.5, col = "lightblue", border = NA)
+    # rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
   }
 }
-lines(real_df_simple_DCD_noise_PL_model_result_coef, type = "o", col = "blue", pch = 16)
-#axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
-axis(1, at = 1:48, labels = name_label, las = 2, cex.axis = 0.7)
-abline(a = 0, b =0, col = "red")
+# Plot beta coefficients
+points(real_df_simple_DCD_PL_model_result_coef, 1:45, col = "blue", pch = 16)
+# Add error bars
+segments(real_df_simple_DCD_PL_model_result_coefLB, 1:45, real_df_simple_DCD_PL_model_result_coefUB, 1:45, col = "blue")
+# Add reference line
+abline(v = 0, col = "red", lty = 2)
+# Add y-axis labels vertically
+axis(2, at = 1:45, labels = name_label_DCD, las = 2, cex.axis = 1.0)
+
+
+plot(real_df_simple_DCD_PL_model_result_coef_noshrinakge, 1:45, type = "n", 
+     col = "blue", pch = 16,
+     xlab = "estimated beta", ylab = "",
+     main = "Beta estimation for DCD (no shrinakge)", yaxt = "n", xlim = c(-1, 1))
+
+for (i in 1:length(real_df_simple_DCD_PL_model_result_variableSelection_noshrinakge)) {
+  if (real_df_simple_DCD_PL_model_result_variableSelection_noshrinakge[i]) {
+    rect(-1.5, i - 0.5, 1.5, i + 0.5, col = "lightblue", border = NA)
+    # rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+# Plot beta coefficients
+points(real_df_simple_DCD_PL_model_result_coef_noshrinakge, 1:45, col = "blue", pch = 16)
+# Add error bars
+segments(real_df_simple_DCD_PL_model_result_coefLB_noshrinakge, 1:45, real_df_simple_DCD_PL_model_result_coefUB_noshrinakge, 1:45, col = "blue")
+# Add reference line
+abline(v = 0, col = "red", lty = 2)
+```
+
+#10-fold cv for DBD
+```{r, echo=TRUE}
+set.seed(123456)
+
+# Number of folds
+k <- 10
+
+# Assuming p is the number of coefficients
+p <- 105
+p1 <- 45
+
+# Preallocate lists to store results across repetitions
+PL_C_INDEX_noshrinkage = PL_C_INDEX = rep(NA, k)
+
+folds <- createFolds(real_df_simple_DBD_int$status, k = k, list = TRUE)
+
+for (i in seq_along(folds)) {
+    indices <- folds[[i]]
+    training_dataset <- real_df_simple_DBD_int[-indices,]
+    testing_dataset <- real_df_simple_DBD_int[indices,]
+    
+    cat("Fold", i, "\n")
+    cat("Dataset size:", nrow(training_dataset), "\n")
+    
+    # insert your model training and evaluation code here
+    #-----------MODEL 1.1: bSpline model----------
+    
+    #-----------MODEL 1.3: PL model----------
+    Data_PL <- stan_data_Constructer_PL(
+      training_dataset = training_dataset,
+      testing_dataset = testing_dataset,
+      havingInt = TRUE
+    )
+    
+    PL_model <- Bayesian_Survival_model(
+      stan_data = Data_PL,
+      baseline_modelling = "none",
+      shrinkage = TRUE,
+      withPrediction = TRUE,
+      havingInt = TRUE,
+      niter = 10000,
+      nwarmup = 2000,
+      thin = 10,
+      chains = 1
+    )
+    
+    PL_results = Bayesian_Survival_result_Extract(
+    bayesian_model_fit = PL_model,
+    model_type = "none",
+    criteria = c(
+      "Prediction_SurvivalProb"
+    )
+  )
+    PL_Prediction_SurvivalProb <- PL_results$eta_pred
+    PL_C_INDEX[i] <- rcorr.cens(-PL_Prediction_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
+    
+    
+    
+    ###---------------------------------------------------------
+    ###-------------for simplified dataset----------------------
+    ###---------------------------------------------------------
+    #-----------MODEL 1.3: PL model----------
+    PL_model_noshrinkage <- Bayesian_Survival_model(
+      stan_data = Data_PL,
+      baseline_modelling = "none",
+      shrinkage = FALSE,
+      withPrediction = TRUE,
+      havingInt = TRUE,
+      niter = 10000,
+      nwarmup = 2000,
+      thin = 10,
+      chains = 1
+    )
+    
+    PL_results_noshrinkage = Bayesian_Survival_result_Extract(
+      bayesian_model_fit = PL_model_noshrinkage,
+      model_type = "none",
+      criteria = c(
+        "Prediction_SurvivalProb"
+      )
+    )
+    PL_Prediction_SurvivalProb_noshrinkage <- PL_results_noshrinkage$eta_pred
+    PL_C_INDEX_noshrinkage[i] <-
+      rcorr.cens(
+        -PL_Prediction_SurvivalProb_noshrinkage,
+        Surv(testing_dataset$obstime, testing_dataset$status)
+      )["C Index"] 
+
+}
+save.image(file = "./Data/03_results_combined_Step5_includSimplifiedDatanprediction_DBD.RData")
+```
+
+#10-fold cv for DCD
+```{r, echo=TRUE}
+set.seed(123456)
+
+# Number of folds
+k <- 10
+
+# Assuming p is the number of coefficients
+p <- 105
+p1 <- 45
+
+# Preallocate lists to store results across repetitions
+PL_C_INDEX_DCD_noshrinkage = PL_C_DCD_INDEX = rep(NA, k)
+
+folds <- createFolds(real_df_simple_DCD_int$status, k = k, list = TRUE)
+
+for (i in seq_along(folds)) {
+    indices <- folds[[i]]
+    training_dataset <- real_df_simple_DCD_int[-indices,]
+    testing_dataset <- real_df_simple_DCD_int[indices,]
+    
+    cat("Fold", i, "\n")
+    cat("Dataset size:", nrow(training_dataset), "\n")
+    
+    # insert your model training and evaluation code here
+    #-----------MODEL 1.1: bSpline model----------
+    
+    #-----------MODEL 1.3: PL model----------
+    Data_DCD_PL <- stan_data_Constructer_PL(
+      training_dataset = training_dataset,
+      testing_dataset = testing_dataset,
+      havingInt = TRUE
+    )
+    
+    PL_model_DCD <- Bayesian_Survival_model(
+      stan_data = Data_DCD_PL,
+      baseline_modelling = "none",
+      shrinkage = TRUE,
+      withPrediction = TRUE,
+      havingInt = TRUE,
+      niter = 10000,
+      nwarmup = 2000,
+      thin = 10,
+      chains = 1
+    )
+    
+    PL_results_DCD = Bayesian_Survival_result_Extract(
+    bayesian_model_fit = PL_model_DCD,
+    model_type = "none",
+    criteria = c(
+      "Prediction_SurvivalProb"
+    )
+  )
+    PL_Prediction_SurvivalProb_DCD <- PL_results_DCD$eta_pred
+    PL_C_DCD_INDEX[i] <- rcorr.cens(-PL_Prediction_SurvivalProb_DCD, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
+    
+    
+    
+    ###---------------------------------------------------------
+    ###-------------for simplified dataset----------------------
+    ###---------------------------------------------------------
+    #-----------MODEL 1.3: PL model----------
+    PL_model_noshrinkage_DCD <- Bayesian_Survival_model(
+      stan_data = Data_DCD_PL,
+      baseline_modelling = "none",
+      shrinkage = FALSE,
+      withPrediction = TRUE,
+      havingInt = TRUE,
+      niter = 10000,
+      nwarmup = 2000,
+      thin = 10,
+      chains = 1
+    )
+    
+    PL_results_noshrinkage_DCD = Bayesian_Survival_result_Extract(
+      bayesian_model_fit = PL_model_noshrinkage_DCD,
+      model_type = "none",
+      criteria = c(
+        "Prediction_SurvivalProb"
+      )
+    )
+    PL_Prediction_SurvivalProb_noshrinkage_DCD <- PL_results_noshrinkage_DCD$eta_pred
+    PL_C_INDEX_DCD_noshrinkage[i] <-
+      rcorr.cens(
+        -PL_Prediction_SurvivalProb_noshrinkage_DCD,
+        Surv(testing_dataset$obstime, testing_dataset$status)
+      )["C Index"] 
+
+}
+save.image(file = "./Data/03_results_combined_Step5_includSimplifiedDatanprediction_DCD.RData")
+```
+
+#Visualize the results
+```{r, echo=TRUE}
+load(file = "./Data/03_results_combined_Step5_includSimplifiedDatanprediction_DCD.RData")
+load(file = "./Data/03_results_combined_Step5_includSimplifiedDatanprediction_DBD.RData")
+
+par(mfrow = c(1, 2))
+
+C_index <- list(PL_withShrinkage = PL_C_INDEX, PL_noShrinakge = PL_C_INDEX_noshrinkage)
+boxplot(C_index, names = c("with Shrinkage", "no Shrinkage"), col = c("orange", "green"), main = "C-index for DBD dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
+abline(h = 0.5, col = "grey", lty = 3)
+
+C_index_DCD <- list(PL_withShrinkage = PL_C_DCD_INDEX, PL_noShrinakge = PL_C_INDEX_DCD_noshrinkage)
+boxplot(C_index_DCD, names = c("with Shrinkage", "no Shrinkage"), col = c("orange", "green"), main = "C-index for DCD dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
+abline(h = 0.5, col = "grey", lty = 3)
 ```
 
