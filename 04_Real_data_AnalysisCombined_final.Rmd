@@ -1,0 +1,1005 @@
+---
+title: "03_Real_Data_Analysis"
+author: "Yufang Wang"
+date: "2025-03-18"
+output: pdf_document
+---
+
+# Step 1: Set up the environment
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+source("./function_file/Functions.R")
+source("./function_file/stan_constructor.R")
+
+install_and_load <- function(packages) {
+  for (pkg in packages) {
+    if (!require(pkg, character.only = TRUE)) {
+      install.packages(pkg, dependencies = TRUE)
+    }
+    library(pkg, character.only = TRUE) }
+  
+}
+
+# List of required packages
+required_packages <- c("rstan", "MASS", "rstantools", "coda", "readr", "survival", "splines2", "dplyr", "simsurv", "Hmisc", "caret", "corrplot","ggplot2", "loo", "survival", "caret")
+# Install and/or load packages
+install_and_load(required_packages)
+```
+
+
+# Step 2: Organize and strafied the real-world data
+```{r, echo=TRUE}
+real_df <- readRDS("./Data/imputed_NOTR_DGF.rds")
+# sum(!complete.cases(real_df))
+# mean(real_df$status == "graftloss")
+# mean(real_df$status == "alive")
+# mean(real_df$status == "death")
+
+# # Reversed KM for follow-up analysis
+# fit <- survfit(Surv(real_df$time, real_df$status != "graftloss") ~ 1)
+# plot(fit)
+# abline(h = 0.5, col = "red", lty = 2)
+# 
+# str(real_df)
+real_df <- real_df[, !names(real_df) %in% "ID"]
+
+# set the factor variable being sum-to-zero encoded
+contrasts(real_df$Recipientsex) <- contr.sum(levels(real_df$Recipientsex))
+contrasts(real_df$Donorsex) <- contr.sum(levels(real_df$Donorsex))
+contrasts(real_df$Smoking) <- contr.sum(levels(real_df$Smoking))
+contrasts(real_df$InitialPrimaryDiseaseET_regroup) <- contr.sum(levels(real_df$InitialPrimaryDiseaseET_regroup))
+contrasts(real_df$Donorcauseofdeath_group) <- contr.sum(levels(real_df$Donorcauseofdeath_group))
+
+
+# center the numeric variables
+real_df$Recipientage <- scale(real_df$Recipientage)
+real_df$Dialysisdaysrenine <- scale(real_df$Dialysisdaysrenine)
+real_df$Donorage <- scale(real_df$Donorage)
+real_df$Lastcreatininemgdl <- scale(real_df$Lastcreatininemgdl)
+real_df$Warm_ischaemic_period_1 <- scale(real_df$Warm_ischaemic_period_1)
+real_df$Cold_ischaemic_period <- scale(real_df$Cold_ischaemic_period)
+real_df$HLA_mismatch <- scale(real_df$HLA_mismatch)
+real_df$DonorBMI <- scale(real_df$DonorBMI)
+real_df$Recipient_BMI <- scale(real_df$Recipient_BMI)
+#
+
+# print(colnames(real_df)[factorName])
+
+real_df <- real_df[, !(names(real_df) %in% "InitialOnmachineindicator")]
+real_df$Donorcauseofdeath_group <- ifelse(real_df$Donorcauseofdeath_group == "Cardiac", "Cardiac", "Others")
+real_df$Donorcauseofdeath_group <- factor(real_df$Donorcauseofdeath_group)
+contrasts(real_df$Donorcauseofdeath_group) <- contr.sum(levels(real_df$Donorcauseofdeath_group))
+
+real_df$InitialPrimaryDiseaseET_regroup <- ifelse(real_df$InitialPrimaryDiseaseET_regroup == "Diabetes Mellitus", "Diabetes", "Others")
+real_df$InitialPrimaryDiseaseET_regroup <- factor(real_df$InitialPrimaryDiseaseET_regroup)
+contrasts(real_df$InitialPrimaryDiseaseET_regroup) <- contr.sum(levels(real_df$InitialPrimaryDiseaseET_regroup))
+
+
+combined_Data <- subset(real_df, select = -Warm_ischaemic_period_1)
+
+combined_Data$noise1 <- rnorm(nrow(combined_Data), 0, 1)
+combined_Data$noise2 <- rnorm(nrow(combined_Data), 1, 2)
+combined_Data$time <- combined_Data$time + 0.05
+```
+
+# Descriptive data analysis
+```{r, echo=TRUE}
+library(dplyr)
+combined_Data_encoded <- subset(combined_Data, select = -c(time, status)) %>%
+  mutate(across(where(is.factor), as.character)) %>%
+  mutate(across(where(is.character), ~ as.factor(.))) %>%
+  model.matrix(~ . - 1, data = .) %>%
+  as.data.frame() %>%
+  mutate(across(everything(), ~ ifelse(. == 0, -1, .)))
+
+# Step 3: Calculate correlation matrix
+cor_matrix <- cor(combined_Data_encoded)
+
+# Step 4: View the correlation matrix
+print(cor_matrix)
+
+# Optional: Visualize with a heatmap
+library(corrplot)
+corrplot(cor_matrix, method = "color", tl.cex = 0.7, type = "lower")
+```
+
+
+
+```{r, echo=TRUE}
+real_df_simple <- subset(real_df, select = -c(Smoking, Donorcauseofdeath_group, Dialysisdaysrenine, Recipientsex, Recipient_BMI, Warm_ischaemic_period_1))
+# set the factor variable being sum-to-zero encoded
+contrasts(real_df_simple$Donorsex) <- contr.sum(levels(real_df_simple$Donorsex))
+contrasts(real_df_simple$TypecadavericDBDDCD) <- contr.sum(levels(real_df_simple$TypecadavericDBDDCD))
+contrasts(real_df_simple$InitialPrimaryDiseaseET_regroup) <- contr.sum(levels(real_df_simple$InitialPrimaryDiseaseET_regroup))
+
+
+
+# center the numeric variables
+real_df_simple$Recipientage <- scale(real_df_simple$Recipientage)
+real_df_simple$Donorage <- scale(real_df_simple$Donorage)
+real_df_simple$Lastcreatininemgdl <- scale(real_df_simple$Lastcreatininemgdl)
+real_df_simple$Cold_ischaemic_period <- scale(real_df_simple$Cold_ischaemic_period)
+real_df_simple$HLA_mismatch <- scale(real_df_simple$HLA_mismatch)
+real_df_simple$DonorBMI <- scale(real_df_simple$DonorBMI)
+
+
+combined_Data_Simple <- real_df_simple
+```
+
+# Check whether or not each level have sufficient events
+```{r, echo=TRUE}
+# Identify categorical variables
+categorical_vars <- names(combined_Data)[sapply(combined_Data, function(x) is.factor(x) || is.character(x))]
+
+# Print the categorical variables
+print(categorical_vars)
+
+for (cvars in categorical_vars){
+  if (cvars != "status"){
+    print(cvars)
+    print(table(combined_Data$status == "graftloss", combined_Data[[cvars]]))
+  }
+}
+```
+
+# Section 1: include all variables and see whether or not it is possible for the get the model converenge
+
+## Step 4: Verify the existence of interaction effects
+```{r, echo=TRUE}
+combined_Data_int <- includingInter(combined_Data)
+# combined_Data_int <- subset(combined_Data_int, select = -c(id))
+
+combined_Data_Simple_int <- includingInter(combined_Data_Simple)
+#combined_Data_Simple_int <- subset(combined_Data_Simple_int, select = -c(id))
+```
+# Data analysis
+```{r, echo=TRUE}
+Data_bSplines <- stan_data_Constructer_BSpline(
+  training_dataset = combined_Data_int,
+  testing_dataset = NULL,
+  obs_window = 3415,
+  log_lik_saving = FALSE,
+  havingInt = TRUE
+)
+bSplines_model <-
+  Bayesian_Survival_model(
+    stan_data = Data_bSplines,
+    baseline_modelling = "bSplines",
+    shrinkage = TRUE,
+    withPrediction = FALSE,
+    havingInt = TRUE,
+    niter = 10000,
+    nwarmup = 2000,
+    thin = 10,
+    chains = 1
+  )
+    
+# Extract the model result
+bSplines_model_results = Bayesian_Survival_result_Extract(
+  bayesian_model_fit = bSplines_model,
+  model_type = "bSplines",
+  criteria = c(
+    "DesignCoefficients",
+    "variableSelection",
+    "baseline"
+  ),
+  uncertainty = TRUE
+)
+    
+bSplines_model_beta <- bSplines_model_results$Beta_bayesian_est[, "mean"]
+bSplines_model_variableSelection <- bSplines_model_results$variableSelection
+bSplines_model_coefUB <- bSplines_model_results$Beta_bayesian_estUB
+bSplines_model_coefLB <- bSplines_model_results$Beta_bayesian_estLB
+
+ #-----------MODEL 1.3: PL model----------
+Data_PL <- stan_data_Constructer_PL(
+  training_dataset = combined_Data_int,
+  testing_dataset = NULL,
+  havingInt = TRUE
+)
+
+
+PL_model <- Bayesian_Survival_model(
+  stan_data = Data_PL,
+  baseline_modelling = "none",
+  shrinkage = TRUE,
+  withPrediction = FALSE,
+  havingInt = TRUE,
+  niter = 10000,
+  nwarmup = 2000,
+  thin = 10,
+  chains = 1
+)
+
+PL_results = Bayesian_Survival_result_Extract(
+  bayesian_model_fit = PL_model,
+  model_type = "none",
+  criteria = c("DesignCoefficients",
+               "variableSelection"),
+  uncertainty = TRUE
+)
+PL_beta <- PL_results$Beta_bayesian_est[, "mean"]
+PL_variableSelection <- PL_results$variableSelection
+PL_coefUB <- PL_results$Beta_bayesian_estUB
+PL_coefLB <- PL_results$Beta_bayesian_estLB
+
+
+#----------NO SHRINKAGE---------------------
+bSplines_model_noshrinkage <-
+  Bayesian_Survival_model(
+    stan_data = Data_bSplines,
+    baseline_modelling = "bSplines",
+    shrinkage = FALSE,
+    withPrediction = FALSE,
+    havingInt = TRUE,
+    niter = 10000,
+    nwarmup = 2000,
+    thin = 10,
+    chains = 1
+  )
+    
+# Extract the model result
+bSplines_model_noshrinkage_results = Bayesian_Survival_result_Extract(
+  bayesian_model_fit = bSplines_model_noshrinkage,
+  model_type = "bSplines",
+  criteria = c(
+    "DesignCoefficients",
+    "variableSelection",
+    "baseline"
+  ),
+  uncertainty = TRUE
+)
+    
+bSplines_model_noshrinkage_beta <- bSplines_model_noshrinkage_results$Beta_bayesian_est[, "mean"]
+bSplines_model_noshrinkage_variableSelection <- bSplines_model_noshrinkage_results$variableSelection
+bSplines_model_noshrinkage_coefUB <- bSplines_model_noshrinkage_results$Beta_bayesian_estUB
+bSplines_model_noshrinkage_coefLB <- bSplines_model_noshrinkage_results$Beta_bayesian_estLB
+
+
+PL_model_noshrinkage <- Bayesian_Survival_model(
+  stan_data = Data_PL,
+  baseline_modelling = "none",
+  shrinkage = FALSE,
+  withPrediction = FALSE,
+  havingInt = TRUE,
+  niter = 10000,
+  nwarmup = 2000,
+  thin = 10,
+  chains = 1
+)
+
+PL_noshrinkage_results = Bayesian_Survival_result_Extract(
+  bayesian_model_fit = PL_model_noshrinkage,
+  model_type = "none",
+  criteria = c("DesignCoefficients",
+               "variableSelection"),
+  uncertainty = TRUE
+)
+PL_noshrinkage_beta <- PL_noshrinkage_results$Beta_bayesian_est[, "mean"]
+PL_noshrinkage_variableSelection <- PL_noshrinkage_results$variableSelection
+PL_noshrinkage_coefUB <- PL_noshrinkage_results$Beta_bayesian_estUB
+PL_noshrinkage_coefLB <- PL_noshrinkage_results$Beta_bayesian_estLB
+
+#################FOR THE SIMPLIFIED MODEL############
+
+Data_bSplines_Simple <- stan_data_Constructer_BSpline(
+  training_dataset = combined_Data_Simple_int,
+  testing_dataset = NULL,
+  obs_window = 3415,
+  log_lik_saving = FALSE,
+  havingInt = TRUE
+)
+bSplines_model_Simple <-
+  Bayesian_Survival_model(
+    stan_data = Data_bSplines_Simple,
+    baseline_modelling = "bSplines",
+    shrinkage = TRUE,
+    withPrediction = FALSE,
+    havingInt = TRUE,
+    niter = 10000,
+    nwarmup = 2000,
+    thin = 10,
+    chains = 1
+  )
+    
+# Extract the model result
+bSplines_model_results_Simple = Bayesian_Survival_result_Extract(
+  bayesian_model_fit = bSplines_model_Simple,
+  model_type = "bSplines",
+  criteria = c(
+    "DesignCoefficients",
+    "variableSelection",
+    "baseline"
+  ),
+  uncertainty = TRUE
+)
+    
+bSplines_model_Simple_beta <- bSplines_model_results_Simple$Beta_bayesian_est[, "mean"]
+bSplines_model_Simple_variableSelection <- bSplines_model_results_Simple$variableSelection
+bSplines_model_Simple_coefUB <- bSplines_model_results_Simple$Beta_bayesian_estUB
+bSplines_model_Simple_coefLB <- bSplines_model_results_Simple$Beta_bayesian_estLB
+
+ #-----------MODEL 1.3: PL model----------
+Data_PL_Simple <- stan_data_Constructer_PL(
+  training_dataset = combined_Data_Simple_int,
+  testing_dataset = NULL,
+  havingInt = TRUE
+)
+
+
+PL_model_Simple <- Bayesian_Survival_model(
+  stan_data = Data_PL_Simple,
+  baseline_modelling = "none",
+  shrinkage = TRUE,
+  withPrediction = FALSE,
+  havingInt = TRUE,
+  niter = 10000,
+  nwarmup = 2000,
+  thin = 10,
+  chains = 1
+)
+
+PL_results_Simple = Bayesian_Survival_result_Extract(
+  bayesian_model_fit = PL_model_Simple,
+  model_type = "none",
+  criteria = c("DesignCoefficients",
+               "variableSelection"),
+  uncertainty = TRUE
+)
+PL_Simple_beta <- PL_results_Simple$Beta_bayesian_est[, "mean"]
+PL_Simple_variableSelection <- PL_results_Simple$variableSelection
+PL_Simple_coefUB <- PL_results_Simple$Beta_bayesian_estUB
+PL_Simple_coefLB <- PL_results_Simple$Beta_bayesian_estLB
+
+
+#---------No shrinkage----------------
+bSplines_model_noshrinkage_Simple <-
+  Bayesian_Survival_model(
+    stan_data = Data_bSplines_Simple,
+    baseline_modelling = "bSplines",
+    shrinkage = FALSE,
+    withPrediction = FALSE,
+    havingInt = TRUE,
+    niter = 10000,
+    nwarmup = 2000,
+    thin = 10,
+    chains = 1
+  )
+    
+# Extract the model result
+bSplines_model_noshrinkage_results_Simple = Bayesian_Survival_result_Extract(
+  bayesian_model_fit = bSplines_model_noshrinkage_Simple,
+  model_type = "bSplines",
+  criteria = c(
+    "DesignCoefficients",
+    "variableSelection",
+    "baseline"
+  ),
+  uncertainty = TRUE
+)
+    
+bSplines_model_noshrinkage_Simple_beta <- bSplines_model_noshrinkage_results_Simple$Beta_bayesian_est[, "mean"]
+bSplines_model_noshrinkage_Simple_variableSelection <- bSplines_model_noshrinkage_results_Simple$variableSelection
+bSplines_model_noshrinkage_Simple_coefUB <- bSplines_model_noshrinkage_results_Simple$Beta_bayesian_estUB
+bSplines_model_noshrinkage_Simple_coefLB <- bSplines_model_noshrinkage_results_Simple$Beta_bayesian_estLB
+
+PL_model_noshrinkage_Simple <- Bayesian_Survival_model(
+  stan_data = Data_PL_Simple,
+  baseline_modelling = "none",
+  shrinkage = FALSE,
+  withPrediction = FALSE,
+  havingInt = TRUE,
+  niter = 10000,
+  nwarmup = 2000,
+  thin = 10,
+  chains = 1
+)
+
+PL_results_noshrinkage_Simple = Bayesian_Survival_result_Extract(
+  bayesian_model_fit = PL_model_noshrinkage_Simple,
+  model_type = "none",
+  criteria = c("DesignCoefficients",
+               "variableSelection"),
+  uncertainty = TRUE
+)
+PL_Simple_noshrinkage_beta <- PL_results_noshrinkage_Simple$Beta_bayesian_est[, "mean"]
+PL_Simple_noshrinkage_variableSelection <- PL_results_noshrinkage_Simple$variableSelection
+PL_Simple_noshrinkage_coefUB <- PL_results_noshrinkage_Simple$Beta_bayesian_estUB
+PL_Simple_noshrinkage_coefLB <- PL_results_noshrinkage_Simple$Beta_bayesian_estLB
+
+save.image(file = "./Data/04_OverallKidneyData_Final1.RData")
+```
+
+#Visualize the result
+```{r, echo=TRUE}
+load(file = "./Data/04_OverallKidneyData_Final1.RData")
+name_label <- names(combined_Data_int)[1:136]
+name_label_simple <- names(combined_Data_Simple_int)
+
+par(mfrow = c(1, 2), mar = c(0, 0, 0, 0), oma = c(3, 24, 3, 1))
+# Set up the plot without drawing points initially
+plot(
+  bSplines_model_beta, 1:136, type = "n",
+  col = "blue", pch = 16,
+  xlab = "Estimated Beta", ylab = "",
+  main = "", yaxt = "n"
+)
+
+# Get the x-axis limits to use for full-width background rectangles
+x_limits <- par("usr")[1:2]
+
+# Highlight selected variables with full-width light blue rectangles
+for (i in which(bSplines_model_variableSelection)) {
+  rect(x_limits[1], i - 0.5, x_limits[2], i + 0.5, col = "lightblue", border = NA)
+}
+
+# Add beta coefficient points
+points(bSplines_model_beta, 1:136, col = "blue", pch = 16)
+
+# Add error bars for beta coefficients
+segments(
+  bSplines_model_coefLB, 1:136,
+  bSplines_model_coefUB, 1:136,
+  col = "blue"
+)
+
+# Add a vertical reference line at 0
+abline(v = 0, col = "red", lty = 2)
+
+# Add vertical y-axis labels
+axis(2, at = 1:136, labels = name_label, las = 2, cex.axis = 1.0)
+title(main = "Beta Estimation (BayesbSplines)")
+
+plot(
+  bSplines_model_noshrinkage_beta, 1:136, type = "n",
+  col = "darkgreen", pch = 16,
+  xlab = "Estimated Beta", ylab = "",
+  main = "", yaxt = "n"
+)
+
+# Get the x-axis limits to use for full-width background rectangles
+x_limits <- par("usr")[1:2]
+
+# Highlight selected variables with full-width light blue rectangles
+for (i in which(bSplines_model_noshrinkage_variableSelection)) {
+  rect(x_limits[1], i - 0.5, x_limits[2], i + 0.5, col = "lightgreen", border = NA)
+}
+
+# Add beta coefficient points
+points(bSplines_model_noshrinkage_beta, 1:136, col = "darkgreen", pch = 16)
+
+# Add error bars for beta coefficients
+segments(
+  bSplines_model_noshrinkage_coefLB, 1:136,
+  bSplines_model_noshrinkage_coefUB, 1:136,
+  col = "darkgreen"
+)
+
+# Add a vertical reference line at 0
+abline(v = 0, col = "red", lty = 2)
+
+# Add vertical y-axis labels
+#axis(2, at = 1:136, labels = name_label, las = 2, cex.axis = 1.0)
+title(main = "Beta Estimation (BayesPL_noinfor)")
+
+
+
+
+
+par(mfrow = c(1, 2), mar = c(0, 0, 0, 0), oma = c(3, 24, 3, 1))
+# Set up the plot without drawing points initially
+plot(
+  PL_beta, 1:136, type = "n",
+  col = "blue", pch = 16,
+  xlab = "Estimated Beta", ylab = "",
+  main = "", yaxt = "n"
+)
+
+# Get the x-axis limits to use for full-width background rectangles
+x_limits <- par("usr")[1:2]
+
+# Highlight selected variables with full-width light blue rectangles
+for (i in which(PL_variableSelection)) {
+  rect(x_limits[1], i - 0.5, x_limits[2], i + 0.5, col = "lightblue", border = NA)
+}
+
+# Add beta coefficient points
+points(PL_beta, 1:136, col = "blue", pch = 16)
+
+# Add error bars for beta coefficients
+segments(
+  PL_coefLB, 1:136,
+  PL_coefUB, 1:136,
+  col = "blue"
+)
+
+# Add a vertical reference line at 0
+abline(v = 0, col = "red", lty = 2)
+
+# Add vertical y-axis labels
+axis(2, at = 1:136, labels = name_label, las = 2, cex.axis = 1.0)
+title(main = "Beta Estimation (BayesPL)")
+
+plot(
+  PL_noshrinkage_beta, 1:136, type = "n",
+  col = "darkgreen", pch = 16,
+  xlab = "Estimated Beta", ylab = "",
+  main = "", yaxt = "n"
+)
+
+# Get the x-axis limits to use for full-width background rectangles
+x_limits <- par("usr")[1:2]
+
+# Highlight selected variables with full-width light blue rectangles
+for (i in which(PL_noshrinkage_variableSelection)) {
+  rect(x_limits[1], i - 0.5, x_limits[2], i + 0.5, col = "lightgreen", border = NA)
+}
+
+# Add beta coefficient points
+points(PL_noshrinkage_beta, 1:136, col = "darkgreen", pch = 16)
+
+# Add error bars for beta coefficients
+segments(
+  PL_noshrinkage_coefLB, 1:136,
+  PL_noshrinkage_coefUB, 1:136,
+  col = "darkgreen"
+)
+
+# Add a vertical reference line at 0
+abline(v = 0, col = "red", lty = 2)
+
+# Add vertical y-axis labels
+#axis(2, at = 1:136, labels = name_label, las = 2, cex.axis = 1.0)
+title(main = "Beta Estimation (BayesPL_noinfor)")
+```
+
+
+
+```{r, echo=TRUE}
+name_label_simple <- names(combined_Data_Simple_int)[1:45]
+
+par(mfrow = c(1, 2), mar = c(0, 0, 0, 0), oma = c(3, 24, 3, 1))
+# Set up the plot without drawing points initially
+plot(
+  bSplines_model_Simple_beta, 1:45, type = "n",
+  col = "blue", pch = 16,
+  xlab = "Estimated Beta", ylab = "",
+  main = "", yaxt = "n"
+)
+
+# Get the x-axis limits to use for full-width background rectangles
+x_limits <- par("usr")[1:2]
+
+# Highlight selected variables with full-width light blue rectangles
+for (i in which(bSplines_model_Simple_variableSelection)) {
+  rect(x_limits[1], i - 0.5, x_limits[2], i + 0.5, col = "lightblue", border = NA)
+}
+
+# Add beta coefficient points
+points(bSplines_model_Simple_beta, 1:45, col = "blue", pch = 16)
+
+# Add error bars for beta coefficients
+segments(
+  bSplines_model_Simple_coefLB, 1:45,
+  bSplines_model_Simple_coefUB, 1:45,
+  col = "blue"
+)
+
+# Add a vertical reference line at 0
+abline(v = 0, col = "red", lty = 2)
+
+# Add vertical y-axis labels
+axis(2, at = 1:45, labels = name_label_simple, las = 2, cex.axis = 1.0)
+title(main = "Beta Estimation (BayesbSplines) for simpleData")
+
+plot(
+  bSplines_model_noshrinkage_Simple_beta, 1:45, type = "n",
+  col = "darkgreen", pch = 16,
+  xlab = "Estimated Beta", ylab = "",
+  main = "", yaxt = "n"
+)
+
+# Get the x-axis limits to use for full-width background rectangles
+x_limits <- par("usr")[1:2]
+
+# Highlight selected variables with full-width light blue rectangles
+for (i in which(bSplines_model_noshrinkage_Simple_variableSelection)) {
+  rect(x_limits[1], i - 0.5, x_limits[2], i + 0.5, col = "lightgreen", border = NA)
+}
+
+# Add beta coefficient points
+points(bSplines_model_noshrinkage_Simple_beta, 1:45, col = "darkgreen", pch = 16)
+
+# Add error bars for beta coefficients
+segments(
+  bSplines_model_noshrinkage_Simple_coefLB, 1:45,
+  bSplines_model_noshrinkage_Simple_coefUB, 1:45,
+  col = "darkgreen"
+)
+
+# Add a vertical reference line at 0
+abline(v = 0, col = "red", lty = 2)
+
+# Add vertical y-axis labels
+#axis(2, at = 1:136, labels = name_label, las = 2, cex.axis = 1.0)
+title(main = "Beta Estimation (BayesBSpline_noinfor) for simpleData")
+
+
+
+
+
+par(mfrow = c(1, 2), mar = c(0, 0, 0, 0), oma = c(3, 24, 3, 1))
+# Set up the plot without drawing points initially
+plot(
+  PL_Simple_beta, 1:45, type = "n",
+  col = "blue", pch = 16,
+  xlab = "Estimated Beta", ylab = "",
+  main = "", yaxt = "n"
+)
+
+# Get the x-axis limits to use for full-width background rectangles
+x_limits <- par("usr")[1:2]
+
+# Highlight selected variables with full-width light blue rectangles
+for (i in which(PL_Simple_variableSelection)) {
+  rect(x_limits[1], i - 0.5, x_limits[2], i + 0.5, col = "lightblue", border = NA)
+}
+
+# Add beta coefficient points
+points(PL_Simple_beta, 1:45, col = "blue", pch = 16)
+
+# Add error bars for beta coefficients
+segments(
+  PL_Simple_coefLB, 1:45,
+  PL_Simple_coefUB, 1:45,
+  col = "blue"
+)
+
+# Add a vertical reference line at 0
+abline(v = 0, col = "red", lty = 2)
+
+# Add vertical y-axis labels
+axis(2, at = 1:45, labels = name_label_simple, las = 2, cex.axis = 1.0)
+title(main = "Beta Estimation (BayesPL)")
+
+plot(
+  PL_Simple_noshrinkage_beta, 1:45, type = "n",
+  col = "darkgreen", pch = 16,
+  xlab = "Estimated Beta", ylab = "",
+  main = "", yaxt = "n"
+)
+
+# Get the x-axis limits to use for full-width background rectangles
+x_limits <- par("usr")[1:2]
+
+# Highlight selected variables with full-width light blue rectangles
+for (i in which(PL_Simple_noshrinkage_variableSelection)) {
+  rect(x_limits[1], i - 0.5, x_limits[2], i + 0.5, col = "lightgreen", border = NA)
+}
+
+# Add beta coefficient points
+points(PL_Simple_noshrinkage_beta, 1:45, col = "darkgreen", pch = 16)
+
+# Add error bars for beta coefficients
+segments(
+  PL_Simple_noshrinkage_coefLB, 1:45,
+  PL_Simple_noshrinkage_coefUB, 1:45,
+  col = "darkgreen"
+)
+
+# Add a vertical reference line at 0
+abline(v = 0, col = "red", lty = 2)
+
+# Add vertical y-axis labels
+#axis(2, at = 1:136, labels = name_label, las = 2, cex.axis = 1.0)
+title(main = "Beta Estimation (BayesPL_noinfor)")
+```
+
+```{r, echo=TRUE}
+# Step 4. separate the dataset randomly into two and compare the stability of the model across different sub dataset
+# Separate the dataset into two small datasets to see the stablility of the estimation of the models
+set.seed(123456)
+
+# Number of folds
+k <- 10
+
+# Assuming p is the number of coefficients
+p <- 105
+p1 <- 45
+
+# Preallocate lists to store results across repetitions
+bSplines_model_C_INDEX_Simple = bSplines_model_C_INDEX = rep(NA, k)
+coxRegression_C_INDEX_Simple = coxRegression_C_INDEX = rep(NA, k)
+PL_C_INDEX_Simple = PL_C_INDEX = rep(NA, k)
+
+bSplines_model_beta <- matrix(NA, nrow = k, ncol = p)
+bSplines_model_variableSelection <- matrix(NA, nrow = k, ncol = p)
+PL_beta <- matrix(NA, nrow = k, ncol = p)
+PL_variableSelection <- matrix(NA, nrow = k, ncol = p)
+cox_beta <- matrix(NA, nrow = k, ncol = p)
+cox_variableSelection <- matrix(NA, nrow = k, ncol = p)
+  
+  
+bSplines_model_beta_Simple <- matrix(NA, nrow = k, ncol = p1)
+bSplines_model_variableSelection_Simple <- matrix(NA, nrow = k, ncol = p1)
+PL_beta_Simple <- matrix(NA, nrow = k, ncol = p1)
+PL_variableSelection_Simple <- matrix(NA, nrow = k, ncol = p1)
+cox_beta_Simple <- matrix(NA, nrow = k, ncol = p1)
+cox_variableSelection_Simple <- matrix(NA, nrow = k, ncol = p1)  
+ 
+
+folds <- createFolds(combined_Data_int$status, k = k, list = TRUE)
+
+for (i in seq_along(folds)) {
+    indices <- folds[[i]]
+    training_dataset <- combined_Data_int[-indices,]
+    testing_dataset <- combined_Data_int[indices,]
+    
+    training_dataset_Simple <- combined_Data_Simple_int[-indices,]
+    testing_dataset_Simple <- combined_Data_Simple_int[indices,]
+    
+    cat("Fold", i, "\n")
+    cat("Dataset size:", nrow(training_dataset), "\n")
+    
+    # insert your model training and evaluation code here
+    #-----------MODEL 1.1: bSpline model----------
+    Data_bSplines <- stan_data_Constructer_BSpline(
+      training_dataset = training_dataset,
+      testing_dataset = testing_dataset,
+      obs_window = 3415,
+      log_lik_saving = FALSE,
+      havingInt = TRUE
+    )
+    bSplines_model <-
+      Bayesian_Survival_model(
+        stan_data = Data_bSplines,
+        baseline_modelling = "bSplines",
+        shrinkage = TRUE,
+        withPrediction = TRUE,
+        havingInt = TRUE,
+        niter = 10000,
+        nwarmup = 2000,
+        thin = 10,
+        chains = 1
+      )
+    
+    # Extract the model result
+    bSplines_model_results = Bayesian_Survival_result_Extract(
+      bayesian_model_fit = bSplines_model,
+      model_type = "bSplines",
+      criteria = c(
+        "DesignCoefficients",
+        "variableSelection",
+        "Prediction_SurvivalProb",
+        "baseline"
+      )
+    )
+    
+    bSplines_model_beta[i, ] <- bSplines_model_results$Beta_bayesian_est[, "mean"]
+    bSplines_model_variableSelection[i, ] <- bSplines_model_results$variableSelection
+    bSplines_model_Prediction_SurvivalProb <- as.vector(bSplines_model_results$eta_pred)
+    bSplines_model_C_INDEX[i] <- rcorr.cens(-bSplines_model_Prediction_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"]
+    baseline_bSplines <-
+      exp(as.matrix(Data_bSplines$basis) %*% as.matrix(bSplines_model_results$baselinePara[, "mean"]))
+    
+    
+    
+    #-----------MODEL 1.2: Cox regression ----------
+    cox_regression <- coxph(Surv(as.numeric(obstime), status) ~ ., data = training_dataset)
+    cox_regression_result <- summary(cox_regression)
+   
+    cox_beta[i,] <- as.vector(cox_regression_result$coefficients[, "coef"])
+    cox_variableSelection[i,] <- as.vector((cox_regression_result$coefficients[, "Pr(>|z|)"] * p) < 0.05)
+    coxRegression_SurvivalProb <- predict(cox_regression, newdata = testing_dataset, type = "lp")
+    coxRegression_C_INDEX[i] <- rcorr.cens(-coxRegression_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
+    
+    #-----------MODEL 1.3: PL model----------
+    Data_PL <- stan_data_Constructer_PL(
+      training_dataset = training_dataset,
+      testing_dataset = testing_dataset,
+      havingInt = TRUE
+    )
+    
+    PL_model <- Bayesian_Survival_model(
+      stan_data = Data_PL,
+      baseline_modelling = "none",
+      shrinkage = TRUE,
+      withPrediction = TRUE,
+      havingInt = TRUE,
+      niter = 10000,
+      nwarmup = 2000,
+      thin = 10,
+      chains = 1
+    )
+    
+    PL_results = Bayesian_Survival_result_Extract(
+    bayesian_model_fit = PL_model,
+    model_type = "none",
+    criteria = c(
+      "DesignCoefficients",
+      "variableSelection",
+      "Prediction_SurvivalProb"
+    )
+  )
+    PL_beta[i, ] <- PL_results$Beta_bayesian_est[, "mean"]
+    PL_variableSelection[i, ] <- PL_results$variableSelection
+    PL_Prediction_SurvivalProb <- PL_results$eta_pred
+    PL_C_INDEX[i] <- rcorr.cens(-PL_Prediction_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
+    
+    
+    
+    
+    ###---------------------------------------------------------
+    ###-------------for simplified dataset----------------------
+    ###---------------------------------------------------------
+    #-----------MODEL 2.1: bSpline model----------
+    Data_bSplines_Simple <- stan_data_Constructer_BSpline(
+      training_dataset = training_dataset_Simple,
+      testing_dataset = testing_dataset_Simple,
+      obs_window = 3415,
+      log_lik_saving = FALSE,
+      havingInt = TRUE
+    )
+    bSplines_model_Simple <-
+      Bayesian_Survival_model(
+        stan_data = Data_bSplines_Simple,
+        baseline_modelling = "bSplines",
+        shrinkage = TRUE,
+        withPrediction = TRUE,
+        havingInt = TRUE,
+        niter = 10000,
+        nwarmup = 2000,
+        thin = 10,
+        chains = 1
+      )
+    
+    # Extract the model result
+    bSplines_model_results_Simple = Bayesian_Survival_result_Extract(
+      bayesian_model_fit = bSplines_model_Simple,
+      model_type = "bSplines",
+      criteria = c(
+        "DesignCoefficients",
+        "variableSelection",
+        "Prediction_SurvivalProb"
+      )
+    )
+    
+    bSplines_model_beta_Simple[i, ] <- bSplines_model_results_Simple$Beta_bayesian_est[, "mean"]
+    bSplines_model_variableSelection_Simple[i, ] <- bSplines_model_results_Simple$variableSelection
+    bSplines_model_Prediction_SurvivalProb_Simple <- bSplines_model_results_Simple$eta_pred
+    bSplines_model_C_INDEX_Simple[i] <- rcorr.cens(-bSplines_model_Prediction_SurvivalProb_Simple, Surv(testing_dataset_Simple$obstime, testing_dataset_Simple$status))["C Index"] 
+    
+    
+    
+    #-----------MODEL 1.2: Cox regression ----------
+    cox_regression_Simple <- coxph(Surv(as.numeric(obstime), status) ~ ., data = training_dataset_Simple)
+    cox_regression_result_Simple <- summary(cox_regression_Simple)
+    
+    cox_beta_Simple[i,] <- as.vector(cox_regression_result_Simple$coefficients[, "coef"])
+    cox_variableSelection_Simple[i,] <- as.vector((cox_regression_result_Simple$coefficients[, "Pr(>|z|)"] * p1) < 0.05)
+    coxRegression_SurvivalProb_Simple <- predict(cox_regression_Simple, newdata = testing_dataset_Simple, type = "lp")
+    coxRegression_C_INDEX_Simple[i] <- rcorr.cens(-coxRegression_SurvivalProb_Simple, Surv(testing_dataset_Simple$obstime, testing_dataset_Simple$status))["C Index"] 
+    
+    #-----------MODEL 1.3: PL model----------
+    Data_PL_Simple <- stan_data_Constructer_PL(
+      training_dataset = training_dataset_Simple,
+      testing_dataset = testing_dataset_Simple,
+      havingInt = TRUE
+    )
+    
+    PL_model_Simple <- Bayesian_Survival_model(
+      stan_data = Data_PL_Simple,
+      baseline_modelling = "none",
+      shrinkage = TRUE,
+      withPrediction = TRUE,
+      havingInt = TRUE,
+      niter = 10000,
+      nwarmup = 2000,
+      thin = 10,
+      chains = 1
+    )
+    
+    PL_results_Simple = Bayesian_Survival_result_Extract(
+      bayesian_model_fit = PL_model_Simple,
+      model_type = "none",
+      criteria = c(
+        "DesignCoefficients",
+        "variableSelection",
+        "Prediction_SurvivalProb"
+      )
+    )
+    PL_beta_Simple[i, ] <- PL_results_Simple$Beta_bayesian_est[, "mean"]
+    PL_variableSelection_Simple[i, ] <- PL_results_Simple$variableSelection
+    PL_Prediction_SurvivalProb_Simple <- PL_results_Simple$eta_pred
+    PL_C_INDEX_Simple[i] <-
+      rcorr.cens(
+        -PL_Prediction_SurvivalProb_Simple,
+        Surv(testing_dataset_Simple$obstime, testing_dataset_Simple$status)
+      )["C Index"] 
+
+}
+
+save.image(file = "./Data/03_results_combined_Step5_includSimplifiedDatanprediction.RData")
+```
+
+
+```{r, echo=TRUE}
+load(file = "./Data/03_results_combined_Step5_includSimplifiedDatanprediction.RData")
+par(mfrow = c(1, 2))
+
+C_index <- list(bSplines = bSplines_model_C_INDEX, CoxRegression = coxRegression_C_INDEX,  PL = PL_C_INDEX)
+boxplot(C_index, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for complex dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
+abline(h = 0.5, col = "grey", lty = 3)
+
+C_index_Simplified <- list(bSplines = bSplines_model_C_INDEX_Simple, CoxRegression = coxRegression_C_INDEX_Simple, PL = PL_C_INDEX_Simple)
+boxplot(C_index_Simplified, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for complex dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
+abline(h = 0.5, col = "grey", lty = 3)
+```
+
+
+```{r, echo=TRUE}
+# Visualize the model results
+par(mfrow = c(3, 2), mar = c(2, 2, 2, 1), oma = c(0, 0, 0, 0))
+bSplines_model_beta_df <- as.data.frame(t(bSplines_model_beta))
+names(bSplines_model_beta_df) <- c("-fold 1", "-fold 2", "-fold 3", "-fold 4", "-fold 5", "-fold 6", "-fold 7", "-fold 8", "-fold 9", "-fold 10")
+bSplines_model_beta_cofficients <- cor(bSplines_model_beta_df)
+corrplot(bSplines_model_beta_cofficients, method = "color", tl.cex = 1.5, type = "lower", addCoef.col = "white", number.cex = 0.8)
+# Add a title to the plot
+title("Correlation Plot of BayesianbSpline estimated betas (complex dataset)")
+
+
+bSplines_model_beta_Simple_df <- as.data.frame(t(bSplines_model_beta_Simple))
+names(bSplines_model_beta_Simple_df) <- c("-fold 1", "-fold 2", "-fold 3", "-fold 4", "-fold 5", "-fold 6", "-fold 7", "-fold 8", "-fold 9", "-fold 10")
+bSplines_model_beta_Simple_cofficients <- cor(bSplines_model_beta_Simple_df)
+corrplot(cor(bSplines_model_beta_Simple_cofficients), method = "color", tl.cex = 1.5, type = "lower", addCoef.col = "white", number.cex = 0.8)
+# Add a title to the plot
+title("Correlation Plot of BayesianbSpline estimated betas (simplified dataset)")
+
+
+cox_beta_df <- as.data.frame(t(cox_beta))
+names(cox_beta_df) <- c("-fold 1", "-fold 2", "-fold 3", "-fold 4", "-fold 5", "-fold 6", "-fold 7", "-fold 8", "-fold 9", "-fold 10")
+cox_beta_cofficients <- cor(cox_beta_df)
+corrplot(cox_beta_cofficients, method = "color", tl.cex = 1.5, type = "lower", addCoef.col = "white", number.cex = 0.8)
+title("Correlation Plot of cox regression estimated betas (complex dataset)")
+
+
+cox_beta_Simple_df <- as.data.frame(t(cox_beta_Simple))
+names(cox_beta_Simple_df) <- c("-fold 1", "-fold 2", "-fold 3", "-fold 4", "-fold 5", "-fold 6", "-fold 7", "-fold 8", "-fold 9", "-fold 10")
+cox_beta_Simple_cofficients <- cor(cox_beta_Simple_df)
+corrplot(cox_beta_Simple_cofficients, method = "color", tl.cex = 1.5, type = "lower", addCoef.col = "white", number.cex = 0.8)
+title("Correlation Plot of cox regression estimated betas (simplified dataset)")
+
+PL_beta_df <- as.data.frame(t(PL_beta))
+names(PL_beta_df) <- c("-fold 1", "-fold 2", "-fold 3", "-fold 4", "-fold 5", "-fold 6", "-fold 7", "-fold 8", "-fold 9", "-fold 10")
+PL_beta_cofficients <- cor(PL_beta_df)
+corrplot(PL_beta_cofficients, method = "color", tl.cex = 1.5, type = "lower", addCoef.col = "white", number.cex = 0.8)
+title("Correlation Plot of Bayesian PL estimated betas (complex dataset)")
+
+
+PL_beta_Simple_df <- as.data.frame(t(PL_beta_Simple))
+names(PL_beta_Simple_df) <- c("-fold 1", "-fold 2", "-fold 3", "-fold 4", "-fold 5", "-fold 6", "-fold 7", "-fold 8", "-fold 9", "-fold 10")
+PL_beta_Simple_cofficients <- cor(PL_beta_Simple_df)
+corrplot(PL_beta_Simple_cofficients, method = "color", tl.cex = 1.5, type = "lower", addCoef.col = "white", number.cex = 0.8)
+title("Correlation Plot of cox regression estimated betas (simplified dataset)")
+```
+
+```{r, echo=TRUE}
+bSplines_model_beta_corVal <- bSplines_model_beta_cofficients[lower.tri(bSplines_model_beta_cofficients)]
+bSplines_model_beta_Simple_corVal <- bSplines_model_beta_Simple_cofficients[lower.tri(bSplines_model_beta_Simple_cofficients)]
+
+cox_beta_corVal <- cox_beta_cofficients[lower.tri(cox_beta_cofficients)]
+cox_beta_Simple_corVal <- cox_beta_Simple_cofficients[lower.tri(cox_beta_Simple_cofficients)]
+
+PL_beta_corVal <- PL_beta_cofficients[lower.tri(PL_beta_cofficients)] 
+PL_beta_Simple_corVal <- PL_beta_Simple_cofficients[lower.tri(PL_beta_Simple_cofficients)]
+
+beta <- list(bSplines = bSplines_model_beta_corVal, CoxRegression = cox_beta_corVal, PL = PL_beta_corVal)
+beta_Simplified <- list(bSplines = bSplines_model_beta_Simple_corVal, CoxRegression = cox_beta_Simple_corVal, PL = PL_beta_Simple_corVal)
+
+par(mfrow = c(1, 2))
+boxplot(beta, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "correlation of estimated betas  for complex dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
+
+boxplot(beta_Simplified, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for simplified dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
+```
