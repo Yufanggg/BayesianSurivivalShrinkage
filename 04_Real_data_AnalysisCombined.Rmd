@@ -386,7 +386,7 @@ boxplot(C_index, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), c
 abline(h = 0.5, col = "grey", lty = 3)
 
 C_index_Simplified <- list(bSplines = bSplines_model_C_INDEX_Simple, CoxRegression = coxRegression_C_INDEX_Simple, PL = PL_C_INDEX_Simple)
-boxplot(C_index_Simplified, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for complex dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
+boxplot(C_index_Simplified, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for simplifed dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
 abline(h = 0.5, col = "grey", lty = 3)
 ```
 
