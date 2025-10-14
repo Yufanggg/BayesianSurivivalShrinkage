@@ -1,3 +1,49 @@
+#Schoenfeld residuals 
+Schoenfeld_resid <- function(beta, X, times, status){
+  # Extract event times and their original indices
+  event_times <- times[status == 2]
+  event_indices <- which(status == 2)
+  sorted_event_indices <- order(event_times)
+  sorted_event_times <- event_times[sorted_event_indices]
+  sorted_event_indices <- event_indices[sorted_event_indices]
+  # 
+  # event_timPoSorted <- sort(times[status == 2])
+  # event_timPoSortedIndex <- sort(times[status == 2], index.return = TRUE)$ix
+  # indices_list <- lapply(event_timPoSorted, function(t_i) which(times >= t_i))
+  # R_ij <- matrix(data = NA, nrow = length(indices_list), ncol = ncol(X))
+  
+  
+  # Build risk sets: indices where times >= t_i
+  indices_list <- lapply(sorted_event_times, function(t_i) which(times >= t_i))
+  
+  # Initialize residual matrix
+  R_ij <- matrix(NA, nrow = length(indices_list), ncol = ncol(X))
+  
+  # Loop over covariates and event times
+  
+  for (i in 1:length(indices_list)) {
+    print(sorted_event_times[i])
+    for (j in 1:ncol(X)) {
+      R_i <- indices_list[[i]]
+      X_k_all <- X[R_i, ]
+      exp_part <- exp(X_k_all %*% beta)
+      deno <- sum(exp_part)
+      
+      X_kj_all <- X[R_i, j]
+      nemo <- sum(X_kj_all * exp_part)
+      E_ij <- nemo / deno
+      
+      t_iIndex <- sorted_event_indices[i]
+      R_ij[i, j] <- X[t_iIndex, j] - E_ij
+    }
+  }
+  return(R_ij)
+}
+
+
+
+
+
 # Function to find indices of main effects for interaction effects
 # @param: interaction_effects, a vector with the names of the interaction effects
 # @param: main_effects, a vector with the names of the main effects
