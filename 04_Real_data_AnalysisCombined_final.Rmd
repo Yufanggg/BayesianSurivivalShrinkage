@@ -159,7 +159,7 @@ combined_Data_Simple_int <- includingInter(combined_Data_Simple)
 Data_bSplines <- stan_data_Constructer_BSpline(
   training_dataset = combined_Data_int,
   testing_dataset = NULL,
-  obs_window = 3415,
+  obs_window = 3416,
   log_lik_saving = FALSE,
   havingInt = TRUE
 )
