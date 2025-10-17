@@ -69,7 +69,7 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
     testing_dataset = NULL
   }
   
-  stan_data_PH <- stan_data_Constructer_PH(
+  stan_data_PH <- stan_data_Constructer_PL(
     training_dataset = training_dataset,
     testing_dataset = testing_dataset
   )
@@ -121,20 +121,22 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   if ("baseline" %in% criteria) {
     if (withPrediction){
       output$time_vec <-
-      sort(training_dataset[training_dataset$status == 1, ]$obstime) # obs_window = 5
+      sort(unique(training_dataset$obstime))#[training_dataset$status == 1, ]$obstime) # obs_window = 5
     } else {
        output$time_vec <-
-      sort(dataset[dataset$status == 1, ]$obstime) # obs_window = 5
+         sort(dataset$obstime) #sort(dataset[dataset$status == 1, ]$obstime) # obs_window = 5
     }
     output$baseline_true <-  10 * 2 * (output$time_vec  ** (10 - 1))
     
     output$baseline_exponential <-
-      rep(model_result_exponential$baselinePara, length(output$time_vec ))
+      rep(model_result_exponential$baselinePara, length(output$time_vec))
     
     weibull_lambda <- model_result_weibull$baselinePara[1]
     weibull_shape <- model_result_weibull$baselinePara[2]
     output$baseline_weibull <-
       weibull_shape * weibull_lambda * (output$time_vec  ** (weibull_shape - 1))
+    
+    output$baseline_PL <- compute_baseline_hazard(beta = output$Beta_est_PH, X = as.matrix(training_dataset[, !(colnames(training_dataset) %in% c("id", "status", "obstime"))]), time = output$time_vec, status = training_dataset$status)
     
     output$baseline_bSplines <-
       exp(
@@ -385,15 +387,16 @@ for (i in 1:replicate_times) {
   baseline_weibull <- simulated_results[, i]$baseline_weibull
   baseline_bSplines <- simulated_results[, i]$baseline_bSplines
   
-  plot(baseline_true, col = "red", type = "l", pch = 16, lty = 1, lwd = 2)
+  plot(baseline_true, col = "red", type = "l", pch = 16, lty = 1, lwd = 2, xlab = "time", ylab = " ")
   lines(baseline_weibull, col = "green", type = "l", pch = 16, lty = 1, lwd = 2)
   lines(baseline_exponential, col = "blue", pch = 16, lty = 1, lwd = 2)
+  lines(aseline_PL, col = "black", pch = 16, lty = 1, lwd = 2)
   lines(baseline_bSplines, col = "orange", pch = 16, lty = 1, lwd = 2)
   # Add legend
   legend(
     "topleft",
-    legend = c("True", "Exponential", "Weibull", "B-Splines"),
-    col = c("red", "blue", "green", "orange"),
+    legend = c("True", "Exponential", "Weibull", "B-Splines", "PL"),
+    col = c("red", "blue", "green", "orange", "black"),
     pch = 16,
     lty = 1
   )

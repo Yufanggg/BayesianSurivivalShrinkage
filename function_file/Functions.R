@@ -1,28 +1,70 @@
 #Schoenfeld residuals 
-Schoenfeld_resid <- function(beta, X, times, status){
+compute_baseline_hazard <- function(beta, X, time, status) {
+  # beta: numeric vector of Cox coefficients
+  # X: matrix or data frame of covariates
+  # time: numeric vector of observed times
+  # status: numeric or logical vector (1 = event, 0 = censored)
+  
+  # Compute risk scores
+  risk_scores <- exp(as.matrix(X) %*% beta)
+  
+  # All unique times (including censored)
+  all_times <- sort(unique(time))
+  
+  baseline_hazard <- numeric(length(all_times))
+  last_hazard <- 0
+  
+  
+  for (i in seq_along(all_times)) {
+    t <- all_times[i]
+    
+    # Number of events at time t
+    d_i <- sum(time == t & status == 1)
+    
+    if (d_i > 0) {
+      # Risk set: subjects with time >= t
+      risk_set <- sum(risk_scores[time >= t])
+      
+      # Breslow estimator for hazard at time t
+      last_hazard <- d_i / risk_set
+    }
+    
+    
+    
+    # If no event, carry forward previous hazard
+    baseline_hazard[i] <- last_hazard
+  }
+  # Return as data frame
+  return(baseline_hazard)
+}
+
+
+Schoenfeld_resid <- function(beta, X, times, status) {
   # Extract event times and their original indices
-  event_times <- times[status == 2]
-  event_indices <- which(status == 2)
+  event_times <- times[status == 1]
+  event_indices <- which(status == 1)
   sorted_event_indices <- order(event_times)
   sorted_event_times <- event_times[sorted_event_indices]
   sorted_event_indices <- event_indices[sorted_event_indices]
-  # 
+  #
   # event_timPoSorted <- sort(times[status == 2])
   # event_timPoSortedIndex <- sort(times[status == 2], index.return = TRUE)$ix
   # indices_list <- lapply(event_timPoSorted, function(t_i) which(times >= t_i))
   # R_ij <- matrix(data = NA, nrow = length(indices_list), ncol = ncol(X))
   
-  
+  Output <- list()
   # Build risk sets: indices where times >= t_i
-  indices_list <- lapply(sorted_event_times, function(t_i) which(times >= t_i))
+  indices_list <- lapply(sorted_event_times, function(t_i)
+    which(times >= t_i))
   
   # Initialize residual matrix
   R_ij <- matrix(NA, nrow = length(indices_list), ncol = ncol(X))
   
   # Loop over covariates and event times
   
+  # if (length(unique(event_times)) == length(event_times)){
   for (i in 1:length(indices_list)) {
-    print(sorted_event_times[i])
+    # print(sorted_event_times[i])
     for (j in 1:ncol(X)) {
       R_i <- indices_list[[i]]
       X_k_all <- X[R_i, ]
@@ -37,7 +79,11 @@ Schoenfeld_resid <- function(beta, X, times, status){
       R_ij[i, j] <- X[t_iIndex, j] - E_ij
     }
   }
-  return(R_ij)
+  
+  Output$R_ij <- R_ij
+  Output$sorted_event_times <- t
+
+return(Output)
 }
 
 
@@ -664,28 +710,6 @@ includingInter <- function(dataframe_) {
   factor_vars <- c("Recipientsex", "Donorsex", "Smoking", "InitialOnmachineindicator", "status", "InitialPrimaryDiseaseET_regroup", "Donorcauseofdeath_group")#colnames(dataframe_)[factor_var]
   # print(factor_vars)
   
-  # exclude_terms <- sapply(interaction_terms, function(term) {
-  #   terms_ <- unlist(strsplit(term, ":"))
-  #   Con1 <- any(agrepl(terms_[1], factor_vars))
-  #   Con2 <- any(agrepl(terms_[2], factor_vars))
-  #   if ((Con2 | Con1)){
-  #     Con1 = agrepl(terms_[1], "InitialPrimaryDiseaseET_regroup")
-  #     Con2 = agrepl(terms_[2], "InitialPrimaryDiseaseET_regroup")
-  #     
-  #     return(any(Con1, Con2))
-  #     # print(terms_[2])
-  #     # print(Con2)
-  #   }
-  #   # print(term)
-  #   # print(all(Con1, Con2))
-  #   return(all(Con1, Con2))
-  # })
-  # 
-  # # print(exclude_terms)
-  # exclude_columns <- interaction_terms[exclude_terms]
-  # selected_columns <- setdiff(all_terms, exclude_columns)
-  # interaction_df <- subset(interaction_df, select = selected_columns)
-  #interaction_df$id = 1:nrow(dataframe_)#dataframe_$ID
   interaction_df$status = ifelse(dataframe_$status == "graftloss", 1, 0)
   interaction_df$obstime = dataframe_$time
   
