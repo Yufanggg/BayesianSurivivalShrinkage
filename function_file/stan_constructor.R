@@ -1145,11 +1145,13 @@ handle_basehaz_surv <- function(times,
   degree <- 3
   
   
-  tt <- sort(unique(times))#[status == 1]) # uncensored event times
+  # tt <- times#sort(unique(times))#[status == 1]) # uncensored event times
   
   bknots <- c(min_t, max_t)
-  iknots <- get_iknots(tt, df = df, degree = degree)
-  basis  <- splines2::bSpline(tt, iknots = iknots, Boundary.knots = bknots, degree = 3, intercept = FALSE)     
+  # iknots <- get_iknots(tt, df = df, degree = degree)
+  # basis  <- splines2::bSpline(tt, iknots = iknots, Boundary.knots = bknots, degree = 3, intercept = FALSE)
+  iknots <- get_iknots(sort(times[status == 1]), df = df, degree = degree)
+  basis  <- splines2::bSpline(sort(unique(times)), iknots = iknots, Boundary.knots = bknots, degree = 3, intercept = FALSE)
   
   
   

@@ -136,8 +136,8 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
     output$baseline_weibull <-
       weibull_shape * weibull_lambda * (output$time_vec  ** (weibull_shape - 1))
     
-    output$baseline_PL <- compute_baseline_hazard(beta = output$Beta_est_PH, X = as.matrix(training_dataset[, !(colnames(training_dataset) %in% c("id", "status", "obstime"))]), time = output$time_vec, status = training_dataset$status)
-    
+    # output$baseline_PL <- compute_baseline_hazard(beta = output$Beta_est_PH, X = as.matrix(training_dataset[, !(colnames(training_dataset) %in% c("id", "status", "obstime"))]), time = output$time_vec, status = training_dataset$status)
+    # 
     output$baseline_bSplines <-
       exp(
         as.matrix(stan_data_bSplines$basis) %*% as.matrix(model_result_bSplines$baselinePara[, "mean"])
@@ -387,16 +387,16 @@ for (i in 1:replicate_times) {
   baseline_weibull <- simulated_results[, i]$baseline_weibull
   baseline_bSplines <- simulated_results[, i]$baseline_bSplines
   
-  plot(baseline_true, col = "red", type = "l", pch = 16, lty = 1, lwd = 2, xlab = "time", ylab = " ")
-  lines(baseline_weibull, col = "green", type = "l", pch = 16, lty = 1, lwd = 2)
-  lines(baseline_exponential, col = "blue", pch = 16, lty = 1, lwd = 2)
-  lines(aseline_PL, col = "black", pch = 16, lty = 1, lwd = 2)
-  lines(baseline_bSplines, col = "orange", pch = 16, lty = 1, lwd = 2)
+  plot(output$time_vec, output$baseline_true, col = "red", type = "l", pch = 16, lty = 1, lwd = 2, xlab = "time", ylab = " ")
+  lines(output$time_vec, output$baseline_weibull, col = "green", type = "l", pch = 16, lty = 1, lwd = 2)
+  lines(output$time_vec, output$baseline_exponential, col = "blue", pch = 16, lty = 1, lwd = 2)
+  #lines(output$aseline_PL, col = "black", pch = 16, lty = 1, lwd = 2)
+  lines(output$time_vec, output$baseline_bSplines, col = "orange", pch = 16, lty = 1, lwd = 2)
   # Add legend
   legend(
     "topleft",
-    legend = c("True", "Exponential", "Weibull", "B-Splines", "PL"),
-    col = c("red", "blue", "green", "orange", "black"),
+    legend = c("True", "Exponential", "Weibull", "B-Splines"),
+    col = c("red", "blue", "green", "orange"),
     pch = 16,
     lty = 1
   )

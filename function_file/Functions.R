@@ -10,14 +10,11 @@ compute_baseline_hazard <- function(beta, X, time, status) {
   
   # All unique times (including censored)
   all_times <- sort(unique(time))
-  
   baseline_hazard <- numeric(length(all_times))
   last_hazard <- 0
   
-  
   for (i in seq_along(all_times)) {
     t <- all_times[i]
-    
     # Number of events at time t
     d_i <- sum(time == t & status == 1)
     
@@ -28,12 +25,10 @@ compute_baseline_hazard <- function(beta, X, time, status) {
       # Breslow estimator for hazard at time t
       last_hazard <- d_i / risk_set
     }
-    
-    
-    
     # If no event, carry forward previous hazard
     baseline_hazard[i] <- last_hazard
   }
+  
   # Return as data frame
   return(baseline_hazard)
 }
@@ -58,7 +53,7 @@ Schoenfeld_resid <- function(beta, X, times, status) {
     which(times >= t_i))
   
   # Initialize residual matrix
-  R_ij <- matrix(NA, nrow = length(indices_list), ncol = ncol(X))
+  R_ij <- E_ij <- X_ij <- matrix(NA, nrow = length(indices_list), ncol = ncol(X))
   
   # Loop over covariates and event times
   
@@ -73,18 +68,98 @@ Schoenfeld_resid <- function(beta, X, times, status) {
       
       X_kj_all <- X[R_i, j]
       nemo <- sum(X_kj_all * exp_part)
-      E_ij <- nemo / deno
+      E_ij[i, j] <- nemo / deno
       
       t_iIndex <- sorted_event_indices[i]
-      R_ij[i, j] <- X[t_iIndex, j] - E_ij
+      X_ij[i, j] <- X[t_iIndex, j]
+      R_ij[i, j] <- X[t_iIndex, j] - E_ij[i, j]
     }
   }
   
   Output$R_ij <- R_ij
-  Output$sorted_event_times <- t
-
-return(Output)
+  Output$sorted_event_times <- sorted_event_times
+  Output$E_ij <- E_ij
+  Output$X_ij <- X_ij
+  
+  return(Output)
 }
+
+
+
+Schoenfeld_resid_tied <- function(beta, X, times, status) {
+  # Identify unique event times and counts (status == 2 means event)
+  event_info <- data.frame(times = times, status = status) |>
+    dplyr::filter(status == 1) |>
+    dplyr::group_by(times) |>
+    dplyr::summarise(event_count = dplyr::n(), .groups = "drop")
+  
+  unique_event_times <- event_info$times
+  event_counts <- event_info$event_count
+  
+  # Extract all event times and their original indices
+  event_times <- times[status == 1]
+  event_indices <- which(status == 1)
+  
+  # Sort events by time
+  sort_order <- order(event_times)
+  sorted_event_times <- event_times[sort_order]
+  sorted_event_indices <- event_indices[sort_order]
+  
+  # Initialize matrices
+  n_events <- sum(status == 1)
+  p <- ncol(X)
+  R_ij <- matrix(NA, nrow = n_events, ncol = p)
+  # E_ij <- matrix(NA, nrow = n_events, ncol = p)
+  # X_ij <- matrix(NA, nrow = n_events, ncol = p)
+  
+  i <- 1
+  while (i <= length(sorted_event_times)) {
+    t_i <- sorted_event_times[i]
+    R_i <- which(times >= t_i)                # Risk set
+    D_i <- which(times == t_i & status == 2) # Tied events at t_i
+    
+    d_i <- length(D_i)
+    X_k_all <- X[R_i, , drop = FALSE]
+    exp_part <- exp(X_k_all %*% beta)
+    
+    X_tied_all <- X[D_i, , drop = FALSE]
+    tied_exp_part <- exp(X_tied_all %*% beta)
+    
+    for (j in 1:p) {
+      X_kj_all <- X_k_all[, j]
+      X_tiedj_all <- X_tied_all[, j]
+      
+      # Compute Efron-adjusted expected value
+      E_ij_local <- 0
+      for (r in 1:d_i) {
+        num <- sum(X_kj_all * exp_part) - ((r - 1) / d_i) * sum(X_tiedj_all * tied_exp_part)
+        den <- sum(exp_part) - ((r - 1) / d_i) * sum(tied_exp_part)
+        E_ij_local <- E_ij_local + num / den
+      }
+      E_ij_local <- E_ij_local / d_i
+      
+      # Assign for each tied event
+      for (k in 0:(d_i - 1)) {
+        idx <- i + k
+        # X_ij[idx, j] <- X[sorted_event_indices[idx], j]
+        # E_ij[idx, j] <- E_ij_local
+        R_ij[idx, j] <- X[sorted_event_indices[idx], j] - E_ij_local
+      }
+    }
+    i <- i + d_i
+  }
+  
+  Output <- list(
+    R_ij = R_ij,
+    # E_ij = E_ij,
+    # X_ij = X_ij,
+    sorted_event_times = sorted_event_times,
+    sorted_event_indices = sorted_event_indices
+  )
+  
+  return(Output)
+}
+
 
 
 

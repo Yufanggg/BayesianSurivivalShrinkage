@@ -115,8 +115,8 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   
   if ("baseline" %in% criteria) {
     if (withPrediction){
-      output$time_vec <-
-      sort(training_dataset[training_dataset$status == 1, ]$obstime) # obs_window = 5
+      output$time_vec <- sort(unique(training_dataset$obstime))
+      #sort(training_dataset[training_dataset$status == 1, ]$obstime) # obs_window = 5
     } else {
        output$time_vec <-
       sort(dataset[dataset$status == 1, ]$obstime) # obs_window = 5
@@ -372,3 +372,16 @@ boxplot(C_index_list, names = c("bSplines_withShrinkag", "bSplines_noShrinkag", 
 abline(h = 0.5, col = "red", lty = 2)
 ```
 
+```{r, echo=TRUE}
+  plot(output$time_vec, output$baseline_true, col = "red", type = "l", pch = 16, lty = 1, lwd = 2, xlab = "time", ylab = " ")
+  lines(output$time_vec, output$baseline_bSplines_withShrinkage, col = "green", type = "l", pch = 16, lty = 1, lwd = 2)
+  lines(output$time_vec, output$baseline_bSplines_noShrinkage, col = "blue", pch = 16, lty = 1, lwd = 2)
+  # Add legend
+  legend(
+    "topleft",
+    legend = c("True", "BaysBSpL", "BaysBSpN"),
+    col = c("red",  "green",  "blue"),
+    pch = 16,
+    lty = 1
+  )
+```
