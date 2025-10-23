@@ -121,10 +121,10 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   if ("baseline" %in% criteria) {
     if (withPrediction){
       output$time_vec <-
-      sort(training_dataset$obstime)#[training_dataset$status == 1, ]$obstime) # obs_window = 5
+      sort(unique(training_dataset$obstime))#[training_dataset$status == 1, ]$obstime) # obs_window = 5
     } else {
        output$time_vec <-
-         sort(dataset$obstime) #sort(dataset[dataset$status == 1, ]$obstime) # obs_window = 5
+         sort(unique(dataset$obstime)) #sort(dataset[dataset$status == 1, ]$obstime) # obs_window = 5
     }
     output$baseline_true <-  10 * 2 * (output$time_vec  ** (10 - 1))
     

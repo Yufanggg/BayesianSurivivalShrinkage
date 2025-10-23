@@ -372,8 +372,14 @@ stan_data_Constructer_BSpline <- function (training_dataset, testing_dataset, ob
     #----- basis terms for baseline hazard
     
     basis_epts_event <- make_basis(t_event, basehaz)
+    print("dim of basis_epts_event is:")
+    print(dim(basis_epts_event))
     basis_qpts_event <- make_basis(qpts_event, basehaz)
+    print("dim of qpts_event is:")
+    print(dim(basis_qpts_event))
     basis_qpts_rcens <- make_basis(qpts_rcens, basehaz)
+    print("dim of qpts_rcens is:")
+    print(dim(basis_qpts_rcens))
     
     
     #----- model frames for generating predictor matrices
@@ -1151,7 +1157,7 @@ handle_basehaz_surv <- function(times,
   # iknots <- get_iknots(tt, df = df, degree = degree)
   # basis  <- splines2::bSpline(tt, iknots = iknots, Boundary.knots = bknots, degree = 3, intercept = FALSE)
   iknots <- get_iknots(sort(times[status == 1]), df = df, degree = degree)
-  basis  <- splines2::bSpline(sort(times), iknots = iknots, Boundary.knots = bknots, degree = 3, intercept = FALSE)
+  basis  <- splines2::bSpline(sort(unique(times)), iknots = iknots, Boundary.knots = bknots, degree = 3, intercept = FALSE)
   
   
   nvars  <- ncol(basis)  # number of aux parameters, basis terms
