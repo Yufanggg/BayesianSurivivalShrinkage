@@ -372,14 +372,14 @@ stan_data_Constructer_BSpline <- function (training_dataset, testing_dataset, ob
     #----- basis terms for baseline hazard
     
     basis_epts_event <- make_basis(t_event, basehaz)
-    print("dim of basis_epts_event is:")
-    print(dim(basis_epts_event))
+    # print("dim of basis_epts_event is:")
+    # print(dim(basis_epts_event))
     basis_qpts_event <- make_basis(qpts_event, basehaz)
-    print("dim of qpts_event is:")
-    print(dim(basis_qpts_event))
+    # print("dim of qpts_event is:")
+    # print(dim(basis_qpts_event))
     basis_qpts_rcens <- make_basis(qpts_rcens, basehaz)
-    print("dim of qpts_rcens is:")
-    print(dim(basis_qpts_rcens))
+    # print("dim of qpts_rcens is:")
+    # print(dim(basis_qpts_rcens))
     
     
     #----- model frames for generating predictor matrices
