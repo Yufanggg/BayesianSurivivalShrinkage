@@ -1151,8 +1151,7 @@ handle_basehaz_surv <- function(times,
   # iknots <- get_iknots(tt, df = df, degree = degree)
   # basis  <- splines2::bSpline(tt, iknots = iknots, Boundary.knots = bknots, degree = 3, intercept = FALSE)
   iknots <- get_iknots(sort(times[status == 1]), df = df, degree = degree)
-  basis  <- splines2::bSpline(sort(unique(times)), iknots = iknots, Boundary.knots = bknots, degree = 3, intercept = FALSE)
-  
+  basis  <- splines2::bSpline(sort(times), iknots = iknots, Boundary.knots = bknots, degree = 3, intercept = FALSE)
   
   
   nvars  <- ncol(basis)  # number of aux parameters, basis terms
