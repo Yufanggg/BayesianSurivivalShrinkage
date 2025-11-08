@@ -108,24 +108,24 @@ corrplot(cor_matrix, method = "color", tl.cex = 0.7, type = "lower")
 
 
 ```{r, echo=TRUE}
-real_df_simple <- subset(real_df, select = -c(Smoking, Donorcauseofdeath_group, Dialysisdaysrenine, Recipientsex, Recipient_BMI, Warm_ischaemic_period_1))
+combined_Data_Simple <- subset(combined_Data, select = -c(Smoking, Donorcauseofdeath_group, Dialysisdaysrenine, Recipientsex, Recipient_BMI))
 # set the factor variable being sum-to-zero encoded
-contrasts(real_df_simple$Donorsex) <- contr.sum(levels(real_df_simple$Donorsex))
-contrasts(real_df_simple$TypecadavericDBDDCD) <- contr.sum(levels(real_df_simple$TypecadavericDBDDCD))
-contrasts(real_df_simple$InitialPrimaryDiseaseET_regroup) <- contr.sum(levels(real_df_simple$InitialPrimaryDiseaseET_regroup))
+# contrasts(real_df_simple$Donorsex) <- contr.sum(levels(real_df_simple$Donorsex))
+# contrasts(real_df_simple$TypecadavericDBDDCD) <- contr.sum(levels(real_df_simple$TypecadavericDBDDCD))
+# contrasts(real_df_simple$InitialPrimaryDiseaseET_regroup) <- contr.sum(levels(real_df_simple$InitialPrimaryDiseaseET_regroup))
+# 
+# 
+# 
+# # center the numeric variables
+# real_df_simple$Recipientage <- scale(real_df_simple$Recipientage)
+# real_df_simple$Donorage <- scale(real_df_simple$Donorage)
+# real_df_simple$Lastcreatininemgdl <- scale(real_df_simple$Lastcreatininemgdl)
+# real_df_simple$Cold_ischaemic_period <- scale(real_df_simple$Cold_ischaemic_period)
+# real_df_simple$HLA_mismatch <- scale(real_df_simple$HLA_mismatch)
+# real_df_simple$DonorBMI <- scale(real_df_simple$DonorBMI)
 
 
-
-# center the numeric variables
-real_df_simple$Recipientage <- scale(real_df_simple$Recipientage)
-real_df_simple$Donorage <- scale(real_df_simple$Donorage)
-real_df_simple$Lastcreatininemgdl <- scale(real_df_simple$Lastcreatininemgdl)
-real_df_simple$Cold_ischaemic_period <- scale(real_df_simple$Cold_ischaemic_period)
-real_df_simple$HLA_mismatch <- scale(real_df_simple$HLA_mismatch)
-real_df_simple$DonorBMI <- scale(real_df_simple$DonorBMI)
-
-
-combined_Data_Simple <- real_df_simple
+# combined_Data_Simple <- real_df_simple
 ```
 
 # Check whether or not each level have sufficient events
@@ -217,10 +217,11 @@ PL_results = Bayesian_Survival_result_Extract(
   bayesian_model_fit = PL_model,
   model_type = "none",
   criteria = c("DesignCoefficients",
-               "variableSelection"),
+               "variableSelection", "se"),
   uncertainty = TRUE
 )
 PL_beta <- PL_results$Beta_bayesian_est[, "mean"]
+PL_beta_se <- PL_results$se
 PL_variableSelection <- PL_results$variableSelection
 PL_coefUB <- PL_results$Beta_bayesian_estUB
 PL_coefLB <- PL_results$Beta_bayesian_estLB
@@ -281,9 +282,10 @@ PL_noshrinkage_beta <- PL_noshrinkage_results$Beta_bayesian_est[, "mean"]
 PL_noshrinkage_variableSelection <- PL_noshrinkage_results$variableSelection
 PL_noshrinkage_coefUB <- PL_noshrinkage_results$Beta_bayesian_estUB
 PL_noshrinkage_coefLB <- PL_noshrinkage_results$Beta_bayesian_estLB
+```
 
 #################FOR THE SIMPLIFIED MODEL############
-
+```{r, echo=TRUE}
 Data_bSplines_Simple <- stan_data_Constructer_BSpline(
   training_dataset = combined_Data_Simple_int,
   testing_dataset = NULL,
@@ -345,10 +347,11 @@ PL_results_Simple = Bayesian_Survival_result_Extract(
   bayesian_model_fit = PL_model_Simple,
   model_type = "none",
   criteria = c("DesignCoefficients",
-               "variableSelection"),
+               "variableSelection", "se"),
   uncertainty = TRUE
 )
 PL_Simple_beta <- PL_results_Simple$Beta_bayesian_est[, "mean"]
+PL_Simple_beta_se <- PL_results_Simple$se
 PL_Simple_variableSelection <- PL_results_Simple$variableSelection
 PL_Simple_coefUB <- PL_results_Simple$Beta_bayesian_estUB
 PL_Simple_coefLB <- PL_results_Simple$Beta_bayesian_estLB
@@ -409,14 +412,14 @@ PL_Simple_noshrinkage_variableSelection <- PL_results_noshrinkage_Simple$variabl
 PL_Simple_noshrinkage_coefUB <- PL_results_noshrinkage_Simple$Beta_bayesian_estUB
 PL_Simple_noshrinkage_coefLB <- PL_results_noshrinkage_Simple$Beta_bayesian_estLB
 
-save.image(file = "./Data/04_OverallKidneyData_Final1.RData")
+save.image(file = "./Data/04_OverallKidneyData_Final.RData")
 ```
 
 #Visualize the result
 ```{r, echo=TRUE}
-load(file = "./Data/04_OverallKidneyData_Final1.RData")
+load(file = "./Data/04_OverallKidneyData_Final.RData")
 name_label <- names(combined_Data_int)[1:136]
-name_label_simple <- names(combined_Data_Simple_int)
+name_label_simple <- names(combined_Data_Simple_int)[1:66]
 
 par(mfrow = c(1, 2), mar = c(0, 0, 0, 0), oma = c(3, 24, 3, 1))
 # Set up the plot without drawing points initially
@@ -555,15 +558,80 @@ abline(v = 0, col = "red", lty = 2)
 title(main = "Beta Estimation (BayesPL_noinfor)")
 ```
 
+```{r, echo=TRUE}
+load(file = "./Data/04_OverallKidneyData_Final.RData")
+name_label_simple <- names(combined_Data_Simple_int)[1:66]
+names(PL_Simple_beta) <- name_label_simple
 
+
+name_label <- names(combined_Data_int)[1:136]
+names(PL_beta) <- name_label
+names(PL_beta_se) <- name_label
+
+PL_beta_overlap <- PL_beta[name_label_simple]
+PL_beta_seoverlap <- PL_beta_se[name_label_simple]
+# Assuming PL_beta_overlap and PL_Simple_beta are numeric vectors
+
+# Calculate Pearson correlation
+r_value <- cor(PL_beta_overlap, PL_Simple_beta)
+r_value_se <- cor(PL_beta_seoverlap, PL_Simple_beta_se)
+
+
+par(mfrow = c(1, 2))
+# Create the plot
+plot(PL_beta_overlap, PL_Simple_beta,
+     col = "blue", pch = 16,
+     xlab = "beta (ComplexData)", ylab = "beta (SimpleData)",
+     main = "")
+
+# Add regression line
+model <- lm(PL_Simple_beta ~ PL_beta_overlap)
+abline(model, col = "red", lty = 2, lwd = 2)
+
+# Add horizontal line at y = 0 (intercept = 0, slope = 0)
+abline(a = 0, b = 1, col = "blue", lty = 2)
+
+
+# Add italic r value inside the plot
+# legend("topright",
+#        legend = bquote(italic(r) == .(round(r_value, 2))),
+#        text.col = "red", bty = "n", cex = 1.2)
+# 
+text(x = min(PL_beta_overlap), y = max(PL_Simple_beta),
+     labels = bquote(italic(r == .(round(r_value, 2)))),
+     pos = 4, col = "red", cex = 1.2)
+
+plot(PL_beta_seoverlap, PL_Simple_beta_se,
+     col = "blue", pch = 16,
+     xlab = "posterior standard deviations (ComplexData)", ylab = "posterior standard deviations (SimpleData)",
+     main = "")
+
+# Add regression line
+model2 <- lm(PL_Simple_beta_se ~ PL_beta_seoverlap)
+abline(model2, col = "red", lty = 2, lwd = 2)
+
+# Add horizontal line at y = 0 (intercept = 0, slope = 0)
+abline(a = 0, b = 1, col = "blue", lty = 2)
+
+
+# Add italic r value inside the plot
+# legend("topright",
+#        legend = bquote(italic(r) == .(round(r_value, 2))),
+#        text.col = "red", bty = "n", cex = 1.2)
+# 
+text(x = min(PL_beta_seoverlap), y = max(PL_Simple_beta_se),
+     labels = bquote(italic(r == .(round(r_value_se, 2)))),
+     pos = 4, col = "red", cex = 1.2)
+
+```
 
 ```{r, echo=TRUE}
-name_label_simple <- names(combined_Data_Simple_int)[1:45]
+name_label_simple <- names(combined_Data_Simple_int)[1:66]
 
 par(mfrow = c(1, 2), mar = c(0, 0, 0, 0), oma = c(3, 24, 3, 1))
 # Set up the plot without drawing points initially
 plot(
-  bSplines_model_Simple_beta, 1:45, type = "n",
+  bSplines_model_Simple_beta, 1:66, type = "n",
   col = "blue", pch = 16,
   xlab = "Estimated Beta", ylab = "",
   main = "", yaxt = "n"
@@ -578,12 +646,12 @@ for (i in which(bSplines_model_Simple_variableSelection)) {
 }
 
 # Add beta coefficient points
-points(bSplines_model_Simple_beta, 1:45, col = "blue", pch = 16)
+points(bSplines_model_Simple_beta, 1:66, col = "blue", pch = 16)
 
 # Add error bars for beta coefficients
 segments(
-  bSplines_model_Simple_coefLB, 1:45,
-  bSplines_model_Simple_coefUB, 1:45,
+  bSplines_model_Simple_coefLB, 1:66,
+  bSplines_model_Simple_coefUB, 1:66,
   col = "blue"
 )
 
@@ -591,11 +659,11 @@ segments(
 abline(v = 0, col = "red", lty = 2)
 
 # Add vertical y-axis labels
-axis(2, at = 1:45, labels = name_label_simple, las = 2, cex.axis = 1.0)
+axis(2, at = 1:66, labels = name_label_simple, las = 2, cex.axis = 1.0)
 title(main = "Beta Estimation (BayesbSplines) for simpleData")
 
 plot(
-  bSplines_model_noshrinkage_Simple_beta, 1:45, type = "n",
+  bSplines_model_noshrinkage_Simple_beta, 1:66, type = "n",
   col = "darkgreen", pch = 16,
   xlab = "Estimated Beta", ylab = "",
   main = "", yaxt = "n"
@@ -610,12 +678,12 @@ for (i in which(bSplines_model_noshrinkage_Simple_variableSelection)) {
 }
 
 # Add beta coefficient points
-points(bSplines_model_noshrinkage_Simple_beta, 1:45, col = "darkgreen", pch = 16)
+points(bSplines_model_noshrinkage_Simple_beta, 1:66, col = "darkgreen", pch = 16)
 
 # Add error bars for beta coefficients
 segments(
-  bSplines_model_noshrinkage_Simple_coefLB, 1:45,
-  bSplines_model_noshrinkage_Simple_coefUB, 1:45,
+  bSplines_model_noshrinkage_Simple_coefLB, 1:66,
+  bSplines_model_noshrinkage_Simple_coefUB, 1:66,
   col = "darkgreen"
 )
 
@@ -633,7 +701,7 @@ title(main = "Beta Estimation (BayesBSpline_noinfor) for simpleData")
 par(mfrow = c(1, 2), mar = c(0, 0, 0, 0), oma = c(3, 24, 3, 1))
 # Set up the plot without drawing points initially
 plot(
-  PL_Simple_beta, 1:45, type = "n",
+  PL_Simple_beta, 1:66, type = "n",
   col = "blue", pch = 16,
   xlab = "Estimated Beta", ylab = "",
   main = "", yaxt = "n"
@@ -648,12 +716,12 @@ for (i in which(PL_Simple_variableSelection)) {
 }
 
 # Add beta coefficient points
-points(PL_Simple_beta, 1:45, col = "blue", pch = 16)
+points(PL_Simple_beta, 1:66, col = "blue", pch = 16)
 
 # Add error bars for beta coefficients
 segments(
-  PL_Simple_coefLB, 1:45,
-  PL_Simple_coefUB, 1:45,
+  PL_Simple_coefLB, 1:66,
+  PL_Simple_coefUB, 1:66,
   col = "blue"
 )
 
@@ -661,11 +729,11 @@ segments(
 abline(v = 0, col = "red", lty = 2)
 
 # Add vertical y-axis labels
-axis(2, at = 1:45, labels = name_label_simple, las = 2, cex.axis = 1.0)
+axis(2, at = 1:66, labels = name_label_simple, las = 2, cex.axis = 1.0)
 title(main = "Beta Estimation (BayesPL)")
 
 plot(
-  PL_Simple_noshrinkage_beta, 1:45, type = "n",
+  PL_Simple_noshrinkage_beta, 1:66, type = "n",
   col = "darkgreen", pch = 16,
   xlab = "Estimated Beta", ylab = "",
   main = "", yaxt = "n"
@@ -680,12 +748,12 @@ for (i in which(PL_Simple_noshrinkage_variableSelection)) {
 }
 
 # Add beta coefficient points
-points(PL_Simple_noshrinkage_beta, 1:45, col = "darkgreen", pch = 16)
+points(PL_Simple_noshrinkage_beta, 1:66, col = "darkgreen", pch = 16)
 
 # Add error bars for beta coefficients
 segments(
-  PL_Simple_noshrinkage_coefLB, 1:45,
-  PL_Simple_noshrinkage_coefUB, 1:45,
+  PL_Simple_noshrinkage_coefLB, 1:66,
+  PL_Simple_noshrinkage_coefUB, 1:66,
   col = "darkgreen"
 )
 
@@ -695,6 +763,86 @@ abline(v = 0, col = "red", lty = 2)
 # Add vertical y-axis labels
 #axis(2, at = 1:136, labels = name_label, las = 2, cex.axis = 1.0)
 title(main = "Beta Estimation (BayesPL_noinfor)")
+```
+
+
+# Plot the baseline hazard function
+```{r, echo=TRUE}
+load(file = "./Data/04_OverallKidneyData_Final.RData")
+baseline_bSpline_complex <- exp(
+        as.matrix(Data_bSplines$basis) %*% as.matrix(bSplines_model_results$baselinePara[[1]])
+      )
+baseline_bSpline_complex_noshrinkage <- exp(
+        as.matrix(Data_bSplines$basis) %*% as.matrix(bSplines_model_noshrinkage_results$baselinePara[[1]])
+      )
+
+
+baseline_bSpline_simple<- exp(
+        as.matrix(Data_bSplines$basis) %*% as.matrix(bSplines_model_results_Simple$baselinePara[[1]])
+      )
+baseline_bSpline_complex_noshrinkage <- exp(
+        as.matrix(Data_bSplines$basis) %*% as.matrix(bSplines_model_noshrinkage_results_Simple$baselinePara[[1]])
+      )
+
+# Set up a 2x2 plotting layout with custom margins
+par(mfrow = c(2, 2))
+
+# Extract sorted unique observation times
+time_points <- sort(unique(combined_Data_int$obstime))
+
+# Plot baseline hazard estimates
+plot(time_points[1:300], baseline_bSpline_complex[1:300], type = "l", main = "Complex B-spline", col = "red",  xlab = "Event Times (days)", ylab = "estimated baseline hazard")
+plot(time_points, baseline_bSpline_complex_noshrinkage, type = "l", main = "Complex B-spline (No Shrinkage)", col = "blue", xlab = "Event Times (days)", ylab = "estimated baseline hazard")
+plot(time_points, baseline_bSpline_simple, type = "l", main = "Simple B-spline", col = "green", xlab = "Event Times (days)", ylab = "estimated baseline hazard")
+plot(time_points, baseline_bSpline_complex_noshrinkage, type = "l", main = "Complex B-spline (No Shrinkage)", col = "orange", xlab = "Event Times (days)", ylab = "estimated baseline hazard")
+
+
+par(mfrow = c(1, 2))
+plot(time_points, baseline_bSpline_complex, type = "l", main = "Complex B-spline", col = "red",  xlab = "Event Times (days)", ylab = "estimated baseline hazard")
+plot(time_points[1:200], baseline_bSpline_complex[1:200], type = "l", main = "Complex B-spline", col = "red",  xlab = "Event Times (days)", ylab = "estimated baseline hazard")
+```
+
+# assumption checking
+```{r, echo=TRUE}
+load(file = "./Data/04_OverallKidneyData_Final.RData")
+beta_Simple = PL_Simple_beta
+X_Simple = as.matrix(combined_Data_Simple_int[, !(names(combined_Data_Simple_int) %in% c("obstime", "status"))])
+
+Schoenfeld_residuals_PL_simple <- Schoenfeld_resid_tied(beta = beta_Simple,X =X_Simple, times = combined_Data_Simple_int$obstime, status = combined_Data_Simple_int$status)
+for (i in 1:ncol(Schoenfeld_residuals_PL_simple$R_ij)) {
+  plot(
+    Schoenfeld_residuals_PL_simple$sorted_event_times,
+    Schoenfeld_residuals_PL_simple$R_ij[, i],
+    type = "l",
+    # line plot for better visualization
+    xlab = "Event Times",
+    ylab = paste("Residuals for Covariate", colnames(Schoenfeld_residuals_PL_simple$R_ij)[i]),
+    main = paste("Schoenfeld Residuals - Covariate", colnames(Schoenfeld_residuals_PL_simple$R_ij)[i])
+  )
+  
+  abline(h = 0, col = "red", lty = 2)
+}
+
+```
+
+
+```{r, echo=TRUE}
+X <- as.matrix(combined_Data_int[, !(names(combined_Data_int) %in% c("obstime", "status"))])
+Schoenfeld_residuals_PL <- Schoenfeld_resid_tied(beta = PL_beta,X = X, times = combined_Data_int$obstime, status = combined_Data_int$status)
+
+for (i in 1:ncol(Schoenfeld_residuals_PL$R_ij)) {
+  plot(
+    Schoenfeld_residuals_PL$sorted_event_times,
+    Schoenfeld_residuals_PL$R_ij[, i],
+    type = "l",
+    # line plot for better visualization
+    xlab = "Event Times",
+    ylab = paste("Residuals for Covariate", colnames(Schoenfeld_residuals_PL$R_ij)[i]),
+    main = paste("Schoenfeld Residuals - Covariate", colnames(Schoenfeld_residuals_PL$R_ij)[i])
+  )
+  
+  abline(h = 0, col = "red", lty = 2)
+}
 ```
 
 ```{r, echo=TRUE}
