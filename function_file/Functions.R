@@ -59,6 +59,7 @@ Schoenfeld_resid <- function(beta, X, times, status) {
   
   # if (length(unique(event_times)) == length(event_times)){
   for (i in 1:length(indices_list)) {
+    print(i)
     # print(sorted_event_times[i])
     for (j in 1:ncol(X)) {
       R_i <- indices_list[[i]]
@@ -114,9 +115,10 @@ Schoenfeld_resid_tied <- function(beta, X, times, status) {
   
   i <- 1
   while (i <= length(sorted_event_times)) {
+    print(i)
     t_i <- sorted_event_times[i]
     R_i <- which(times >= t_i)                # Risk set
-    D_i <- which(times == t_i & status == 2) # Tied events at t_i
+    D_i <- which(times == t_i & status == 1) # Tied events at t_i
     
     d_i <- length(D_i)
     X_k_all <- X[R_i, , drop = FALSE]
@@ -148,6 +150,7 @@ Schoenfeld_resid_tied <- function(beta, X, times, status) {
     }
     i <- i + d_i
   }
+  colnames(R_ij) <- colnames(X)
   
   Output <- list(
     R_ij = R_ij,
@@ -231,33 +234,48 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
     
     else if (baseline_modelling == "bSplines") {
       message("We utilized B-splines to estimate the log baseline hazard function.")
+      if (shrinkage) {
+        message("bSpline model with shrinkage.")
+        bayesian_model <- rstan::stan_model("./stan_file/bSpline_est.stan")
+      } else {
+        message("No shrinkaged bSplines modelling!")
+        bayesian_model <-
+          rstan::stan_model("./stan_file/bSpline_estnoShrinkage.stan")
+      }
       
       # compile the model
-      if (log_likSaving == TRUE) {
-        if (havingInt == TRUE) {
-          bayesian_model <- rstan::stan_model("./stan_file/bSpline_est_loglik.stan")
-        } else {
-          bayesian_model <- rstan::stan_model("./stan_file/bSpline_est_loglik_noInt.stan")
-        }
-        
-      } else {
-        if (havingInt == TRUE){
-          bayesian_model <- rstan::stan_model("./stan_file/bSpline_est.stan")
-        } else {
-          bayesian_model <- rstan::stan_model("./stan_file/bSpline_est_noInt.stan")
-        }
-        
+      # if (log_likSaving == TRUE) {
+      #   if (havingInt == TRUE) {
+      #     bayesian_model <- rstan::stan_model("./stan_file/bSpline_est_loglik.stan")
+      #   } else {
+      #     bayesian_model <- rstan::stan_model("./stan_file/bSpline_est_loglik_noInt.stan")
+      #   }
+      #   
+      # } else {
+      #   if (havingInt == TRUE){
+      #     bayesian_model <- rstan::stan_model("./stan_file/bSpline_est.stan")
+      #   } else {
+      #     bayesian_model <- rstan::stan_model("./stan_file/bSpline_est_noInt.stan")
+      #   }
+      #   
       }
-    }
     
     else if (baseline_modelling == "none"){
       message("we used the partical likelihood to estimate the cofficients of covariates")
-      if (havingInt == TRUE){
+      
+      if (shrinkage) {
         bayesian_model <- rstan::stan_model("./stan_file/PH_est.stan")
       } else {
-        bayesian_model <- rstan::stan_model("./stan_file/PH_est_noInt.stan")
+        message("No shrinkaged PH modelling!")
+        bayesian_model <-
+          rstan::stan_model("./stan_file/PH_estnoshrinkage.stan")
       }
-      
+      # if (havingInt == TRUE){
+      #   bayesian_model <- rstan::stan_model("./stan_file/PH_est.stan")
+      # } else {
+      #   bayesian_model <- rstan::stan_model("./stan_file/PH_est_noInt.stan")
+      # }
+      # 
     }
     
   } else {
@@ -487,12 +505,18 @@ Bayesian_Survival_result_Extract <- function(bayesian_model_fit, model_type,
                                              criteria = c("DesignCoefficients",
                                                           "Prediction_SurvivalProb",
                                                           "variableSelection",
-                                                          "baseline"), uncertainty = FALSE) {
+                                                          "baseline", "se"), uncertainty = FALSE) {
   # Ensure the Output object is available
   Output <- summary(bayesian_model_fit)$summary
   
   # Initialize the result list
   model_result <- list()
+  
+  if("se" %in% criteria){
+    Beta_bayesian_est_LB <- Output[grep("^Beta", rownames(Output)), "2.5%", drop = FALSE]
+    Beta_bayesian_est_UB <- Output[grep("^Beta", rownames(Output)), "97.5%", drop = FALSE]
+    model_result$se <- (Beta_bayesian_est_UB - Beta_bayesian_est_LB)/2
+  }
   
   if ("variableSelection" %in% criteria) {
     Beta_bayesian_est_LB <- Output[grep("^Beta", rownames(Output)), "2.5%", drop = FALSE]

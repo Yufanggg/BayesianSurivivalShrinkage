@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 
 
 install_and_load <- function(packages) {
@@ -375,7 +375,7 @@ boxplot(Power_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLi
 
 # # Subfigure 7 C index
 CI_index_list = list(CI_index_exponential = CI_index_exponential, CI_index_weibull = CI_index_weibull, CI_index_bSplines = CI_index_bSplines, CI_index_PH = CI_index_PH)
-boxplot(CI_index_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), main = "C index", xlab = "", ylab = "C index", ylim = c(0, 1))
+boxplot(CI_index_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), main = "C index", xlab = "", ylab = "C index", ylim = c(.5, 1))
 abline(h = 0.5, col = "red", lty = 2)
 ```
 
