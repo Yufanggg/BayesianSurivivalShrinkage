@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 source("./function_file/stan_constructor.R")
 
@@ -109,23 +109,6 @@ corrplot(cor_matrix, method = "color", tl.cex = 0.7, type = "lower")
 
 ```{r, echo=TRUE}
 combined_Data_Simple <- subset(combined_Data, select = -c(Smoking, Donorcauseofdeath_group, Dialysisdaysrenine, Recipientsex, Recipient_BMI))
-# set the factor variable being sum-to-zero encoded
-# contrasts(real_df_simple$Donorsex) <- contr.sum(levels(real_df_simple$Donorsex))
-# contrasts(real_df_simple$TypecadavericDBDDCD) <- contr.sum(levels(real_df_simple$TypecadavericDBDDCD))
-# contrasts(real_df_simple$InitialPrimaryDiseaseET_regroup) <- contr.sum(levels(real_df_simple$InitialPrimaryDiseaseET_regroup))
-# 
-# 
-# 
-# # center the numeric variables
-# real_df_simple$Recipientage <- scale(real_df_simple$Recipientage)
-# real_df_simple$Donorage <- scale(real_df_simple$Donorage)
-# real_df_simple$Lastcreatininemgdl <- scale(real_df_simple$Lastcreatininemgdl)
-# real_df_simple$Cold_ischaemic_period <- scale(real_df_simple$Cold_ischaemic_period)
-# real_df_simple$HLA_mismatch <- scale(real_df_simple$HLA_mismatch)
-# real_df_simple$DonorBMI <- scale(real_df_simple$DonorBMI)
-
-
-# combined_Data_Simple <- real_df_simple
 ```
 
 # Check whether or not each level have sufficient events
@@ -160,8 +143,6 @@ Data_bSplines <- stan_data_Constructer_BSpline(
   training_dataset = combined_Data_int,
   testing_dataset = NULL,
   obs_window = 3416,
-  log_lik_saving = FALSE,
-  havingInt = TRUE
 )
 bSplines_model <-
   Bayesian_Survival_model(
@@ -169,7 +150,6 @@ bSplines_model <-
     baseline_modelling = "bSplines",
     shrinkage = TRUE,
     withPrediction = FALSE,
-    havingInt = TRUE,
     niter = 10000,
     nwarmup = 2000,
     thin = 10,
@@ -206,7 +186,6 @@ PL_model <- Bayesian_Survival_model(
   baseline_modelling = "none",
   shrinkage = TRUE,
   withPrediction = FALSE,
-  havingInt = TRUE,
   niter = 10000,
   nwarmup = 2000,
   thin = 10,
@@ -284,7 +263,11 @@ PL_noshrinkage_coefUB <- PL_noshrinkage_results$Beta_bayesian_estUB
 PL_noshrinkage_coefLB <- PL_noshrinkage_results$Beta_bayesian_estLB
 ```
 
+
 #################FOR THE SIMPLIFIED MODEL############
+=======
+#################FOR THE SIMPLIFIED MODEL############
+
 ```{r, echo=TRUE}
 Data_bSplines_Simple <- stan_data_Constructer_BSpline(
   training_dataset = combined_Data_Simple_int,
@@ -412,12 +395,22 @@ PL_Simple_noshrinkage_variableSelection <- PL_results_noshrinkage_Simple$variabl
 PL_Simple_noshrinkage_coefUB <- PL_results_noshrinkage_Simple$Beta_bayesian_estUB
 PL_Simple_noshrinkage_coefLB <- PL_results_noshrinkage_Simple$Beta_bayesian_estLB
 
+
 save.image(file = "./Data/04_OverallKidneyData_Final.RData")
+```
+
+# Assumptation checking
+```{r, echo=TRUE}
+load(file = "./Data/04_OverallKidneyData_Final.RData")
+beta = as.vector(bSplines_model_beta); X = as.matrix(combined_Data_int[, !(names(combined_Data_int) %in% c("obstime", "status"))]); times = combined_Data_int$obstime; status = combined_Data_int$status
+
+Schoenfeld_residuals <- Schoenfeld_resid_tied(beta, X, times, status)
 ```
 
 #Visualize the result
 ```{r, echo=TRUE}
 load(file = "./Data/04_OverallKidneyData_Final.RData")
+
 name_label <- names(combined_Data_int)[1:136]
 name_label_simple <- names(combined_Data_Simple_int)[1:66]
 
@@ -1150,4 +1143,49 @@ par(mfrow = c(1, 2))
 boxplot(beta, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "correlation of estimated betas  for complex dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
 
 boxplot(beta_Simplified, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for simplified dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
+```
+
+
+```{r, echo=TRUE}
+load("./Data/04_OverallKidneyData_Final_All.RData")
+baselinehazard <- exp(as.matrix(Data_bSplines$basis) %*% bSplines_model_results$baselinePara[[1]])
+baselinehazard_Simple <- exp(as.matrix(Data_bSplines_Simple$basis) %*% bSplines_model_results_Simple$baselinePara[[1]])
+baselinehazard_no <- exp(as.matrix(Data_bSplines$basis) %*% bSplines_model_noshrinkage_results$baselinePara[[1]])
+baselinehazard_Simple_no <- exp(as.matrix(Data_bSplines_Simple$basis) %*% bSplines_model_noshrinkage_results_Simple$baselinePara[[1]])
+
+par(mfrow = c(2, 2), mar = c(2, 2, 2, 1), oma = c(0, 0, 0, 0))
+timevec <- sort(unique(combined_Data_int$obstime))
+plot(timevec, baselinehazard, col = "red", pch = 16, lty = 1, lwd = 2, xlab = "time", ylab = "")
+legend(
+    "topright",
+    legend = "B-Splines",
+    col = "red",
+    pch = 16,
+    lty = 1)
+plot(timevec, baselinehazard_no, col = "blue", pch = 16, lty = 1, lwd = 2, xlab = "time", ylab = "")
+legend(
+    "topright",
+    legend = "B-Splines_No",
+    col = "blue",
+    pch = 16,
+    lty = 1)
+
+plot(timevec, baselinehazard_Simple, col = "green", pch = 16, lty = 1, lwd = 2)
+legend(
+    "topright",
+    legend = "B-Splines_Simple",
+    col = "green",
+    pch = 16,
+    lty = 1)
+
+plot(timevec, baselinehazard_Simple_no, col = "orange", pch = 16, lty = 1, lwd = 2)
+# Add legend
+legend(
+    "topright",
+    legend = "B-Splines_No_Simple",
+    col = "orange",
+    pch = 16,
+    lty = 1)
+
+
 ```
