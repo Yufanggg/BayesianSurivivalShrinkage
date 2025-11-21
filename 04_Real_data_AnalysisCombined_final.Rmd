@@ -9,7 +9,7 @@ output: pdf_document
 ```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
 source("./function_file/Functions.R")
 source("./function_file/stan_constructor.R")
 
@@ -41,6 +41,12 @@ real_df <- readRDS("./Data/imputed_NOTR_DGF.rds")
 # fit <- survfit(Surv(real_df$time, real_df$status != "graftloss") ~ 1)
 # plot(fit)
 # abline(h = 0.5, col = "red", lty = 2)
+
+fit2 <- survfit(Surv(real_df$time, real_df$status == "graftloss") ~ 1)
+plot(fit2, ylim = c(0.7, 1), xlab = "time", ylab = "survival probability", cex.lab = 1.5)
+```
+
+```{r, echo=TRUE}
 # 
 # str(real_df)
 real_df <- real_df[, !names(real_df) %in% "ID"]
@@ -254,10 +260,11 @@ PL_noshrinkage_results = Bayesian_Survival_result_Extract(
   bayesian_model_fit = PL_model_noshrinkage,
   model_type = "none",
   criteria = c("DesignCoefficients",
-               "variableSelection"),
+               "variableSelection", "se"),
   uncertainty = TRUE
 )
 PL_noshrinkage_beta <- PL_noshrinkage_results$Beta_bayesian_est[, "mean"]
+PL_noshrinkage_beta_se <- PL_noshrinkage_results$se
 PL_noshrinkage_variableSelection <- PL_noshrinkage_results$variableSelection
 PL_noshrinkage_coefUB <- PL_noshrinkage_results$Beta_bayesian_estUB
 PL_noshrinkage_coefLB <- PL_noshrinkage_results$Beta_bayesian_estLB
@@ -265,8 +272,7 @@ PL_noshrinkage_coefLB <- PL_noshrinkage_results$Beta_bayesian_estLB
 
 
 #################FOR THE SIMPLIFIED MODEL############
-=======
-#################FOR THE SIMPLIFIED MODEL############
+
 
 ```{r, echo=TRUE}
 Data_bSplines_Simple <- stan_data_Constructer_BSpline(
@@ -387,10 +393,11 @@ PL_results_noshrinkage_Simple = Bayesian_Survival_result_Extract(
   bayesian_model_fit = PL_model_noshrinkage_Simple,
   model_type = "none",
   criteria = c("DesignCoefficients",
-               "variableSelection"),
+               "variableSelection", "se"),
   uncertainty = TRUE
 )
 PL_Simple_noshrinkage_beta <- PL_results_noshrinkage_Simple$Beta_bayesian_est[, "mean"]
+PL_Simple_noshrinkage_beta_se <- PL_results_noshrinkage_Simple$se
 PL_Simple_noshrinkage_variableSelection <- PL_results_noshrinkage_Simple$variableSelection
 PL_Simple_noshrinkage_coefUB <- PL_results_noshrinkage_Simple$Beta_bayesian_estUB
 PL_Simple_noshrinkage_coefLB <- PL_results_noshrinkage_Simple$Beta_bayesian_estLB
@@ -414,7 +421,7 @@ load(file = "./Data/04_OverallKidneyData_Final.RData")
 name_label <- names(combined_Data_int)[1:136]
 name_label_simple <- names(combined_Data_Simple_int)[1:66]
 
-par(mfrow = c(1, 2), mar = c(0, 0, 0, 0), oma = c(3, 24, 3, 1))
+par(mfrow = c(1, 2), mar = c(0, 0, 0, 0), oma = c(3, 24, 3, 5))
 # Set up the plot without drawing points initially
 plot(
   bSplines_model_beta, 1:136, type = "n",
@@ -443,7 +450,6 @@ segments(
 
 # Add a vertical reference line at 0
 abline(v = 0, col = "red", lty = 2)
-
 # Add vertical y-axis labels
 axis(2, at = 1:136, labels = name_label, las = 2, cex.axis = 1.0)
 title(main = "Beta Estimation (BayesbSplines)")
@@ -475,6 +481,28 @@ segments(
 
 # Add a vertical reference line at 0
 abline(v = 0, col = "red", lty = 2)
+# Generate labels: \beta_1, \beta_2, ..., \beta_136
+beta_labels_main <- sapply(1:16, function(x) paste0("\u03B2", "_" , x))
+pairs <- c("1,2", "1,3", "1,4", "1,5", "1,6", "1,7", "1,8", "1,9", "1,10", "1,11", "1,12", "1,13", "1,14", "1,15", "1,16",
+                  "2,3", "2,4", "2,5", "2,6", "2,7", "2,8", "2,9", "2,10", "2,11", "2,12", "2,13", "2,14", "2,15", "2,16",
+                         "3,4", "3,5", "3,6", "3,7", "3,8", "3,9", "3,10", "3,11", "3,12", "3,13", "3,14", "3,15", "3,16",
+                                "4,5", "4,6", "4,7", "4,8", "4,9", "4,10", "4,11", "4,12", "4,13", "4,14", "4,15", "4,16",
+                                       "5,6", "5,7", "5,8", "5,9", "5,10", "5,11", "5,12", "5,13", "5,14", "5,15", "5,16",
+                                              "6,7", "6,8", "6,9", "6,10", "6,11", "6,12", "6,13", "6,14", "6,15", "6,16",
+                                                     "7,8", "7,9", "7,10", "7,11", "7,12", "7,13", "7,14", "7,15", "7,16",
+                                                            "8,9", "8,10", "8,11", "8,12", "8,13", "8,14", "8,15", "8,16",
+                                                                   "9,10", "9,11", "9,12", "9,13", "9,14", "9,15", "9,16",
+                                                                           "10,11", "10,12", "10,13", "10,14", "10,15", "10,16",
+                                                                                    "11,12", "11,13", "11,14", "11,15", "11,16",
+                                                                                             "12,13", "12,14", "12,15", "12,16",
+                                                                                                      "13,14", "13,15", "13,16",
+                                                                                                               "14,15", "14,16",
+                                                                                                                        "15,16"
+           )
+beta_labels_int <- sapply(pairs, function(x) paste0("\u03B2", "_" , x))
+
+# Add right-side axis with these labels
+axis(4, at = 1:136, labels = c(beta_labels_main, beta_labels_int), las = 2, cex.axis = 0.8)
 
 # Add vertical y-axis labels
 #axis(2, at = 1:136, labels = name_label, las = 2, cex.axis = 1.0)
@@ -484,7 +512,7 @@ title(main = "Beta Estimation (BayesPL_noinfor)")
 
 
 
-par(mfrow = c(1, 2), mar = c(0, 0, 0, 0), oma = c(3, 24, 3, 1))
+par(mfrow = c(1, 2), mar = c(0, 0, 0, 0), oma = c(3, 24, 3, 5))
 # Set up the plot without drawing points initially
 plot(
   PL_beta, 1:136, type = "n",
@@ -545,12 +573,116 @@ segments(
 
 # Add a vertical reference line at 0
 abline(v = 0, col = "red", lty = 2)
+axis(4, at = 1:136, labels = c(beta_labels_main, beta_labels_int), las = 2, cex.axis = 0.8)
 
 # Add vertical y-axis labels
 #axis(2, at = 1:136, labels = name_label, las = 2, cex.axis = 1.0)
 title(main = "Beta Estimation (BayesPL_noinfor)")
 ```
 
+# Figure 12.-1
+```{r, echo=TRUE}
+load(file = "./Data/04_OverallKidneyData_Final.RData")
+name_label_simple <- names(combined_Data_Simple_int)[1:66]
+names(PL_Simple_beta) <- name_label_simple
+
+
+# Assuming PL_beta_overlap and PL_Simple_beta are numeric vectors
+
+# Calculate Pearson correlation
+color_complex <- c(rep("blue", 16), rep("red", 120))
+r_value_complex <- cor(PL_beta, PL_noshrinkage_beta)
+r_value_se_complex <- cor(PL_beta_se, PL_noshrinkage_beta_se)
+
+color_simple <- c(rep("blue", 11), rep("red", 55))
+r_value_simple <- cor(PL_Simple_beta, PL_Simple_noshrinkage_beta)
+r_value_se_simple <- cor(PL_Simple_beta_se, PL_Simple_noshrinkage_beta_se)
+
+
+par(mfrow = c(2, 2))
+# Create the plot
+plot(PL_beta, PL_noshrinkage_beta,
+     col = color_complex, pch = 16,
+     xlab = "ParticalLikelihood", ylab = "ParticalLikelihood_no", main = "beta (complexData)", xlim = c(-0.7, 0.7), ylim = c(-0.7, 0.7),
+     asp = 1)
+
+# Add regression line
+model <- lm(PL_beta ~ PL_noshrinkage_beta)
+abline(model, col = "red", lty = 2, lwd = 2)
+
+# Add horizontal line at y = 0 (intercept = 0, slope = 1)
+abline(a = 0, b = 1, col = "blue", lty = 2)
+
+
+#Add italic r value inside the plot
+legend("topleft",
+       legend = bquote(italic(r) == .(round(r_value_complex, 2))),
+       text.col = "red", bty = "n", cex = 1.2)
+
+
+# Create the plot
+plot(PL_beta_se, PL_noshrinkage_beta_se,
+     col = color_complex, pch = 16,
+      xlab = "ParticalLikelihood", ylab = "ParticalLikelihood_no", xlim = c(0, 0.9), ylim = c(0, 0.9),
+     main = "standard derivation (complexData) ", asp = 1)
+
+# Add regression line
+model <- lm(PL_beta_se ~ PL_noshrinkage_beta_se)
+abline(model, col = "red", lty = 2, lwd = 2)
+
+# Add horizontal line at y = 0 (intercept = 0, slope = 1)
+abline(a = 0, b = 1, col = "blue", lty = 2)
+
+
+#Add italic r value inside the plot
+legend("topleft",
+       legend = bquote(italic(r) == .(round(r_value_se_complex, 2))),
+       text.col = "red", bty = "n", cex = 1.2)
+
+
+plot(PL_Simple_beta, PL_Simple_noshrinkage_beta,
+     col = color_simple, pch = 16, xlim = c(-0.5, 0.7), ylim = c(-0.5, 0.7),
+     xlab = "ParticalLikelihood", ylab = "ParticalLikelihood_no",
+     main = "beta (simpleData)", asp = 1)
+
+# Add regression line
+model2 <- lm(PL_Simple_beta ~ PL_Simple_noshrinkage_beta)
+abline(model2, col = "red", lty = 2, lwd = 2)
+
+# Add horizontal line at y = 0 (intercept = 0, slope = 0)
+abline(a = 0, b = 1, col = "blue", lty = 2)
+
+
+# Add italic r value inside the plot
+legend("topleft",
+       legend = bquote(italic(r) == .(round(r_value_simple, 2))),
+       text.col = "red", bty = "n", cex = 1.2)
+
+
+plot(PL_Simple_beta_se, PL_Simple_noshrinkage_beta_se,
+     col = color_simple, pch = 16, xlim = c(0, 0.3), ylim = c(0, 0.3),
+    xlab = "ParticalLikelihood", ylab = "ParticalLikelihood_no",
+     main = "standard derivation (simpleData)", asp = 1)
+
+# Add regression line
+model2 <- lm(PL_Simple_beta_se ~ PL_Simple_noshrinkage_beta_se)
+abline(model2, col = "red", lty = 2, lwd = 2)
+
+# Add horizontal line at y = 0 (intercept = 0, slope = 0)
+abline(a = 0, b = 1, col = "blue", lty = 2)
+
+
+# Add italic r value inside the plot
+legend("topleft",
+       legend = bquote(italic(r) == .(round(r_value_se_simple, 2))),
+       text.col = "red", bty = "n", cex = 1.2)
+
+```
+
+
+
+
+# Figure 12
 ```{r, echo=TRUE}
 load(file = "./Data/04_OverallKidneyData_Final.RData")
 name_label_simple <- names(combined_Data_Simple_int)[1:66]
@@ -560,28 +692,85 @@ names(PL_Simple_beta) <- name_label_simple
 name_label <- names(combined_Data_int)[1:136]
 names(PL_beta) <- name_label
 names(PL_beta_se) <- name_label
+names(PL_noshrinkage_beta) <- name_label
+names(PL_noshrinkage_beta_se) <-name_label
 
 PL_beta_overlap <- PL_beta[name_label_simple]
 PL_beta_seoverlap <- PL_beta_se[name_label_simple]
+PL_beta_overlap_noShrinkage <- PL_noshrinkage_beta[name_label_simple]
+PL_beta_seoverlap_noShrinkage <- PL_noshrinkage_beta_se[name_label_simple]
+
 # Assuming PL_beta_overlap and PL_Simple_beta are numeric vectors
 
 # Calculate Pearson correlation
 r_value <- cor(PL_beta_overlap, PL_Simple_beta)
 r_value_se <- cor(PL_beta_seoverlap, PL_Simple_beta_se)
 
+r_value_noShrinkage <- cor(PL_beta_overlap_noShrinkage, PL_Simple_noshrinkage_beta)
+r_value_noShrinkage_se <- cor(PL_beta_seoverlap_noShrinkage, PL_Simple_noshrinkage_beta_se)
+
 
 par(mfrow = c(1, 2))
 # Create the plot
+# plot(PL_beta_overlap_noShrinkage, PL_Simple_noshrinkage_beta,
+#      col = color_simple, pch = 16,
+#      xlab = "beta (ComplexData)", ylab = "beta (SimpleData)", xlim = c(-0.7, 0.7), ylim = c(-0.7, 0.7),
+#      main = "", asp = 1)
+# 
+# # Add regression line
+# model <- lm(PL_beta_overlap_noShrinkage ~ PL_Simple_noshrinkage_beta)
+# abline(model, col = "red", lty = 2, lwd = 2)
+# 
+# # Add horizontal line at y = 0 (intercept = 0, slope = 1)
+# abline(a = 0, b = 1, col = "blue", lty = 2)
+# 
+# 
+# #Add italic r value inside the plot
+# legend("topright",
+#        legend = bquote(italic(r) == .(round(r_value_noShrinkage, 2))),
+#        text.col = "red", bty = "n", cex = 1.2)
+# 
+# # text(x = min(PL_beta_overlap_noShrinkage), y = max(PL_Simple_noshrinkage_beta),
+# #      labels = bquote(italic(r == .(round(r_value_noShrinkage, 2)))),
+# #      pos = 4, col = "red", cex = 1.2)
+# 
+# 
+# 
+# plot(PL_beta_seoverlap_noShrinkage, PL_Simple_noshrinkage_beta_se,
+#      col = color_simple, pch = 16, xlim = c(0, 0.5), ylim = c(0, 0.5),
+#      xlab = "posterior standard deviations (ComplexData)", ylab = "posterior standard deviations (SimpleData)",
+#      main = "", asp = 1)
+# 
+# # Add regression line
+# model2 <- lm(PL_Simple_noshrinkage_beta_se ~ PL_beta_seoverlap_noShrinkage)
+# abline(model2, col = "red", lty = 2, lwd = 2)
+# 
+# # Add horizontal line at y = 0 (intercept = 0, slope = 0)
+# abline(a = 0, b = 1, col = "blue", lty = 2)
+# 
+# 
+# # Add italic r value inside the plot
+# legend("topright",
+#        legend = bquote(italic(r) == .(round(r_value_noShrinkage_se, 2))),
+#        text.col = "red", bty = "n", cex = 1.2)
+# 
+# # text(x = min(PL_beta_seoverlap_noShrinkage), y = max(PL_Simple_noshrinkage_beta_se),
+# #      labels = bquote(italic(r == .(round(r_value_noShrinkage_se, 2)))),
+# #      pos = 4, col = "red", cex = 1.2)
+
+
+
+# Create the plot
 plot(PL_beta_overlap, PL_Simple_beta,
-     col = "blue", pch = 16,
-     xlab = "beta (ComplexData)", ylab = "beta (SimpleData)",
-     main = "")
+     col = color_simple, pch = 16,
+     xlab = "beta (ComplexData)", ylab = "beta (SimpleData)", xlim = c(-0.15, 0.4), ylim = c(-0.15, 0.4),
+     main = "", asp = 1)
 
 # Add regression line
 model <- lm(PL_Simple_beta ~ PL_beta_overlap)
 abline(model, col = "red", lty = 2, lwd = 2)
 
-# Add horizontal line at y = 0 (intercept = 0, slope = 0)
+# Add horizontal line at y = 0 (intercept = 0, slope = 1)
 abline(a = 0, b = 1, col = "blue", lty = 2)
 
 
@@ -594,10 +783,13 @@ text(x = min(PL_beta_overlap), y = max(PL_Simple_beta),
      labels = bquote(italic(r == .(round(r_value, 2)))),
      pos = 4, col = "red", cex = 1.2)
 
+PL_beta_bar = mean(PL_beta_overlap)
+PL_Simple_beta_bar = mean(PL_Simple_beta)
+
 plot(PL_beta_seoverlap, PL_Simple_beta_se,
-     col = "blue", pch = 16,
+     col = color_simple, pch = 16, xlim = c(0, 0.3), ylim = c(0, 0.3),
      xlab = "posterior standard deviations (ComplexData)", ylab = "posterior standard deviations (SimpleData)",
-     main = "")
+     main = "", asp = 1)
 
 # Add regression line
 model2 <- lm(PL_Simple_beta_se ~ PL_beta_seoverlap)
@@ -621,7 +813,7 @@ text(x = min(PL_beta_seoverlap), y = max(PL_Simple_beta_se),
 ```{r, echo=TRUE}
 name_label_simple <- names(combined_Data_Simple_int)[1:66]
 
-par(mfrow = c(1, 2), mar = c(0, 0, 0, 0), oma = c(3, 24, 3, 1))
+par(mfrow = c(1, 2), mar = c(0, 0, 0, 0), oma = c(3, 24, 3, 5))
 # Set up the plot without drawing points initially
 plot(
   bSplines_model_Simple_beta, 1:66, type = "n",
@@ -682,7 +874,21 @@ segments(
 
 # Add a vertical reference line at 0
 abline(v = 0, col = "red", lty = 2)
+beta_labels_main_Simple <- sapply(1:11, function(x) paste0("\u03B2", "_" , x))
+pairs_Simple <- c("1,2", "1,3", "1,4", "1,5", "1,6", "1,7", "1,8", "1,9", "1,10", "1,11", 
+                  "2,3", "2,4", "2,5", "2,6", "2,7", "2,8", "2,9", "2,10", "2,11", 
+                         "3,4", "3,5", "3,6", "3,7", "3,8", "3,9", "3,10", "3,11", 
+                                "4,5", "4,6", "4,7", "4,8", "4,9", "4,10", "4,11", 
+                                       "5,6", "5,7", "5,8", "5,9", "5,10", "5,11", 
+                                              "6,7", "6,8", "6,9", "6,10", "6,11",
+                                                     "7,8", "7,9", "7,10", "7,11", 
+                                                            "8,9", "8,10", "8,11",
+                                                                   "9,10", "9,11",
+                                                                           "10,11")
+beta_labels_int_Simple <- sapply(pairs_Simple, function(x) paste0("\u03B2", "_" , x))
 
+# Add right-side axis with these labels
+axis(4, at = 1:66, labels = c(beta_labels_main_Simple, beta_labels_int_Simple), las = 2, cex.axis = 0.8)
 # Add vertical y-axis labels
 #axis(2, at = 1:136, labels = name_label, las = 2, cex.axis = 1.0)
 title(main = "Beta Estimation (BayesBSpline_noinfor) for simpleData")
@@ -691,7 +897,7 @@ title(main = "Beta Estimation (BayesBSpline_noinfor) for simpleData")
 
 
 
-par(mfrow = c(1, 2), mar = c(0, 0, 0, 0), oma = c(3, 24, 3, 1))
+par(mfrow = c(1, 2), mar = c(0, 0, 0, 0), oma = c(3, 24, 3, 5))
 # Set up the plot without drawing points initially
 plot(
   PL_Simple_beta, 1:66, type = "n",
@@ -721,6 +927,10 @@ segments(
 # Add a vertical reference line at 0
 abline(v = 0, col = "red", lty = 2)
 
+
+# Add vertical y-axis labels
+#axis(2, at = 1:136, labels = name_label, las = 2, cex.axis = 1.0)
+title(main = "Beta Estimation (BayesPL_noinfor)")
 # Add vertical y-axis labels
 axis(2, at = 1:66, labels = name_label_simple, las = 2, cex.axis = 1.0)
 title(main = "Beta Estimation (BayesPL)")
@@ -752,7 +962,21 @@ segments(
 
 # Add a vertical reference line at 0
 abline(v = 0, col = "red", lty = 2)
+beta_labels_main_Simple <- sapply(1:11, function(x) paste0("\u03B2", "_" , x))
+pairs_Simple <- c("1,2", "1,3", "1,4", "1,5", "1,6", "1,7", "1,8", "1,9", "1,10", "1,11", 
+                  "2,3", "2,4", "2,5", "2,6", "2,7", "2,8", "2,9", "2,10", "2,11", 
+                         "3,4", "3,5", "3,6", "3,7", "3,8", "3,9", "3,10", "3,11", 
+                                "4,5", "4,6", "4,7", "4,8", "4,9", "4,10", "4,11", 
+                                       "5,6", "5,7", "5,8", "5,9", "5,10", "5,11", 
+                                              "6,7", "6,8", "6,9", "6,10", "6,11",
+                                                     "7,8", "7,9", "7,10", "7,11", 
+                                                            "8,9", "8,10", "8,11",
+                                                                   "9,10", "9,11",
+                                                                           "10,11")
+beta_labels_int_Simple <- sapply(pairs_Simple, function(x) paste0("\u03B2", "_" , x))
 
+# Add right-side axis with these labels
+axis(4, at = 1:66, labels = c(beta_labels_main_Simple, beta_labels_int_Simple), las = 2, cex.axis = 0.8)
 # Add vertical y-axis labels
 #axis(2, at = 1:136, labels = name_label, las = 2, cex.axis = 1.0)
 title(main = "Beta Estimation (BayesPL_noinfor)")
@@ -791,8 +1015,8 @@ plot(time_points, baseline_bSpline_complex_noshrinkage, type = "l", main = "Comp
 
 
 par(mfrow = c(1, 2))
-plot(time_points, baseline_bSpline_complex, type = "l", main = "Complex B-spline", col = "red",  xlab = "Event Times (days)", ylab = "estimated baseline hazard")
-plot(time_points[1:200], baseline_bSpline_complex[1:200], type = "l", main = "Complex B-spline", col = "red",  xlab = "Event Times (days)", ylab = "estimated baseline hazard")
+plot(time_points, baseline_bSpline_complex, type = "l", main = "Estimated baseline hazard function", col = "red",  xlab = "Event Times (days)", ylab = "estimated baseline hazard")
+plot(time_points[1:200], baseline_bSpline_complex[1:200], type = "l", main = "Estimated baseline hazard function", col = "red",  xlab = "Event Times (days)", ylab = "estimated baseline hazard")
 ```
 
 # assumption checking
@@ -850,26 +1074,11 @@ k <- 10
 p <- 105
 p1 <- 45
 
-# Preallocate lists to store results across repetitions
-bSplines_model_C_INDEX_Simple = bSplines_model_C_INDEX = rep(NA, k)
-coxRegression_C_INDEX_Simple = coxRegression_C_INDEX = rep(NA, k)
-PL_C_INDEX_Simple = PL_C_INDEX = rep(NA, k)
 
-bSplines_model_beta <- matrix(NA, nrow = k, ncol = p)
-bSplines_model_variableSelection <- matrix(NA, nrow = k, ncol = p)
-PL_beta <- matrix(NA, nrow = k, ncol = p)
-PL_variableSelection <- matrix(NA, nrow = k, ncol = p)
-cox_beta <- matrix(NA, nrow = k, ncol = p)
-cox_variableSelection <- matrix(NA, nrow = k, ncol = p)
-  
-  
-bSplines_model_beta_Simple <- matrix(NA, nrow = k, ncol = p1)
-bSplines_model_variableSelection_Simple <- matrix(NA, nrow = k, ncol = p1)
-PL_beta_Simple <- matrix(NA, nrow = k, ncol = p1)
-PL_variableSelection_Simple <- matrix(NA, nrow = k, ncol = p1)
-cox_beta_Simple <- matrix(NA, nrow = k, ncol = p1)
-cox_variableSelection_Simple <- matrix(NA, nrow = k, ncol = p1)  
- 
+
+PL_C_INDEX_noShrinkage <- PL_C_INDEX <- rep(NA, nrow = k)
+
+PL_C_INDEX_Simple_noShrinkage <- PL_C_INDEX_Simple <- rep(NA, nrow = k)
 
 folds <- createFolds(combined_Data_int$status, k = k, list = TRUE)
 
@@ -885,57 +1094,6 @@ for (i in seq_along(folds)) {
     cat("Dataset size:", nrow(training_dataset), "\n")
     
     # insert your model training and evaluation code here
-    #-----------MODEL 1.1: bSpline model----------
-    Data_bSplines <- stan_data_Constructer_BSpline(
-      training_dataset = training_dataset,
-      testing_dataset = testing_dataset,
-      obs_window = 3415,
-      log_lik_saving = FALSE,
-      havingInt = TRUE
-    )
-    bSplines_model <-
-      Bayesian_Survival_model(
-        stan_data = Data_bSplines,
-        baseline_modelling = "bSplines",
-        shrinkage = TRUE,
-        withPrediction = TRUE,
-        havingInt = TRUE,
-        niter = 10000,
-        nwarmup = 2000,
-        thin = 10,
-        chains = 1
-      )
-    
-    # Extract the model result
-    bSplines_model_results = Bayesian_Survival_result_Extract(
-      bayesian_model_fit = bSplines_model,
-      model_type = "bSplines",
-      criteria = c(
-        "DesignCoefficients",
-        "variableSelection",
-        "Prediction_SurvivalProb",
-        "baseline"
-      )
-    )
-    
-    bSplines_model_beta[i, ] <- bSplines_model_results$Beta_bayesian_est[, "mean"]
-    bSplines_model_variableSelection[i, ] <- bSplines_model_results$variableSelection
-    bSplines_model_Prediction_SurvivalProb <- as.vector(bSplines_model_results$eta_pred)
-    bSplines_model_C_INDEX[i] <- rcorr.cens(-bSplines_model_Prediction_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"]
-    baseline_bSplines <-
-      exp(as.matrix(Data_bSplines$basis) %*% as.matrix(bSplines_model_results$baselinePara[, "mean"]))
-    
-    
-    
-    #-----------MODEL 1.2: Cox regression ----------
-    cox_regression <- coxph(Surv(as.numeric(obstime), status) ~ ., data = training_dataset)
-    cox_regression_result <- summary(cox_regression)
-   
-    cox_beta[i,] <- as.vector(cox_regression_result$coefficients[, "coef"])
-    cox_variableSelection[i,] <- as.vector((cox_regression_result$coefficients[, "Pr(>|z|)"] * p) < 0.05)
-    coxRegression_SurvivalProb <- predict(cox_regression, newdata = testing_dataset, type = "lp")
-    coxRegression_C_INDEX[i] <- rcorr.cens(-coxRegression_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
-    
     #-----------MODEL 1.3: PL model----------
     Data_PL <- stan_data_Constructer_PL(
       training_dataset = training_dataset,
@@ -964,10 +1122,34 @@ for (i in seq_along(folds)) {
       "Prediction_SurvivalProb"
     )
   )
-    PL_beta[i, ] <- PL_results$Beta_bayesian_est[, "mean"]
-    PL_variableSelection[i, ] <- PL_results$variableSelection
     PL_Prediction_SurvivalProb <- PL_results$eta_pred
+
     PL_C_INDEX[i] <- rcorr.cens(-PL_Prediction_SurvivalProb, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
+    
+    
+    PL_model_noShrinkage <- Bayesian_Survival_model(
+      stan_data = Data_PL,
+      baseline_modelling = "none",
+      shrinkage = FALSE,
+      withPrediction = TRUE,
+      havingInt = TRUE,
+      niter = 10000,
+      nwarmup = 2000,
+      thin = 10,
+      chains = 1
+    )
+    
+    PL_results_noShrinkage = Bayesian_Survival_result_Extract(
+    bayesian_model_fit = PL_model_noShrinkage,
+    model_type = "none",
+    criteria = c(
+      "DesignCoefficients",
+      "variableSelection",
+      "Prediction_SurvivalProb"
+    )
+  )
+    PL_Prediction_SurvivalProb_noShrinkage <- PL_results_noShrinkage$eta_pred
+    PL_C_INDEX_noShrinkage[i] <- rcorr.cens(-PL_Prediction_SurvivalProb_noShrinkage, Surv(testing_dataset$obstime, testing_dataset$status))["C Index"] 
     
     
     
@@ -975,54 +1157,6 @@ for (i in seq_along(folds)) {
     ###---------------------------------------------------------
     ###-------------for simplified dataset----------------------
     ###---------------------------------------------------------
-    #-----------MODEL 2.1: bSpline model----------
-    Data_bSplines_Simple <- stan_data_Constructer_BSpline(
-      training_dataset = training_dataset_Simple,
-      testing_dataset = testing_dataset_Simple,
-      obs_window = 3415,
-      log_lik_saving = FALSE,
-      havingInt = TRUE
-    )
-    bSplines_model_Simple <-
-      Bayesian_Survival_model(
-        stan_data = Data_bSplines_Simple,
-        baseline_modelling = "bSplines",
-        shrinkage = TRUE,
-        withPrediction = TRUE,
-        havingInt = TRUE,
-        niter = 10000,
-        nwarmup = 2000,
-        thin = 10,
-        chains = 1
-      )
-    
-    # Extract the model result
-    bSplines_model_results_Simple = Bayesian_Survival_result_Extract(
-      bayesian_model_fit = bSplines_model_Simple,
-      model_type = "bSplines",
-      criteria = c(
-        "DesignCoefficients",
-        "variableSelection",
-        "Prediction_SurvivalProb"
-      )
-    )
-    
-    bSplines_model_beta_Simple[i, ] <- bSplines_model_results_Simple$Beta_bayesian_est[, "mean"]
-    bSplines_model_variableSelection_Simple[i, ] <- bSplines_model_results_Simple$variableSelection
-    bSplines_model_Prediction_SurvivalProb_Simple <- bSplines_model_results_Simple$eta_pred
-    bSplines_model_C_INDEX_Simple[i] <- rcorr.cens(-bSplines_model_Prediction_SurvivalProb_Simple, Surv(testing_dataset_Simple$obstime, testing_dataset_Simple$status))["C Index"] 
-    
-    
-    
-    #-----------MODEL 1.2: Cox regression ----------
-    cox_regression_Simple <- coxph(Surv(as.numeric(obstime), status) ~ ., data = training_dataset_Simple)
-    cox_regression_result_Simple <- summary(cox_regression_Simple)
-    
-    cox_beta_Simple[i,] <- as.vector(cox_regression_result_Simple$coefficients[, "coef"])
-    cox_variableSelection_Simple[i,] <- as.vector((cox_regression_result_Simple$coefficients[, "Pr(>|z|)"] * p1) < 0.05)
-    coxRegression_SurvivalProb_Simple <- predict(cox_regression_Simple, newdata = testing_dataset_Simple, type = "lp")
-    coxRegression_C_INDEX_Simple[i] <- rcorr.cens(-coxRegression_SurvivalProb_Simple, Surv(testing_dataset_Simple$obstime, testing_dataset_Simple$status))["C Index"] 
-    
     #-----------MODEL 1.3: PL model----------
     Data_PL_Simple <- stan_data_Constructer_PL(
       training_dataset = training_dataset_Simple,
@@ -1051,12 +1185,39 @@ for (i in seq_along(folds)) {
         "Prediction_SurvivalProb"
       )
     )
-    PL_beta_Simple[i, ] <- PL_results_Simple$Beta_bayesian_est[, "mean"]
-    PL_variableSelection_Simple[i, ] <- PL_results_Simple$variableSelection
     PL_Prediction_SurvivalProb_Simple <- PL_results_Simple$eta_pred
     PL_C_INDEX_Simple[i] <-
       rcorr.cens(
         -PL_Prediction_SurvivalProb_Simple,
+        Surv(testing_dataset_Simple$obstime, testing_dataset_Simple$status)
+      )["C Index"]
+    
+    #no shrinkage model
+    PL_model_Simple_noShrinkage <- Bayesian_Survival_model(
+      stan_data = Data_PL_Simple,
+      baseline_modelling = "none",
+      shrinkage = FALSE,
+      withPrediction = TRUE,
+      havingInt = TRUE,
+      niter = 10000,
+      nwarmup = 2000,
+      thin = 10,
+      chains = 1
+    )
+    
+    PL_results_Simple_noShrinkage = Bayesian_Survival_result_Extract(
+      bayesian_model_fit = PL_model_Simple_noShrinkage,
+      model_type = "none",
+      criteria = c(
+        "DesignCoefficients",
+        "variableSelection",
+        "Prediction_SurvivalProb"
+      )
+    )
+    PL_Prediction_SurvivalProb_Simple_noShrinkage <- PL_results_Simple_noShrinkage$eta_pred
+    PL_C_INDEX_Simple_noShrinkage[i] <-
+      rcorr.cens(
+        -PL_Prediction_SurvivalProb_Simple_noShrinkage,
         Surv(testing_dataset_Simple$obstime, testing_dataset_Simple$status)
       )["C Index"] 
 
@@ -1068,15 +1229,18 @@ save.image(file = "./Data/03_results_combined_Step5_includSimplifiedDatanpredict
 
 ```{r, echo=TRUE}
 load(file = "./Data/03_results_combined_Step5_includSimplifiedDatanprediction.RData")
-par(mfrow = c(1, 2))
 
-C_index <- list(bSplines = bSplines_model_C_INDEX, CoxRegression = coxRegression_C_INDEX,  PL = PL_C_INDEX)
-boxplot(C_index, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for complex dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
+C_index <- list(PL = PL_C_INDEX, PL_noShrinkage = PL_C_INDEX_noShrinkage, PL_Simple = PL_C_INDEX_Simple, PL_Simple_noShrinkage = PL_C_INDEX_Simple_noShrinkage)
+boxplot(C_index, names = c("PartialLikelihood(complexData)", "PartialLikelihood_no(complexData)", "PartialLikelihood(simpleData)", "PartialLikelihood_no(simpleData)"), col = c("orange", "green","purple", "blue"), main = "C-index", xlab = "", ylab = "C-index", ylim = c(0.5, 1))
 abline(h = 0.5, col = "grey", lty = 3)
 
-C_index_Simplified <- list(bSplines = bSplines_model_C_INDEX_Simple, CoxRegression = coxRegression_C_INDEX_Simple, PL = PL_C_INDEX_Simple)
-boxplot(C_index_Simplified, names = c("BayesianBSplines", "CoxRegression", "BayesianPL"), col = c("orange", "green","purple"), main = "C-index for complex dataset", xlab = "", ylab = "C-index", ylim = c(0, 1))
-abline(h = 0.5, col = "grey", lty = 3)
+
+# Add legend
+legend("topright",
+       legend = c("PartialLikelihood(complexData)", "PartialLikelihood_no(complexData)", "PartialLikelihood(simpleData)", "PartialLikelihood_no(simpleData)"),
+       fill = c("orange", "green", "purple", "blue")
+)
+
 ```
 
 
