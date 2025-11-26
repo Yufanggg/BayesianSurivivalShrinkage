@@ -37,25 +37,27 @@ To run this Project, you will need the following:
 
 ## Installation
 
-## Project structure 
+## Project structure
+### Project description
+This project aims to reformulate ***linked shrinkage prior*** in Bayesian Survival model to improve its ability of detecting interaction effects. The reformulated method is first validated on the simulated data and then on the real-world data.
+
 ### Code
-#### Stan model:
-- `.\stan_files\exponential_est.stan`: setting up bayesian survival model with the assumption of exponential baseline hazard function;
-- `.\stan_files\weibull_est.stan`: setting up bayesian survival model with the assumption of weibull baseline hazard function;
-- `.\stan_files\bSpline_est.stan`:
+#### stan_file:
+- `.\stan_file\A_estBC.stan`: setting up bayesian survival model (linked shrinkage) with approach A of baseline hazard function, with B and C (no shrinkage).
 
-#### Stan data constructor
-- `.\function_file\exponential_stan_constructor.R`: setting up the stan_data structure for `exponential_est.stan`;
-- `.\function_file\weibull_stan_constructor.R`: setting up the stan_data structure for `weibull_est.stan`;
-- `.\function_file\bSpline_stan_constructor.R`: setting up the stan_data structure for `bSpline_est.stan`.
+#### function_file:
+- `.\function_file\stan_constructor.R`: constructing stan_data for each model.
+- `.\function_file\Functions.R`: other functions that are useful for this modelling.
 
-#### Other supporting functions
-- `.\function_file\Functions.R`: Functions being used when constructing the stan_data, model diagnosis and model performance evaluation.
+#### actucal code：
+- `.\01_Sim_data_Analysisbaseline.Rmd`: To verify the following models on the simulated data: Different ways to approach baseline hazard function in Bayesian survival models with linked shrinkage priors 
+- `.\02_Sim_dataAnalysis_shrinkagewn.Rmd`: To verify the following models on the simulated data: Bayesian survival models with linked shrinkage priors versus no shrinkage priors. Only partical likelihood and full likelihood with bSplines method to approach baseline hazard function be accounted for.
+- `04_Real_data_AnalysisCombined_final.Rmd`: To verify the following models on the real-world data:  Bayesian survival models with linked shrinkage priors versus no shrinkage priors. Only partical likelihood and full likelihood with bSplines method to approach baseline hazard function be accounted for.
 
 ### Report
-The report of this project is now underdrafting.
+The report of this project can be seen in [report](./Report.pdf).
 
-## Validating the method:
+<!-- ## Validating the method:
 The method was validated from two following perspectivess. 
 1. `Model diagnosis`: The model diagnosis focused on two levels: (1) MCMC convergence; and (2) model assumption check;
 
@@ -114,4 +116,4 @@ doner sex * doner age (within doner type: less sure)
 1. start with strafied datasets (i.e., DBD, DCD for both strata)
 After being straftied, What are all interactions with donor sex within DBD. 
 
-C index, brier score (test data) 
+C index, brier score (test data)  -->
