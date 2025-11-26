@@ -9,7 +9,8 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+
 
 
 install_and_load <- function(packages) {
@@ -69,7 +70,8 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
     testing_dataset = NULL
   }
   
-  stan_data_PH <- stan_data_Constructer_PH(
+
+  stan_data_PH <- stan_data_Constructer_PL(
     training_dataset = training_dataset,
     testing_dataset = testing_dataset
   )
@@ -121,21 +123,23 @@ simulation_bayint_survival <- function(criteria = c("DesignCoefficients", "basel
   if ("baseline" %in% criteria) {
     if (withPrediction){
       output$time_vec <-
-      sort(training_dataset[training_dataset$status == 1, ]$obstime) # obs_window = 5
+      sort(unique(training_dataset$obstime))#[training_dataset$status == 1, ]$obstime) # obs_window = 5
     } else {
        output$time_vec <-
-      sort(dataset[dataset$status == 1, ]$obstime) # obs_window = 5
+         sort(unique(dataset$obstime)) #sort(dataset[dataset$status == 1, ]$obstime) # obs_window = 5
     }
     output$baseline_true <-  10 * 2 * (output$time_vec  ** (10 - 1))
     
     output$baseline_exponential <-
-      rep(model_result_exponential$baselinePara, length(output$time_vec ))
+      rep(model_result_exponential$baselinePara, length(output$time_vec))
     
     weibull_lambda <- model_result_weibull$baselinePara[1]
     weibull_shape <- model_result_weibull$baselinePara[2]
     output$baseline_weibull <-
       weibull_shape * weibull_lambda * (output$time_vec  ** (weibull_shape - 1))
     
+    # output$baseline_PL <- compute_baseline_hazard(beta = output$Beta_est_PH, X = as.matrix(training_dataset[, !(colnames(training_dataset) %in% c("id", "status", "obstime"))]), time = output$time_vec, status = training_dataset$status)
+    # 
     output$baseline_bSplines <-
       exp(
         as.matrix(stan_data_bSplines$basis) %*% as.matrix(model_result_bSplines$baselinePara[, "mean"])
@@ -315,12 +319,12 @@ for (i in 1:length(Beta_true)) {
 }
 
 lines(Bias_exponential, type = "o", col = "blue", pch = 16)
-lines(Bias_weibull, type = "o", col = "green", pch = 16)
-lines(Bias_bSplines, type = "o", col = "orange", pch = 16)
-lines(Bias_PH, type = "o", col = "purple", pch = 16)
+lines(Bias_weibull, type = "o", col = "green", pch = 15)
+lines(Bias_bSplines, type = "o", col = "orange", pch = 17)
+lines(Bias_PH, type = "o", col = "purple", pch = 18)
 
-abline(v = 10, col = "red", lty = 2)
-legend("topright", legend = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
+abline(v = 10, col = "red", lty = 2, lwd = 3)
+legend("topright", legend = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), pch = c(16, 15, 17, 18), lty = 1) # Add legend
 
 # Subfigure 2: Variance
 plot(Variance_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Variance", main = "Variance for Beta estimation", ylim = c(0, 0.1), pch = 16)
@@ -333,14 +337,14 @@ for (i in 1:length(Beta_true)) {
 }
 
 lines(Variance_exponential, type = "o", col = "blue", pch = 16)
-lines(Variance_weibull, type = "o", col = "green", pch = 16)
-lines(Variance_bSplines, type = "o", col = "orange", pch = 16)
-lines(Variance_PH, type = "o", col = "purple", pch = 16)
-legend("topright", legend = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1)# Add legend
-
+lines(Variance_weibull, type = "o", col = "green", pch = 15)
+lines(Variance_bSplines, type = "o", col = "orange", pch = 17)
+lines(Variance_PH, type = "o", col = "purple", pch = 18)
+legend("topright", legend = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), pch = c(16, 15, 17, 18), lty = 1)# Add legend
+abline(v = 10, col = "red", lty = 2, lwd = 3)
 
 # Subfigure 3: MSE
-plot(rMSEs_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "rMSE", main = "rMSE for Beta estimation", ylim = c(0, 0.5), pch = 16)
+plot(rMSEs_exponential, type = "o", col = "blue", xlab = "estimated Betas", ylab = "rMSE", main = "rMSE for Beta estimation", ylim = c(0, 0.5), pch = c(16, 15, 17, 18))
 
 # Add background rectangles
 for (i in 1:length(Beta_true)) {
@@ -349,19 +353,18 @@ for (i in 1:length(Beta_true)) {
   }
 }
 
-lines(rMSEs_weibull, type = "o", col = "green", pch = 16)
-lines(rMSEs_bSplines, type = "o", col = "orange", pch = 16)
 lines(rMSEs_exponential, type = "o", col = "blue", pch = 16)
-lines(rMSEs_PH, type = "o", col = "purple", pch = 16)
+lines(rMSEs_weibull, type = "o", col = "green", pch = 15)
+lines(rMSEs_bSplines, type = "o", col = "orange", pch = 17)
+lines(rMSEs_PH, type = "o", col = "purple", pch = 18)
+abline(v = 10, col = "red", lty = 2, lwd = 3)
 
-abline(v = 10, col = "red", lty = 2)
-legend("topright", legend = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1) # Add legend
+legend("topright", legend = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), pch = c(16, 15, 17, 18), lty = 1) # Add legend
 
 # Subfigure 4 Type I error
 # Create side-by-side boxplots for FDR
 FDR_list = list(FDR_exponential = FDR_exponential, FDR_weibull = FDR_weibull, FDR_bSplines = FDR_bSplines, FDR_PH = FDR_PH)
 boxplot(FDR_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), main = "FDR", xlab = "", ylab = "FDR", ylim = c(0, 1))
-abline(h = 0.05, col = "red", lty = 2)
 
 # Subfigure 5 Type II error
 Power_list = list(Exponential = 1 - FNR_exponential, Weibull = 1 - FNR_weibull, BSplines =  1- FNR_bSplines, ParticalLiklihood = 1 - FNR_PH)
@@ -373,8 +376,7 @@ boxplot(Power_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLi
 
 # # Subfigure 7 C index
 CI_index_list = list(CI_index_exponential = CI_index_exponential, CI_index_weibull = CI_index_weibull, CI_index_bSplines = CI_index_bSplines, CI_index_PH = CI_index_PH)
-boxplot(CI_index_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), main = "C index", xlab = "", ylab = "C index", ylim = c(0, 1))
-abline(h = 0.5, col = "red", lty = 2)
+boxplot(CI_index_list, names = c("Exponential", "Weibull", "B-Splines", "ParticalLiklihood"), col = c("blue", "green", "orange", "purple"), main = "C index", xlab = "", ylab = "C index", ylim = c(.5, 1))
 ```
 
 # Step 3: visualize the estimated basline hazard
@@ -385,10 +387,11 @@ for (i in 1:replicate_times) {
   baseline_weibull <- simulated_results[, i]$baseline_weibull
   baseline_bSplines <- simulated_results[, i]$baseline_bSplines
   
-  plot(baseline_true, col = "red", type = "l", pch = 16, lty = 1, lwd = 2)
-  lines(baseline_weibull, col = "green", type = "l", pch = 16, lty = 1, lwd = 2)
-  lines(baseline_exponential, col = "blue", pch = 16, lty = 1, lwd = 2)
-  lines(baseline_bSplines, col = "orange", pch = 16, lty = 1, lwd = 2)
+  plot(output$time_vec, output$baseline_true, col = "red", type = "l", pch = 16, lty = 1, lwd = 2, xlab = "time", ylab = " ")
+  lines(output$time_vec, output$baseline_weibull, col = "green", type = "l", pch = 16, lty = 1, lwd = 2)
+  lines(output$time_vec, output$baseline_exponential, col = "blue", pch = 16, lty = 1, lwd = 2)
+  #lines(output$aseline_PL, col = "black", pch = 16, lty = 1, lwd = 2)
+  lines(output$time_vec, output$baseline_bSplines, col = "orange", pch = 16, lty = 1, lwd = 2)
   # Add legend
   legend(
     "topleft",

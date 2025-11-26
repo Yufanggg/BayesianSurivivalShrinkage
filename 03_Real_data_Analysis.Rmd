@@ -319,6 +319,15 @@ strafied_Data_DBD_int_noise <- strafied_Data_DBD_int
 strafied_Data_DBD_int_noise$noise1 <- rnorm(nrow(strafied_Data_DBD_int_noise))
 strafied_Data_DBD_int_noise$noise2 <- rnorm(nrow(strafied_Data_DBD_int_noise), 1, 2)
 
+strafied_Data_DBD_int_noise$noise3 <- rnorm(nrow(strafied_Data_DBD_int_noise))
+strafied_Data_DBD_int_noise$noise4 <- rnorm(nrow(strafied_Data_DBD_int_noise), 3, 4)
+strafied_Data_DBD_int_noise$noise5 <- rnorm(nrow(strafied_Data_DBD_int_noise))
+strafied_Data_DBD_int_noise$noise6 <- rnorm(nrow(strafied_Data_DBD_int_noise), 1, 2)
+strafied_Data_DBD_int_noise$noise7 <- rnorm(nrow(strafied_Data_DBD_int_noise))
+strafied_Data_DBD_int_noise$noise8 <- rnorm(nrow(strafied_Data_DBD_int_noise), 3, 4)
+strafied_Data_DBD_int_noise$noise9 <- rnorm(nrow(strafied_Data_DBD_int_noise), 1, 2)
+
+
 #-----------MODEL 1: bSpline model----------
 Data_DBD_bSplines_Int_noise <- stan_data_Constructer_BSpline(
   training_dataset = strafied_Data_DBD_int_noise,
@@ -373,6 +382,9 @@ PL_model_Int_results_noise = Bayesian_Survival_result_Extract(
 PL_Int_noise_coef <- PL_model_Int_results_noise$Beta_bayesian_est[, "mean"]
 PL_Int_noise_variableSelection <- PL_model_Int_results_noise$variableSelection
 
+
+name_label = c(names(strafied_Data_DBD_int_noise)[1:91], "noise1", "noise2", "noise3", "noise4", "noise5", "noise6", "noise7", "noise8", "noise9")
+
 par(mfrow = c(2, 1))
 plot(bSplines_model_Int_noise_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, ylim = c(-10, 10), xaxt = "n")
 # Add background rectangles
@@ -383,7 +395,7 @@ for (i in 1:length(bSplines_model_Int_noise_variableSelection)) {
 }
 lines(bSplines_model_Int_noise_coef, type = "o", col = "blue", pch = 16)
 #axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
-axis(1, at = 1:91, labels = c(names(strafied_Data_DBD_int_noise)[1:91], "noise1", "noise2"), las = 2, cex.axis = 0.7)
+axis(1, at = 1:100, labels = name_label, las = 2, cex.axis = 0.7)
 abline(a = 0, b =0, col = "red")
 
 
@@ -395,6 +407,7 @@ for (i in 1:length(PL_Int_noise_variableSelection)) {
   }
 }
 lines(PL_Int_noise_coef, type = "o", col = "darkgreen", pch = 16)
+axis(1, at = 1:100, labels = name_label, las = 2, cex.axis = 0.7)
 abline(a = 0, b =0, col = "red")
 save.image(file = "./Data/03_results_DBD_Step3.RData")
 ```
@@ -404,6 +417,14 @@ save.image(file = "./Data/03_results_DBD_Step3.RData")
 ```{r, echo=TRUE}
 # Step 4. scale down the number of knotes and see its performance
 #---bSpline model
+Data_DBD_bSplines_Int_21 <- stan_data_Constructer_BSpline(
+  training_dataset = strafied_Data_DBD_int,
+  testing_dataset = NULL,
+  obs_window = 3415,
+  log_lik_saving = TRUE,
+  havingInt = TRUE,
+  qnodes = 21
+)
 Data_DBD_bSplines_Int_15 <- stan_data_Constructer_BSpline(
   training_dataset = strafied_Data_DBD_int,
   testing_dataset = NULL,
@@ -431,6 +452,13 @@ Data_DBD_bSplines_Int_7 <- stan_data_Constructer_BSpline(
   qnodes = 7
 )
 
+bSplines_model_Int_21 <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_Int_21,
+                                                baseline_modelling = "bSplines",
+                                                shrinkage = TRUE,
+                                                withPrediction = FALSE,
+                                                havingInt = TRUE)
+
+
 bSplines_model_Int_15 <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_Int_15,
                                                 baseline_modelling = "bSplines",
                                                 shrinkage = TRUE,
@@ -450,6 +478,13 @@ bSplines_model_Int_7 <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_In
                                                 havingInt = TRUE)
 
 # Extract the model result
+bSplines_model_Int_results_21 = Bayesian_Survival_result_Extract(
+  bayesian_model_fit = bSplines_model_Int_21,
+  model_type = "bSplines",
+  criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb"))
+bSplines_model_Int_results_21_coef <- bSplines_model_Int_results_21$Beta_bayesian_est[, "mean"]
+bSplines_model_Int_results_21_varSel <- bSplines_model_Int_results_21$variableSelection
+
 bSplines_model_Int_results_15 = Bayesian_Survival_result_Extract(
   bayesian_model_fit = bSplines_model_Int_15,
   model_type = "bSplines",
@@ -493,12 +528,27 @@ PL_model_Int_results_full = Bayesian_Survival_result_Extract(
   criteria = c("DesignCoefficients", "variableSelection", "Prediction_SurvivalProb"))
 
 PL_model_Int_full_coef <- PL_model_Int_results_full$Beta_bayesian_est[, "mean"]
-PL_model_Int_full_varSel <- PL_model_Int_full$variableSelection
+
+PL_model_Int_full_varSel <- PL_model_Int_results_full$variableSelection
 
 
 # Visualize the model results
-par(mfrow = c(2, 2))
-plot(bSplines_model_Int_results_15_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, ylim = c(-10, 10), xaxt = "n")
+par(mfrow = c(3, 2))
+plot(bSplines_model_Int_results_21_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, xaxt = "n")
+# Add background rectangles
+for (i in 1:length(bSplines_model_Int_results_21_varSel)) {
+  if (bSplines_model_Int_results_21_varSel[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+lines(bSplines_model_Int_results_21_coef, type = "o", col = "blue", pch = 16)
+#axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
+axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
+abline(a = 0, b =0, col = "red")
+
+
+plot(bSplines_model_Int_results_15_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, xaxt = "n")
+
 # Add background rectangles
 for (i in 1:length(bSplines_model_Int_results_15_varSel)) {
   if (bSplines_model_Int_results_15_varSel[i]) {
@@ -511,40 +561,44 @@ axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axi
 abline(a = 0, b =0, col = "red")
 
 
-plot(bSplines_model_Int_results_11_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "", pch = 16, ylim = c(-1, 1), xaxt = "n")
+plot(bSplines_model_Int_results_11_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "", pch = 16, xaxt = "n")
 # Add background rectangles
 for (i in 1:length(bSplines_model_Int_results_11_varSel)) {
   if (bSplines_model_Int_results_11_varSel[i]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
   }
 }
-lines(bSplines_model_Int_results_11_coef, type = "o", col = "darkgreen", pch = 16)
+lines(bSplines_model_Int_results_11_coef, type = "o", col = "blue", pch = 16)
+axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
 abline(a = 0, b =0, col = "red")
 
 
-plot(bSplines_model_Int_results_7_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "", pch = 16, ylim = c(-1, 1), xaxt = "n")
+plot(bSplines_model_Int_results_7_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "", pch = 16, xaxt = "n")
 # Add background rectangles
 for (i in 1:length(bSplines_model_Int_results_7_varSel)) {
   if (bSplines_model_Int_results_7_varSel[i]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
   }
 }
-lines(bSplines_model_Int_results_7_coef, type = "o", col = "darkgreen", pch = 16)
+lines(bSplines_model_Int_results_7_coef, type = "o", col = "blue", pch = 16)
+axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
 abline(a = 0, b =0, col = "red")
 
 
-plot(bSplines_model_Int_results_7_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "", pch = 16, ylim = c(-1, 1), xaxt = "n")
+plot(bSplines_model_Int_results_7_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "", pch = 16, xaxt = "n")
 # Add background rectangles
 for (i in 1:length(bSplines_model_Int_results_7_varSel)) {
   if (bSplines_model_Int_results_7_varSel[i]) {
-    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
   }
 }
-lines(bSplines_model_Int_results_7_coef, type = "o", col = "darkgreen", pch = 16)
+lines(bSplines_model_Int_results_7_coef, type = "o", col = "blue", pch = 16)
+axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
 abline(a = 0, b =0, col = "red")
 
 
-plot(PL_model_Int_full_coef, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "", pch = 16, ylim = c(-1, 1), xaxt = "n")
+plot(PL_model_Int_full_coef, type = "o", col = "darkgreen", xlab = "", ylab = "Beta", main = "", pch = 16, xaxt = "n")
+
 # Add background rectangles
 for (i in 1:length(PL_model_Int_full_varSel)) {
   if (PL_model_Int_full_varSel[i]) {
@@ -552,9 +606,142 @@ for (i in 1:length(PL_model_Int_full_varSel)) {
   }
 }
 lines(PL_model_Int_full_coef, type = "o", col = "darkgreen", pch = 16)
+
+axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
 abline(a = 0, b =0, col = "red")
 
 save.image(file = "./Data/03_results_DBD_step4.RData")
+```
+
+```{r, echo=TRUE}
+# Separate the dataset into two small datasets to see the stablility of the estimation of the models
+folds <- createFolds(strafied_Data_DBD_int$status, k = 2, list = TRUE, returnTrain = FALSE)
+
+# Cross validation (5-fold)
+for (i in seq_along(folds)){
+  indices <- folds[[i]]
+  model_dataset <- strafied_Data_DBD_int[indices, ]
+  
+  cat("Fold", i, "\n")
+  cat("dataset size:", nrow(model_dataset), "\n")
+
+  # insert your model training and evaluation code here
+  #-----------MODEL 1: bSpline model----------
+  Data_DBD_bSplines_subset <- stan_data_Constructer_BSpline(
+    training_dataset = model_dataset,
+    testing_dataset = NULL,
+    obs_window = 3415,
+    log_lik_saving = TRUE,
+    havingInt = TRUE
+  )
+  bSplines_model_subset <- Bayesian_Survival_model(stan_data = Data_DBD_bSplines_subset,
+                                                baseline_modelling = "bSplines",
+                                                shrinkage = TRUE,
+                                                withPrediction = FALSE,
+                                                havingInt = TRUE)
+  
+  #-----------MODEL 2: PL model----------
+  Data_DBD_PL_subset <- stan_data_Constructer_PL(
+    training_dataset = model_dataset,
+    testing_dataset = NULL,
+    havingInt = TRUE
+  )
+  
+  PL_model_subset <- Bayesian_Survival_model(
+    stan_data = Data_DBD_PL_subset,
+    baseline_modelling = "none",
+    shrinkage = TRUE,
+    withPrediction = FALSE,
+    havingInt = TRUE,
+    niter = 10000,
+    nwarmup = 2000,
+    thin = 10,
+    chains = 4
+  )
+  
+  
+  # Extract the model result
+  bSplines_model_subset_results = Bayesian_Survival_result_Extract(
+    bayesian_model_fit = bSplines_model_subset,
+    model_type = "bSplines",
+    criteria = c(
+      "DesignCoefficients",
+      "variableSelection",
+      "Prediction_SurvivalProb"
+    )
+  )
+  
+  
+  bSplines_model_subset_beta[i,] <- bSplines_model_subset_results$Beta_bayesian_est[, "mean"]
+  bSplines_model_subset_variableSelection[i,] <- bSplines_model_subset_results$variableSelection
+  
+  PL_model_subset_results = Bayesian_Survival_result_Extract(
+    bayesian_model_fit = PL_model_subset,
+    model_type = "none",
+    criteria = c(
+      "DesignCoefficients",
+      "variableSelection",
+      "Prediction_SurvivalProb"
+    )
+  )
+  
+  PL_subset_beta[i,] <- PL_model_subset_results$Beta_bayesian_est[, "mean"]
+  PL_subset_variableSelection[i,] <- PL_model_subset_results$variableSelection
+}
+
+
+# Visualize the model results
+par(mfrow = c(3, 2))
+plot(bSplines_model_subset_beta[1,], type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, xaxt = "n")
+# Add background rectangles
+for (i in 1:length(bSplines_model_subset_variableSelection[1,])) {
+  if (bSplines_model_subset_variableSelection[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+lines(bSplines_model_subset_beta[1,], type = "o", col = "blue", pch = 16)
+#axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
+axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
+abline(a = 0, b =0, col = "red")
+
+
+plot(bSplines_model_subset_beta[2,], type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, xaxt = "n")
+# Add background rectangles
+for (i in 1:length(bSplines_model_subset_variableSelection[2,])) {
+  if (bSplines_model_subset_variableSelection[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+lines(bSplines_model_subset_beta[2,], type = "o", col = "blue", pch = 16)
+#axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
+axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
+abline(a = 0, b =0, col = "red")
+
+
+
+plot(PL_subset_beta[1,], type = "o", col = "darkgreen", xlab = "", ylab = "Beta", main = "", pch = 16, xaxt = "n")
+# Add background rectangles
+for (i in 1:length(PL_subset_variableSelection[1,])) {
+  if (PL_subset_variableSelection[1,]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
+  }
+}
+lines(PL_subset_beta[1,], type = "o", col = "darkgreen", pch = 16)
+axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
+abline(a = 0, b =0, col = "red")
+
+plot(PL_subset_beta[2,], type = "o", col = "darkgreen", xlab = "", ylab = "Beta", main = "", pch = 16, xaxt = "n")
+# Add background rectangles
+for (i in 1:length(PL_subset_variableSelection[2,])) {
+  if (PL_subset_variableSelection[2,]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
+  }
+}
+lines(PL_subset_beta[2,], type = "o", col = "darkgreen", pch = 16)
+axis(1, at = 1:91, labels = names(strafied_Data_DBD_int)[1:91], las = 2, cex.axis = 0.7)
+abline(a = 0, b =0, col = "red")
+
+save.image(file = "./Data/03_results_DBD_step5.RData")
 ```
 
 ```{r, echo=TRUE}
@@ -666,42 +853,80 @@ abline(a = 0, b =0, col = "red")
 ```{r, echo=TRUE}
 obs_window = 3415 #max(df_using$time_tx_date_max2)
 strafied_Data_DCD_int <- includingInter(strafied_Data_DCD)
-
+strafied_Data_DCD_int <- subset(strafied_Data_DCD_int, select = -c(id))
+strafied_Data_DCD_int_noise <- strafied_Data_DCD_int
+strafied_Data_DCD_int_noise$noise1 <- rnorm(nrow(strafied_Data_DCD_int_noise))
+strafied_Data_DCD_int_noise$noise2 <- rnorm(nrow(strafied_Data_DCD_int_noise), 1, 2)
+strafied_Data_DCD_int_noise$noise3 <- rnorm(nrow(strafied_Data_DCD_int_noise))
+strafied_Data_DCD_int_noise$noise4 <- rnorm(nrow(strafied_Data_DCD_int_noise), 3, 4)
+strafied_Data_DCD_int_noise$noise5 <- rnorm(nrow(strafied_Data_DCD_int_noise))
+strafied_Data_DCD_int_noise$noise6 <- rnorm(nrow(strafied_Data_DCD_int_noise), 1, 2)
+strafied_Data_DCD_int_noise$noise7 <- rnorm(nrow(strafied_Data_DCD_int_noise))
+strafied_Data_DCD_int_noise$noise8 <- rnorm(nrow(strafied_Data_DCD_int_noise), 3, 4)
+strafied_Data_DCD_int_noise$noise9 <- rnorm(nrow(strafied_Data_DCD_int_noise), 1, 2)
 
 stan_data_bSpline_DCD <- stan_data_Constructer_BSpline(
-      training_dataset = strafied_Data_DCD_int,
+      training_dataset = strafied_Data_DCD_int_noise,
       testing_dataset = NULL,
       obs_window = 3415
     )
 
-stan_data_PH_DCD <- stan_data_Constructer_PH(
-      training_dataset = strafied_Data_DCD_int,
+stan_data_PL_DCD <- stan_data_Constructer_PL(
+      training_dataset = strafied_Data_DCD_int_noise,
       testing_dataset = NULL
     )
 
 model_fit_bSpline_DCD <- Bayesian_Survival_model(stan_data = stan_data_bSpline_DCD, baseline_modelling = "bSplines", withPrediction = FALSE, shrinkage = TRUE)
 
-model_fit_PH_DCD <- Bayesian_Survival_model(stan_data = stan_data_PH_DCD, baseline_modelling = "none", withPrediction = FALSE, shrinkage = TRUE)
+model_fit_PL_DCD <- Bayesian_Survival_model(stan_data = stan_data_PL_DCD, baseline_modelling = "none", withPrediction = FALSE, shrinkage = TRUE)
 
 #model diagnotics
 diagnostics_bSpline_DCD <- summary(model_fit_bSpline_DCD)$summary[, c("Rhat", "n_eff")]
-diagnostics_PH_DCD <- summary(model_fit_PH_DCD)$summary[, c("Rhat", "n_eff")]
+diagnostics_PL_DCD <- summary(model_fit_PL_DCD)$summary[, c("Rhat", "n_eff")]
 print(diagnostics_bSpline_DCD)
-print(diagnostics_PH_DCD)
+print(diagnostics_PL_DCD)
 
 #extract the info from the bayesian model fit
 model_result_bSpline_DCD <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_bSpline_DCD, model_type = "none", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
 
-model_result_PH_DCD <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_PH_DCD, model_type = "none", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
+model_result_PL_DCD <- Bayesian_Survival_result_Extract(bayesian_model_fit = model_fit_PL_DCD, model_type = "none", criteria = c("DesignCoefficients", "baseline", "variableSelection"))
 
-mean_beta_DCD = model_result_bSpline_DCD$Beta_bayesian_est[, "mean"]
-variableSelection_DCD = model_result_bSpline_DCD$variableSelection
+bSplines_model_Int_noise_coef_DCD = model_result_bSpline_DCD$Beta_bayesian_est[, "mean"]
+bSplines_model_Int_noise_variableSelection_DCD = model_result_bSpline_DCD$variableSelection
 
-mean_beta_DCD_PH = model_result_PH_DCD$Beta_bayesian_est[, "mean"]
-variableSelection_DCD_PH = model_result_PH_DCD$variableSelection
+PL_Int_noise_coef_DCD = model_result_PL_DCD$Beta_bayesian_est[, "mean"]
+PL_Int_noise_variableSelection_DCD = model_result_PL_DCD$variableSelection
+
+
+name_label_DCD = c(names(strafied_Data_DCD_int_noise))#, "noise1", "noise2", "noise3", "noise4", "noise5", "noise6", "noise7", "noise8", "noise9")
+
+par(mfrow = c(2, 1))
+plot(bSplines_model_Int_noise_coef_DCD, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "Beta estimation", pch = 16, ylim = c(-10, 10), xaxt = "n")
+# Add background rectangles
+for (i in 1:length(bSplines_model_Int_noise_variableSelection_DCD)) {
+  if (bSplines_model_Int_noise_variableSelection_DCD[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightblue", border = NA)
+  }
+}
+lines(bSplines_model_Int_noise_coef_DCD, type = "o", col = "blue", pch = 16)
+#axis(1, at = 1:91, labels = "", las = 2, cex.axis = 0.7)
+axis(1, at = 1:116, labels = name_label_DCD, las = 2, cex.axis = 0.7)
+abline(a = 0, b =0, col = "red")
+
+
+plot(PL_Int_noise_coef_DCD, type = "o", col = "blue", xlab = "", ylab = "Beta", main = "", pch = 16, ylim = c(-1, 1), xaxt = "n")
+# Add background rectangles
+for (i in 1:length(PL_Int_noise_variableSelection_DCD)) {
+  if (PL_Int_noise_variableSelection_DCD[i]) {
+    rect(i - 0.5, par("usr")[3], i + 0.5, par("usr")[4], col = "lightgreen", border = NA)
+  }
+}
+lines(PL_Int_noise_coef_DCD, type = "o", col = "darkgreen", pch = 16)
+axis(1, at = 1:116, labels = name_label_DCD, las = 2, cex.axis = 0.7)
+abline(a = 0, b =0, col = "red")
 
 #cross_val_metric_DBD <- cross_validation(whole_dataset = strafied_Data_DBD_int, baseline_modelling = "bSplines", num_folds = 5, obs_window = 3415)
-save.image(file = "./Data/03_results_DCD.RData")
+save.image(file = "./Data/03_results_DCD_step3.RData")
 ```
 ## STEP 2: visualize DCD results
 ```{r, echo=TRUE}

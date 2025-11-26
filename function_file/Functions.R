@@ -1,3 +1,169 @@
+#Schoenfeld residuals 
+compute_baseline_hazard <- function(beta, X, time, status) {
+  # beta: numeric vector of Cox coefficients
+  # X: matrix or data frame of covariates
+  # time: numeric vector of observed times
+  # status: numeric or logical vector (1 = event, 0 = censored)
+  
+  # Compute risk scores
+  risk_scores <- exp(as.matrix(X) %*% beta)
+  
+  # All unique times (including censored)
+  all_times <- sort(unique(time))
+  baseline_hazard <- numeric(length(all_times))
+  last_hazard <- 0
+  
+  for (i in seq_along(all_times)) {
+    t <- all_times[i]
+    # Number of events at time t
+    d_i <- sum(time == t & status == 1)
+    
+    if (d_i > 0) {
+      # Risk set: subjects with time >= t
+      risk_set <- sum(risk_scores[time >= t])
+      
+      # Breslow estimator for hazard at time t
+      last_hazard <- d_i / risk_set
+    }
+    # If no event, carry forward previous hazard
+    baseline_hazard[i] <- last_hazard
+  }
+  
+  # Return as data frame
+  return(baseline_hazard)
+}
+
+
+Schoenfeld_resid <- function(beta, X, times, status) {
+  # Extract event times and their original indices
+  event_times <- times[status == 1]
+  event_indices <- which(status == 1)
+  sorted_event_indices <- order(event_times)
+  sorted_event_times <- event_times[sorted_event_indices]
+  sorted_event_indices <- event_indices[sorted_event_indices]
+  #
+  # event_timPoSorted <- sort(times[status == 2])
+  # event_timPoSortedIndex <- sort(times[status == 2], index.return = TRUE)$ix
+  # indices_list <- lapply(event_timPoSorted, function(t_i) which(times >= t_i))
+  # R_ij <- matrix(data = NA, nrow = length(indices_list), ncol = ncol(X))
+  
+  Output <- list()
+  # Build risk sets: indices where times >= t_i
+  indices_list <- lapply(sorted_event_times, function(t_i)
+    which(times >= t_i))
+  
+  # Initialize residual matrix
+  R_ij <- E_ij <- X_ij <- matrix(NA, nrow = length(indices_list), ncol = ncol(X))
+  
+  # Loop over covariates and event times
+  
+  # if (length(unique(event_times)) == length(event_times)){
+  for (i in 1:length(indices_list)) {
+    print(i)
+    # print(sorted_event_times[i])
+    for (j in 1:ncol(X)) {
+      R_i <- indices_list[[i]]
+      X_k_all <- X[R_i, ]
+      exp_part <- exp(X_k_all %*% beta)
+      deno <- sum(exp_part)
+      
+      X_kj_all <- X[R_i, j]
+      nemo <- sum(X_kj_all * exp_part)
+      E_ij[i, j] <- nemo / deno
+      
+      t_iIndex <- sorted_event_indices[i]
+      X_ij[i, j] <- X[t_iIndex, j]
+      R_ij[i, j] <- X[t_iIndex, j] - E_ij[i, j]
+    }
+  }
+  
+  Output$R_ij <- R_ij
+  Output$sorted_event_times <- sorted_event_times
+  Output$E_ij <- E_ij
+  Output$X_ij <- X_ij
+  
+  return(Output)
+}
+
+
+
+Schoenfeld_resid_tied <- function(beta, X, times, status) {
+  # Identify unique event times and counts (status == 2 means event)
+  event_info <- data.frame(times = times, status = status) |>
+    dplyr::filter(status == 1) |>
+    dplyr::group_by(times) |>
+    dplyr::summarise(event_count = dplyr::n(), .groups = "drop")
+  
+  unique_event_times <- event_info$times
+  event_counts <- event_info$event_count
+  
+  # Extract all event times and their original indices
+  event_times <- times[status == 1]
+  event_indices <- which(status == 1)
+  
+  # Sort events by time
+  sort_order <- order(event_times)
+  sorted_event_times <- event_times[sort_order]
+  sorted_event_indices <- event_indices[sort_order]
+  
+  # Initialize matrices
+  n_events <- sum(status == 1)
+  p <- ncol(X)
+  R_ij <- matrix(NA, nrow = n_events, ncol = p)
+  # E_ij <- matrix(NA, nrow = n_events, ncol = p)
+  # X_ij <- matrix(NA, nrow = n_events, ncol = p)
+  
+  i <- 1
+  while (i <= length(sorted_event_times)) {
+    print(i)
+    t_i <- sorted_event_times[i]
+    R_i <- which(times >= t_i)                # Risk set
+    D_i <- which(times == t_i & status == 1) # Tied events at t_i
+    
+    d_i <- length(D_i)
+    X_k_all <- X[R_i, , drop = FALSE]
+    exp_part <- exp(X_k_all %*% beta)
+    
+    X_tied_all <- X[D_i, , drop = FALSE]
+    tied_exp_part <- exp(X_tied_all %*% beta)
+    
+    for (j in 1:p) {
+      X_kj_all <- X_k_all[, j]
+      X_tiedj_all <- X_tied_all[, j]
+      
+      # Compute Efron-adjusted expected value
+      E_ij_local <- 0
+      for (r in 1:d_i) {
+        num <- sum(X_kj_all * exp_part) - ((r - 1) / d_i) * sum(X_tiedj_all * tied_exp_part)
+        den <- sum(exp_part) - ((r - 1) / d_i) * sum(tied_exp_part)
+        E_ij_local <- E_ij_local + num / den
+      }
+      E_ij_local <- E_ij_local / d_i
+      
+      # Assign for each tied event
+      for (k in 0:(d_i - 1)) {
+        idx <- i + k
+        # X_ij[idx, j] <- X[sorted_event_indices[idx], j]
+        # E_ij[idx, j] <- E_ij_local
+        R_ij[idx, j] <- X[sorted_event_indices[idx], j] - E_ij_local
+      }
+    }
+    i <- i + d_i
+  }
+  colnames(R_ij) <- colnames(X)
+  
+  Output <- list(
+    R_ij = R_ij,
+    # E_ij = E_ij,
+    # X_ij = X_ij,
+    sorted_event_times = sorted_event_times,
+    sorted_event_indices = sorted_event_indices
+  )
+  
+  return(Output)
+}
+
+
 # Function to find indices of main effects for interaction effects
 # @param: interaction_effects, a vector with the names of the interaction effects
 # @param: main_effects, a vector with the names of the main effects
@@ -64,33 +230,48 @@ Bayesian_Survival_model <- function(stan_data, baseline_modelling = "exponential
     
     else if (baseline_modelling == "bSplines") {
       message("We utilized B-splines to estimate the log baseline hazard function.")
+      if (shrinkage) {
+        message("bSpline model with shrinkage.")
+        bayesian_model <- rstan::stan_model("./stan_file/bSpline_est.stan")
+      } else {
+        message("No shrinkaged bSplines modelling!")
+        bayesian_model <-
+          rstan::stan_model("./stan_file/bSpline_estnoShrinkage.stan")
+      }
       
       # compile the model
-      if (log_likSaving == TRUE) {
-        if (havingInt == TRUE) {
-          bayesian_model <- rstan::stan_model("./stan_file/bSpline_est_loglik.stan")
-        } else {
-          bayesian_model <- rstan::stan_model("./stan_file/bSpline_est_loglik_noInt.stan")
-        }
-        
-      } else {
-        if (havingInt == TRUE){
-          bayesian_model <- rstan::stan_model("./stan_file/bSpline_est.stan")
-        } else {
-          bayesian_model <- rstan::stan_model("./stan_file/bSpline_est_noInt.stan")
-        }
-        
+      # if (log_likSaving == TRUE) {
+      #   if (havingInt == TRUE) {
+      #     bayesian_model <- rstan::stan_model("./stan_file/bSpline_est_loglik.stan")
+      #   } else {
+      #     bayesian_model <- rstan::stan_model("./stan_file/bSpline_est_loglik_noInt.stan")
+      #   }
+      #   
+      # } else {
+      #   if (havingInt == TRUE){
+      #     bayesian_model <- rstan::stan_model("./stan_file/bSpline_est.stan")
+      #   } else {
+      #     bayesian_model <- rstan::stan_model("./stan_file/bSpline_est_noInt.stan")
+      #   }
+      #   
       }
-    }
     
     else if (baseline_modelling == "none"){
       message("we used the partical likelihood to estimate the cofficients of covariates")
-      if (havingInt == TRUE){
+      
+      if (shrinkage) {
         bayesian_model <- rstan::stan_model("./stan_file/PH_est.stan")
       } else {
-        bayesian_model <- rstan::stan_model("./stan_file/PH_est_noInt.stan")
+        message("No shrinkaged PH modelling!")
+        bayesian_model <-
+          rstan::stan_model("./stan_file/PH_estnoshrinkage.stan")
       }
-      
+      # if (havingInt == TRUE){
+      #   bayesian_model <- rstan::stan_model("./stan_file/PH_est.stan")
+      # } else {
+      #   bayesian_model <- rstan::stan_model("./stan_file/PH_est_noInt.stan")
+      # }
+      # 
     }
     
   } else {
@@ -320,29 +501,16 @@ Bayesian_Survival_result_Extract <- function(bayesian_model_fit, model_type,
                                              criteria = c("DesignCoefficients",
                                                           "Prediction_SurvivalProb",
                                                           "variableSelection",
-                                                          "baseline")) {
+                                                          "baseline", "se"), uncertainty = FALSE) {
   # Ensure the Output object is available
   Output <- summary(bayesian_model_fit)$summary
   
   # Initialize the result list
   model_result <- list()
-  
-  if ("DesignCoefficients" %in% criteria) {
-    Beta_bayesian_est <- Output[grep("^Beta", rownames(Output)), "mean", drop = FALSE]
-    model_result$Beta_bayesian_est <- Beta_bayesian_est
-  }
-  
-  if ("Prediction_SurvivalProb" %in% criteria) {
-    if (model_type != "none"){
-      eta_pred <- Output[grep("^eta_new", rownames(Output)), "50%", drop = FALSE]
-      model_result$eta_pred <- eta_pred
-      sp <- Output[grep("^survival_prob", rownames(Output)), "50%", drop = FALSE]
-      model_result$sp <- sp
-    } else {
-      eta_pred <- Output[grep("^eta_new", rownames(Output)), "50%", drop = FALSE]
-      model_result$eta_pred <- eta_pred
-    }
-    
+  if("se" %in% criteria){
+    Beta_bayesian_est_LB <- Output[grep("^Beta", rownames(Output)), "2.5%", drop = FALSE]
+    Beta_bayesian_est_UB <- Output[grep("^Beta", rownames(Output)), "97.5%", drop = FALSE]
+    model_result$se <- (Beta_bayesian_est_UB - Beta_bayesian_est_LB)/2
   }
   
   if ("variableSelection" %in% criteria) {
@@ -352,20 +520,93 @@ Bayesian_Survival_result_Extract <- function(bayesian_model_fit, model_type,
       (Beta_bayesian_est_UB >= 0)
     model_result$variableSelection <- !includes_zero
   }
-  
-  if ("baseline" %in% criteria) {
-    if (model_type == "exponential") {
-      lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
-      model_result$baselinePara <- lambda
-    } else if (model_type == "weibull") {
-      lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
-      shape <- Output[grep("^shape", rownames(Output)), "50%", drop = FALSE]
-      model_result$baselinePara <- c(lambda, shape)
-    } else if (model_type == "bSplines") {
-      coefs <- Output[grep("^coefs", rownames(Output)), "mean", drop = FALSE]
-      model_result$baselinePara = coefs
-    } else {
-      # No actions for 
+  if (uncertainty == FALSE){
+    if ("DesignCoefficients" %in% criteria) {
+      Beta_bayesian_est <- Output[grep("^Beta", rownames(Output)), "mean", drop = FALSE]
+      model_result$Beta_bayesian_est <- Beta_bayesian_est
+    }
+    
+    if ("Prediction_SurvivalProb" %in% criteria) {
+      if (model_type != "none"){
+        eta_pred <- Output[grep("^eta_new", rownames(Output)), "50%", drop = FALSE]
+        model_result$eta_pred <- eta_pred
+        sp <- Output[grep("^survival_prob", rownames(Output)), "50%", drop = FALSE]
+        model_result$sp <- sp
+      } else {
+        eta_pred <- Output[grep("^eta_new", rownames(Output)), "50%", drop = FALSE]
+        model_result$eta_pred <- eta_pred
+      }
+      
+    }
+    
+    if ("baseline" %in% criteria) {
+      if (model_type == "exponential") {
+        lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
+        model_result$baselinePara <- lambda
+      } else if (model_type == "weibull") {
+        lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
+        shape <- Output[grep("^shape", rownames(Output)), "50%", drop = FALSE]
+        model_result$baselinePara <- c(lambda, shape)
+      } else if (model_type == "bSplines") {
+        coefs <- Output[grep("^coefs", rownames(Output)), "mean", drop = FALSE]
+        model_result$baselinePara = coefs
+      } else {
+        # No actions for 
+      }
+    }
+  } else {
+    
+    if ("DesignCoefficients" %in% criteria) {
+      Beta_bayesian_est <- Output[grep("^Beta", rownames(Output)), "mean", drop = FALSE]
+      model_result$Beta_bayesian_est <- Beta_bayesian_est
+      
+      model_result$Beta_bayesian_estLB <- Output[grep("^Beta", rownames(Output)), "2.5%", drop = FALSE]
+      model_result$Beta_bayesian_estUB <- Output[grep("^Beta", rownames(Output)), "97.5%", drop = FALSE]
+    }
+    
+    if ("Prediction_SurvivalProb" %in% criteria) {
+      eta_pred <- Output[grep("^eta_new", rownames(Output)), "50%", drop = FALSE]
+      model_result$eta_pred <- eta_pred
+      
+      model_result$eta_predLB <- Output[grep("^eta_new", rownames(Output)), "2.5%", drop = FALSE]
+      model_result$eta_predUB <- Output[grep("^eta_new", rownames(Output)), "97.5%", drop = FALSE]
+      
+      if (model_type != "none"){
+        sp <- Output[grep("^survival_prob", rownames(Output)), "50%", drop = FALSE]
+        model_result$sp <- sp
+        
+        model_result$spLB <- Output[grep("^survival_prob", rownames(Output)), "2.5%", drop = FALSE]
+        model_result$spUB <- Output[grep("^survival_prob", rownames(Output)), "97.5%", drop = FALSE]
+      }
+      
+    }
+    
+    if ("baseline" %in% criteria) {
+      if (model_type == "exponential") {
+        lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
+        lambdaLB <- Output[grep("^lambda", rownames(Output)), "2.5%", drop = FALSE]
+        lambdaUB <- Output[grep("^lambda", rownames(Output)), "97.5%", drop = FALSE]
+        
+        model_result$baselinePara <- list(lambda, lambdaLB, lambdaUB)
+      } else if (model_type == "weibull") {
+        lambda <- Output[grep("^lambda", rownames(Output)), "50%", drop = FALSE]
+        lambdaLB <- Output[grep("^lambda", rownames(Output)), "2.5%", drop = FALSE]
+        lambdaUB <- Output[grep("^lambda", rownames(Output)), "97.5%", drop = FALSE]
+        
+        shape <- Output[grep("^shape", rownames(Output)), "50%", drop = FALSE]
+        shapeLB <- Output[grep("^shape", rownames(Output)), "2.5%", drop = FALSE]
+        shapeUB <- Output[grep("^shape", rownames(Output)), "97.5%", drop = FALSE]
+        
+        model_result$baselinePara <- list(lambda, shape, lambdaLB, lambdaUB, shapeLB, shapeUB)
+      } else if (model_type == "bSplines") {
+        coefs <- Output[grep("^coefs", rownames(Output)), "mean", drop = FALSE]
+        coefsLB <- Output[grep("^coefs", rownames(Output)), "2.5%", drop = FALSE]
+        coefsUB <- Output[grep("^coefs", rownames(Output)), "97.5%", drop = FALSE]
+        
+        model_result$baselinePara = list(coefs, coefsLB, coefsUB)
+      } else {
+        # No actions for 
+      }
     }
   }
   
@@ -562,28 +803,6 @@ includingInter <- function(dataframe_) {
   factor_vars <- c("Recipientsex", "Donorsex", "Smoking", "InitialOnmachineindicator", "status", "InitialPrimaryDiseaseET_regroup", "Donorcauseofdeath_group")#colnames(dataframe_)[factor_var]
   # print(factor_vars)
   
-  # exclude_terms <- sapply(interaction_terms, function(term) {
-  #   terms_ <- unlist(strsplit(term, ":"))
-  #   Con1 <- any(agrepl(terms_[1], factor_vars))
-  #   Con2 <- any(agrepl(terms_[2], factor_vars))
-  #   if ((Con2 | Con1)){
-  #     Con1 = agrepl(terms_[1], "InitialPrimaryDiseaseET_regroup")
-  #     Con2 = agrepl(terms_[2], "InitialPrimaryDiseaseET_regroup")
-  #     
-  #     return(any(Con1, Con2))
-  #     # print(terms_[2])
-  #     # print(Con2)
-  #   }
-  #   # print(term)
-  #   # print(all(Con1, Con2))
-  #   return(all(Con1, Con2))
-  # })
-  # 
-  # # print(exclude_terms)
-  # exclude_columns <- interaction_terms[exclude_terms]
-  # selected_columns <- setdiff(all_terms, exclude_columns)
-  # interaction_df <- subset(interaction_df, select = selected_columns)
-  interaction_df$id = 1:nrow(dataframe_)#dataframe_$ID
   interaction_df$status = ifelse(dataframe_$status == "graftloss", 1, 0)
   interaction_df$obstime = dataframe_$time
   

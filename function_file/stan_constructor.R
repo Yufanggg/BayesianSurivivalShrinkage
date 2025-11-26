@@ -372,8 +372,14 @@ stan_data_Constructer_BSpline <- function (training_dataset, testing_dataset, ob
     #----- basis terms for baseline hazard
     
     basis_epts_event <- make_basis(t_event, basehaz)
+    # print("dim of basis_epts_event is:")
+    # print(dim(basis_epts_event))
     basis_qpts_event <- make_basis(qpts_event, basehaz)
+    # print("dim of qpts_event is:")
+    # print(dim(basis_qpts_event))
     basis_qpts_rcens <- make_basis(qpts_rcens, basehaz)
+    # print("dim of qpts_rcens is:")
+    # print(dim(basis_qpts_rcens))
     
     
     #----- model frames for generating predictor matrices
@@ -980,6 +986,55 @@ validate_positive_scalar <- function(x, not_greater_than = NULL) {
 get_quadpoints <- function(nodes = 15) {
   if (!is.numeric(nodes) || (length(nodes) > 1L)) {
     stop("'qnodes' should be a numeric vector of length 1.")
+  } else if (nodes == 21) {
+    list(
+      points = c(
+        -0.9956571630258081,
+        -0.9739065285171717,
+        -0.9301574913557082,
+        -0.8650633666889845,
+        -0.7808177265864169,
+        -0.6794095682990244,
+        -0.5627571346686047,
+        -0.4333953941292472,
+        -0.2943928627014602,
+        -0.1488743389816312,
+        0,
+        0.1488743389816312,
+        0.2943928627014602,
+        0.4333953941292472,
+        0.5627571346686047,
+        0.6794095682990244,
+        0.7808177265864169,
+        0.8650633666889845,
+        0.9301574913557082,
+        0.9739065285171717,
+        0.9956571630258081
+      ),
+      weights = c(
+        0.0116946388673719,
+        0.0325581623079647,
+        0.0547558965743519,
+        0.0750396748109199,
+        0.0931254545836976,
+        0.1093871588022976,
+        0.1234919762620659,
+        0.1347092173114733,
+        0.1427759385770601,
+        0.1477391049013385,
+        0.1494455540029169,
+        0.1477391049013385,
+        0.1427759385770601,
+        0.1347092173114733,
+        0.1234919762620659,
+        0.1093871588022976,
+        0.0931254545836976,
+        0.0750396748109199,
+        0.0547558965743519,
+        0.0325581623079647,
+        0.0116946388673719
+      )
+    )
   } else if (nodes == 15) {
     list(
       points = c(
@@ -1094,13 +1149,13 @@ handle_basehaz_surv <- function(times,
   df     <- 5
   degree <- 3
   
-  
-  tt <- sort(times[status == 1]) # uncensored event times
+  # tt <- times#sort(unique(times))#[status == 1]) # uncensored event times
   
   bknots <- c(min_t, max_t)
-  iknots <- get_iknots(tt, df = df, degree = degree)
-  basis  <- splines2::bSpline(tt, iknots = iknots, Boundary.knots = bknots, degree = 3, intercept = FALSE)      
-  
+  # iknots <- get_iknots(tt, df = df, degree = degree)
+  # basis  <- splines2::bSpline(tt, iknots = iknots, Boundary.knots = bknots, degree = 3, intercept = FALSE)
+  iknots <- get_iknots(sort(times[status == 1]), df = df, degree = degree)
+  basis  <- splines2::bSpline(sort(unique(times)), iknots = iknots, Boundary.knots = bknots, degree = 3, intercept = FALSE)
   
   
   nvars  <- ncol(basis)  # number of aux parameters, basis terms

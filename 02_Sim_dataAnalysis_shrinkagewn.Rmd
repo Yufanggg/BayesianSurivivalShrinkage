@@ -9,7 +9,8 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+setwd("G:/MasterThesis/Code/")#C:/Users/Alisa_Wang/Desktop/MasterThesis/Code/")#G:/MasterThesis/Code/"
+
 install_and_load <- function(packages) {
   for (pkg in packages) {
     if (!require(pkg, character.only = TRUE)) {
@@ -115,8 +116,8 @@ simulation_bayint_survival_shrinkage <- function(criteria = c("DesignCoefficient
   
   if ("baseline" %in% criteria) {
     if (withPrediction){
-      output$time_vec <-
-      sort(training_dataset[training_dataset$status == 1, ]$obstime) # obs_window = 5
+      output$time_vec <- sort(unique(training_dataset$obstime))
+      #sort(training_dataset[training_dataset$status == 1, ]$obstime) # obs_window = 5
     } else {
        output$time_vec <-
       sort(dataset[dataset$status == 1, ]$obstime) # obs_window = 5
@@ -313,12 +314,12 @@ for (i in 1:length(Beta_true)) {
 
 
 lines(Bias_bSplines_withShrinkag, type = "o", col = "blue", pch = 16)
-lines(Bias_PL_withShrinkage, type = "o", col = "green", pch = 16)
-lines(Bias_bSplines_noShrinkag, type = "o", col = "orange", pch = 16)
-lines(Bias_PL_noShrinkag, type = "o", col = "purple", pch = 16)
+lines(Bias_PL_withShrinkage, type = "o", col = "green", pch = 15)
+lines(Bias_bSplines_noShrinkag, type = "o", col = "orange", pch = 17)
+lines(Bias_PL_noShrinkag, type = "o", col = "purple", pch = 18)
 
-abline(v = 10, col = "red", lty = 2)
-legend("top", legend = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1, horiz = TRUE) # Add legend
+abline(v = 10, col = "red", lty = 2, lwd = 3)
+legend("top", legend = c("B-Splines", "PartialLikelihood", "B-Splines_no", "PartialLikelihood_no"), col = c("blue", "green", "orange", "purple"), pch = c(16, 15, 17, 18), lty = 1, horiz = TRUE) # Add legend
 
 # Subfigure 2: Variance
 plot(Variance_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "Variance", ylim = c(0, 0.2), main = "Variance for Beta estimation", pch = 16)
@@ -331,13 +332,13 @@ for (i in 1:length(Beta_true)) {
 }
 
 lines(Variance_bSplines_withShrinkag, type = "o", col = "blue", pch = 16)
-lines(Variance_PL_withShrinkage, type = "o", col = "green", pch = 16)
-lines(Variance_bSplines_noShrinkag, type = "o", col = "orange", pch = 16)
-lines(Variance_PL_noShrinkag, type = "o", col = "purple", pch = 16)
+lines(Variance_PL_withShrinkage, type = "o", col = "green", pch = 15)
+lines(Variance_bSplines_noShrinkag, type = "o", col = "orange", pch = 17)
+lines(Variance_PL_noShrinkag, type = "o", col = "purple", pch = 18)
 
-abline(v = 10, col = "red", lty = 2)
+abline(v = 10, col = "red", lty = 2, lwd = 3)
 abline(h = 0, col = "red", lty = 2)
-legend("top", legend = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1, horiz = TRUE) # Add legend
+legend("top", legend = c("B-Splines", "PartialLikelihood", "B-Splines_no", "PartialLikelihood_no"), col = c("blue", "green", "orange", "purple"), pch = c(16, 15, 17, 18), lty = 1, horiz = TRUE) # Add legend
 
 # Subfigure 3: MSE
 plot(rMSEs_bSplines_withShrinkag, type = "o", col = "blue", xlab = "estimated Betas", ylab = "rMSE", ylim = c(0, 0.5), main = "rMSE for Beta estimation", pch = 16)
@@ -349,26 +350,38 @@ for (i in 1:length(Beta_true)) {
   }
 }
 lines(rMSEs_bSplines_withShrinkag, type = "o", col = "blue", pch = 16)
-lines(rMSEs_PL_withShrinkage, type = "o", col = "green", pch = 16)
-lines(rMSEs_bSplines_noShrinkag, type = "o", col = "orange", pch = 16)
-lines(rMSEs_PL_noShrinkag, type = "o", col = "purple", pch = 16)
+lines(rMSEs_PL_withShrinkage, type = "o", col = "green", pch = 15)
+lines(rMSEs_bSplines_noShrinkag, type = "o", col = "orange", pch = 17)
+lines(rMSEs_PL_noShrinkag, type = "o", col = "purple", pch = 18)
 
-abline(v = 10, col = "red", lty = 2)
-legend("top", legend = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), pch = 16, lty = 1, horiz = TRUE) # Add legend
+abline(v = 10, col = "red", lty = 2, lwd = 3)
+legend("top", legend = c("B-Splines", "PartialLikelihood", "B-Splines_no", "PartialLikelihood_no"), col = c("blue", "green", "orange", "purple"), pch = c(16, 15, 17, 18), lty = 1, horiz = TRUE) # Add legend
 
 
 # Subfigure 4 Type I error
 # Create side-by-side boxplots for FDR
-FDR_list = list(bSplines_withShrinkag = FDR_bSplines_withShrinkag, bSplines_noShrinkag = FDR_bSplines_noShrinkag, PL_withShrinkage = FDR_PL_withShrinkage, PL_noShrinkag = FDR_PL_noShrinkag)
-boxplot(FDR_list, names = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), main = "FDR Boxplots", xlab = "", ylab = "FDR", ylim = c(0, 1))
+FDR_list = list(bSplines_withShrinkag = FDR_bSplines_withShrinkag, bSplines_noShrinkag = FDR_bSplines_noShrinkag, PL_withShriankeg = FDR_PL_withShrinkage, PL_noShrinkag = FDR_PL_noShrinkag)
+boxplot(FDR_list, names = c("B-Splines", "B-Splines_no", "PartialLikelihood", "PartialLikelihood_no"), col = c("blue", "orange", "green","purple"), main = "FDR Boxplots", xlab = "", ylab = "FDR", ylim = c(0, 1))
 
 # Subfigure 5 Type II error
 Power_list = list(bSplines_withShrinkag = 1 - FNR_bSplines_withShrinkag, bSplines_noShrinkag = 1 - FNR_bSplines_noShrinkag,  PL_withShrinkage = 1 - FNR_PL_withShrinkage, PL_noShrinkag = 1 - FNR_PL_noShrinkag)
-boxplot(Power_list, names = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), main = "Power", xlab = "", ylab = "Power", ylim = c(0, 1))
-
+boxplot(Power_list, names = c("B-Splines", "B-Splines_no", "PartialLikelihood",  "PartialLikelihood_no"), col = c("blue", "orange", "green","purple"), main = "Power", xlab = "", ylab = "Power", ylim = c(0, 1))
 
 # # Subfigure 7 C index
 C_index_list = list(bSplines_withShrinkag = C_index_bSplines_withShrinkag, bSplines_noShrinkag = C_index_bSplines_noShrinkag, PL_withShrinkage = C_index_PL_withShrinkage, PL_noShrinkag = C_index_PL_noShrinkag)
-boxplot(C_index_list, names = c("bSplines_withShrinkag", "PL_withShrinkage", "bSplines_noShrinkag", "PL_noShrinkag"), col = c("blue", "green", "orange", "purple"), main = "C index", xlab = "", ylab = "C index", ylim = c(0, 1))
+boxplot(C_index_list, names = c("B-Splines", "B-Splines_no", "PartialLikelihood", "PartialLikelihood_no"), col = c("blue", "orange", "green","purple"), main = "C index", xlab = "", ylab = "C index", ylim = c(0.5, 1))
 ```
 
+```{r, echo=TRUE}
+  plot(output$time_vec, output$baseline_true, col = "red", type = "l", pch = 16, lty = 1, lwd = 2, xlab = "time", ylab = " ")
+  lines(output$time_vec, output$baseline_bSplines_withShrinkage, col = "green", type = "l", pch = 16, lty = 1, lwd = 2)
+  lines(output$time_vec, output$baseline_bSplines_noShrinkage, col = "blue", pch = 16, lty = 1, lwd = 2)
+  # Add legend
+  legend(
+    "topleft",
+    legend = c("True", "BaysBSpL", "BaysBSpN"),
+    col = c("red",  "green",  "blue"),
+    pch = 16,
+    lty = 1
+  )
+```
