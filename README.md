@@ -1,7 +1,7 @@
 
-# Bayesian survival analysis under high-dimensional setting
+# Linked shrinkage prior: a Bayesian approach to detect interaction effects in survival analysis
 
-[![LinkedIn](https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555)](https://www.linkedin.com/in/yufang-w-1295881b5/) [![GitHub](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white&colorB=555)](https://github.com/Yufanggg) <img alt="GitHub" src="https://img.shields.io/github/license/bopith/UnicornCompanies?style=for-the-badge"> 
+[![https://www.linkedin.com/in/yufang-w-1295881b5/](https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555)](https://www.linkedin.com/in/yufang-w-1295881b5/) [![https://github.com/Yufanggg](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white&colorB=555)](https://github.com/Yufanggg) <img alt="GitHub" src="https://img.shields.io/github/license/bopith/UnicornCompanies?style=for-the-badge"> 
 
 ## Overview
 This repository aims to detect the interaction effects for time-to-event data under high-dimensional setting. 
@@ -17,8 +17,7 @@ This project is updated from codes used in my Master work in Statistics & Data S
 - [Requirments](#Requirments)
 - [Installation](#Installation)
 - [Project structure](#Project-structure)
-- [Resuls on the simulated data](#Results-on-the-simulated-data)
-- [Results on the real-world data](#Results-on-the-real-world-data)
+- [Project report](#Project-report)
 
 ## Requirments
 To run this Project, you will need the following:
@@ -36,7 +35,7 @@ To run this Project, you will need the following:
 - caret
 
 ## Installation
-
+No installation
 ## Project structure
 ### Project description
 This project aims to reformulate ***linked shrinkage prior*** in Bayesian Survival model to improve its ability of detecting interaction effects. The reformulated method is first validated on the simulated data and then on the real-world data.
@@ -54,7 +53,7 @@ This project aims to reformulate ***linked shrinkage prior*** in Bayesian Surviv
 - `.\02_Sim_dataAnalysis_shrinkagewn.Rmd`: To verify the following models on the simulated data: Bayesian survival models with linked shrinkage priors versus no shrinkage priors. Only partical likelihood and full likelihood with bSplines method to approach baseline hazard function be accounted for.
 - `04_Real_data_AnalysisCombined_final.Rmd`: To verify the following models on the real-world data:  Bayesian survival models with linked shrinkage priors versus no shrinkage priors. Only partical likelihood and full likelihood with bSplines method to approach baseline hazard function be accounted for.
 
-### Report
+## Project report
 The report of this project can be seen in [report](./Report.pdf).
 
 <!-- ## Validating the method:
