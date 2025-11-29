@@ -56,7 +56,7 @@ This project aims to reformulate ***linked shrinkage prior*** in Bayesian Surviv
 ## Project report
 The report of this project can be seen in [report](./Report.pdf).
 A sample of results can been in [Example Figure](./Image/sim_50_intshrinkagePH.png) as follows:
-![alt text](./Images/sim_50_intshrinkagePH.png)
+![alt text](./Image/sim_50_intshrinkagePH.png)
 
 <!-- ## Validating the method:
 The method was validated from two following perspectivess. 
