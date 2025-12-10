@@ -93,15 +93,15 @@ combined_Data$time <- combined_Data$time + 0.05
 # Descriptive data analysis
 ```{r, echo=TRUE}
 library(dplyr)
-combined_Data_encoded <- subset(combined_Data, select = -c(time, status)) %>%
-  mutate(across(where(is.factor), as.character)) %>%
-  mutate(across(where(is.character), ~ as.factor(.))) %>%
-  model.matrix(~ . - 1, data = .) %>%
+colnames(combined_Data)[colnames(combined_Data) == "TypecadavericDBDDCD"] <- "Typecadaveric"
+combined_Data_encoded <- combined_Data %>%
+  select(-time, -status) %>%
+  { model.matrix(~ ., data = .) } %>%
   as.data.frame() %>%
-  mutate(across(everything(), ~ ifelse(. == 0, -1, .)))
+  mutate(across(everything(), ~ replace(., . == 0, -1)))
 
 # Step 3: Calculate correlation matrix
-cor_matrix <- cor(combined_Data_encoded)
+cor_matrix <- cor(combined_Data_encoded[, -1])
 
 # Step 4: View the correlation matrix
 print(cor_matrix)
@@ -607,7 +607,7 @@ plot(PL_beta, PL_noshrinkage_beta,
      asp = 1)
 
 # Add regression line
-model <- lm(PL_beta ~ PL_noshrinkage_beta)
+model <- lm(PL_noshrinkage_beta ~ PL_beta)
 abline(model, col = "red", lty = 2, lwd = 2)
 
 # Add horizontal line at y = 0 (intercept = 0, slope = 1)
@@ -627,8 +627,8 @@ plot(PL_beta_se, PL_noshrinkage_beta_se,
      main = "standard derivation (complexData) ", asp = 1)
 
 # Add regression line
-model <- lm(PL_beta_se ~ PL_noshrinkage_beta_se)
-abline(model, col = "red", lty = 2, lwd = 2)
+model2 <- lm(PL_noshrinkage_beta_se ~ PL_beta_se)
+abline(model2, col = "red", lty = 2, lwd = 2)
 
 # Add horizontal line at y = 0 (intercept = 0, slope = 1)
 abline(a = 0, b = 1, col = "blue", lty = 2)
@@ -646,8 +646,8 @@ plot(PL_Simple_beta, PL_Simple_noshrinkage_beta,
      main = "beta (simpleData)", asp = 1)
 
 # Add regression line
-model2 <- lm(PL_Simple_beta ~ PL_Simple_noshrinkage_beta)
-abline(model2, col = "red", lty = 2, lwd = 2)
+model3 <- lm(PL_Simple_noshrinkage_beta ~ PL_Simple_beta)
+abline(model3, col = "red", lty = 2, lwd = 2)
 
 # Add horizontal line at y = 0 (intercept = 0, slope = 0)
 abline(a = 0, b = 1, col = "blue", lty = 2)
@@ -665,7 +665,7 @@ plot(PL_Simple_beta_se, PL_Simple_noshrinkage_beta_se,
      main = "standard derivation (simpleData)", asp = 1)
 
 # Add regression line
-model2 <- lm(PL_Simple_beta_se ~ PL_Simple_noshrinkage_beta_se)
+model2 <- lm(PL_Simple_noshrinkage_beta_se ~ PL_Simple_beta_se)
 abline(model2, col = "red", lty = 2, lwd = 2)
 
 # Add horizontal line at y = 0 (intercept = 0, slope = 0)
